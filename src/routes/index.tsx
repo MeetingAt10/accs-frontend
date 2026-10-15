@@ -11,7 +11,7 @@ function Home() {
 
   return (
     <main>
-      <h1>Capstone System</h1>
+      <h1>ACCS</h1>
       <p>API: {health.isPending ? '...' : (health.data?.status ?? 'unreachable')}</p>
     </main>
   )
