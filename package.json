@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@meetingat10/design-system": "github:MeetingAt10/meetingatten-design-system#v1.0.1",
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-router": "^1.0.0",
     "react": "^19.0.0",
