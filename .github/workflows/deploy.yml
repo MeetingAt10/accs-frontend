@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  STACK: accs-dev
+  SITE: App
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The design system is a private repo in the org; npm fetches it over SSH with a read-only deploy key.
+      - name: Design system access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Stack outputs
+        id: stack
+        run: |
+          out() { aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
+          echo "bucket=$(out ${SITE}Bucket)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(out ${SITE}DistributionId)" >> "$GITHUB_OUTPUT"
+          echo "url=$(out ${SITE}Url)" >> "$GITHUB_OUTPUT"
+
+      - run: npm run build
+
+      - name: Upload
+        run: aws s3 sync dist "s3://${{ steps.stack.outputs.bucket }}" --delete
+
+      - name: Invalidate
+        run: aws cloudfront create-invalidation --distribution-id "${{ steps.stack.outputs.distribution }}" --paths '/*'
+
+      - run: echo "Deployed to ${{ steps.stack.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
