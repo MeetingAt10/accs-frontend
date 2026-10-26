@@ -1,18 +1,33 @@
-import { Search } from '@meetingat10/design-system/react'
-import type { HTMLAttributes, ReactNode } from 'react'
+import { Search } from "@meetingat10/design-system/react";
+import type { HTMLAttributes, ReactNode } from "react";
 
-export { Comment, CommentThread, ReactionButton } from './community'
-export type { CommentProps, CommentThreadProps, ReactionButtonProps } from './community'
-export { EventCalendar } from './EventCalendar'
-export type { CalendarEvent, EventCalendarProps } from './EventCalendar'
-export { PersonCard, ProfileHeader } from './people'
-export type { PersonCardProps, ProfileHeaderProps } from './people'
+export { Comment, CommentThread, ReactionButton } from "./community";
+export type {
+  CommentProps,
+  CommentThreadProps,
+  ReactionButtonProps,
+} from "./community";
+export { EventCalendar } from "./EventCalendar";
+export type { CalendarEvent, EventCalendarProps } from "./EventCalendar";
+export { PersonCard, ProfileHeader } from "./people";
+export type { PersonCardProps, ProfileHeaderProps } from "./people";
+export {
+  ConversationList,
+  MessageBubble,
+  MessageComposer,
+  MessageList,
+} from "./chat";
+export { NotificationItem, NotificationList } from "./notifications";
+export { BarChart, TrendChart } from "./charts";
+export type { ChartDatum, ChartProps, ChartSeries } from "./charts";
+export { RatingScale } from "./rating-scale";
+export type { RatingScaleProps } from "./rating-scale";
 
 export interface StatProps {
-  label: string
-  value: ReactNode
-  change?: string
-  scopeNote?: string
+  label: string;
+  value: ReactNode;
+  change?: string;
+  scopeNote?: string;
 }
 
 export function Stat({ label, value, change, scopeNote }: StatProps) {
@@ -23,29 +38,34 @@ export function Stat({ label, value, change, scopeNote }: StatProps) {
       {change && <p className="ds-next-stat__change">{change}</p>}
       {scopeNote && <p className="ds-next-stat__scope">{scopeNote}</p>}
     </section>
-  )
+  );
 }
 
 export interface FilterBarProps extends HTMLAttributes<HTMLDivElement> {
-  query?: string
-  onQueryChange?: (query: string) => void
-  searchLabel?: string
-  searchPlaceholder?: string
-  activeFilters?: string[]
-  children?: ReactNode
+  query?: string;
+  onQueryChange?: (query: string) => void;
+  searchLabel?: string;
+  searchPlaceholder?: string;
+  activeFilters?: string[];
+  children?: ReactNode;
 }
 
 export function FilterBar({
   query,
   onQueryChange,
-  searchLabel = 'Search this list',
+  searchLabel = "Search this list",
   searchPlaceholder,
   activeFilters = [],
   children,
   ...props
 }: FilterBarProps) {
   return (
-    <div {...props} className={['ds-next-filter-bar', props.className].filter(Boolean).join(' ')}>
+    <div
+      {...props}
+      className={["ds-next-filter-bar", props.className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <div className="ds-next-filter-bar__controls">
         <Search
           label={searchLabel}
@@ -58,9 +78,11 @@ export function FilterBar({
       </div>
       {activeFilters.length > 0 && (
         <ul className="ds-next-filter-bar__chips" aria-label="Active filters">
-          {activeFilters.map((filter) => <li key={filter}>{filter}</li>)}
+          {activeFilters.map((filter) => (
+            <li key={filter}>{filter}</li>
+          ))}
         </ul>
       )}
     </div>
-  )
+  );
 }

@@ -200,6 +200,35 @@ select {
   margin-top: var(--ds-space-24);
 }
 
+.app-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--ds-space-12);
+}
+
+.app-permission-cell {
+  display: grid;
+  justify-items: start;
+  gap: var(--ds-space-8);
+  padding: var(--ds-space-12);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-8);
+  background: var(--ds-canvas);
+}
+
+.app-admin-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-16);
+}
+
+.ds-record__facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-8);
+}
+
 @media (min-width: 640px) {
   .sign-in-accounts,
   .app-card-list {

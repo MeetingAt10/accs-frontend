@@ -1,0 +1,24 @@
+.ds-next-notification-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-next-notification-item {
+  padding-block: var(--ds-space-16);
+  border-bottom: 1px solid var(--ds-border-default);
+}
+
+.ds-next-notification-item p {
+  margin: 0;
+}
+
+.ds-next-notification-item small {
+  color: var(--ds-text-secondary);
+}
+
+@media (max-width: 600px) {
+  .ds-next-notification-item > div {
+    align-items: flex-start;
+  }
+}

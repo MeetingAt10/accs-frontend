@@ -1,0 +1,65 @@
+.ds-next-conversation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-next-conversation-list__item {
+  padding-block: var(--ds-space-16);
+  border-bottom: 1px solid var(--ds-border-default);
+}
+
+.ds-next-conversation-list__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-next-conversation-list__preview {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ds-next-message-list {
+  display: grid;
+  gap: var(--ds-space-16);
+}
+
+.ds-next-message-bubble {
+  align-self: start;
+  max-width: min(90%, 45rem);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-8);
+  background: var(--ds-surface);
+}
+
+.ds-next-message-bubble--own {
+  justify-self: end;
+}
+
+.ds-next-message-bubble p {
+  margin-block: var(--ds-space-12);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ds-next-message-bubble small {
+  color: var(--ds-text-secondary);
+}
+
+.ds-next-message-bubble .ds-next-message-bubble {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 600px) {
+  .ds-next-message-bubble {
+    max-width: 100%;
+  }
+}
