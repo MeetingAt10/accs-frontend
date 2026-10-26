@@ -1,0 +1,61 @@
+.grievance-reading {
+  max-width: 60rem;
+}
+
+.grievance-narrative {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.grievance-messages {
+  display: grid;
+  gap: var(--ds-space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grievance-messages li {
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-8);
+  background: var(--ds-surface);
+}
+
+.grievance-messages header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-8);
+}
+
+.grievance-messages time {
+  color: var(--ds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.grievance-messages p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
+}
+
+.grievance-action-rail {
+  align-content: start;
+}
+
+.grievance-mobile {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .grievance-desktop {
+    display: none;
+  }
+
+  .grievance-mobile {
+    display: grid;
+    gap: var(--ds-space-16);
+  }
+}

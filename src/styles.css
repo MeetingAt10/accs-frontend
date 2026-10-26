@@ -1,40 +1,219 @@
-/* Page layout only: color, type, focus and motion come from the design system (tokens.css, components.css). */
-.coming-soon {
-  display: grid;
-  place-items: center;
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--ds-text-primary);
+  background: var(--ds-canvas);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.sign-in-page {
   min-height: 100dvh;
-  padding: var(--ds-space-24) var(--ds-grid-margin-mobile);
+  padding: var(--ds-space-32) var(--ds-grid-margin-mobile);
   box-sizing: border-box;
 }
 
-.coming-soon__sheet {
+.sign-in-page > .ds-container {
   display: grid;
-  gap: var(--ds-space-16);
-  width: min(40rem, 100%);
-  box-sizing: border-box;
+  gap: var(--ds-space-24);
 }
 
-.coming-soon__head {
+.sign-in-brand {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--ds-space-16);
+}
+
+.sign-in-accounts,
+.app-card-list,
+.app-record-list {
+  display: grid;
+  gap: var(--ds-space-16);
+}
+
+.sign-in-account {
+  display: grid;
+  align-content: start;
   gap: var(--ds-space-12);
 }
 
-.coming-soon__sheet > :is(h1, p) {
+.sign-in-account__email,
+.sign-in-note {
+  margin: 0;
+  color: var(--ds-text-secondary);
+}
+
+.sign-in-account__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-8);
+}
+
+.sign-in-note {
+  font-size: 0.875rem;
+}
+
+.app-sidebar-person {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-8);
+}
+
+.app-sidebar-person p {
+  margin: 0 0 var(--ds-space-4);
+  font-weight: 600;
+}
+
+.app-restricted-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-12) var(--ds-grid-margin-mobile);
+  border-bottom: 1px solid var(--ds-border-default);
+  background: var(--ds-surface);
+}
+
+.app-chrome .ds-shell {
+  min-height: 100dvh;
+}
+
+.app-shell__content {
+  display: grid;
+  gap: var(--ds-space-32);
+  padding-block: var(--ds-space-24) var(--ds-space-48);
+}
+
+.app-page {
+  display: grid;
+  gap: var(--ds-space-24);
+  align-content: start;
+}
+
+.app-lead {
+  max-width: 48rem;
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.app-region {
+  display: grid;
+  gap: var(--ds-space-16);
+}
+
+.app-dashboard-main,
+.app-dashboard-rail {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-32);
+}
+
+.app-dashboard-rail {
+  min-width: 0;
+}
+
+.app-stat-grid {
+  gap: var(--ds-space-12);
+}
+
+.ds-next-stat {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-8);
+  min-height: 7rem;
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-8);
+  background: var(--ds-surface);
+}
+
+.ds-next-stat p {
   margin: 0;
 }
 
-/* Phones: the page is the sheet, so the rows get the full width. */
-@media (max-width: 599.98px) {
-  .coming-soon {
-    place-items: start stretch;
+.ds-next-stat__label,
+.ds-next-stat__scope {
+  color: var(--ds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.ds-next-stat__value {
+  font-size: 1.75rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.ds-next-stat__change {
+  font-size: 0.875rem;
+}
+
+.ds-next-filter-bar {
+  display: grid;
+  gap: var(--ds-space-12);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--ds-radius-8);
+  background: var(--ds-surface);
+}
+
+.ds-next-filter-bar__controls,
+.ds-next-filter-bar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-12);
+}
+
+.ds-next-filter-bar__controls > :first-child {
+  flex: 1 1 16rem;
+}
+
+.ds-next-filter-bar__chips {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  color: var(--ds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.app-topbar-search {
+  width: min(22rem, 35vw);
+}
+
+.app-topbar-search .ds-field {
+  margin: 0;
+}
+
+.app-restricted-view .ds-privacy {
+  margin-top: var(--ds-space-24);
+}
+
+@media (min-width: 640px) {
+  .sign-in-accounts,
+  .app-card-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .app-topbar-search {
+    display: none;
   }
 
-  .coming-soon__sheet {
-    padding: 0;
-    border: 0;
-    background: none;
+  .app-shell__content {
+    gap: var(--ds-space-24);
+    padding-block: var(--ds-space-16) var(--ds-space-32);
   }
 }
