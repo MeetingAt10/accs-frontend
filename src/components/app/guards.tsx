@@ -27,7 +27,14 @@ export function RequirePermission({ pageId, children }: { pageId: string; childr
     return <ViewState kind="loading" title="Checking access" />
   }
   const permission = routePermission[pageId]
-  const hasPermission = permission ? session.data?.permissions.includes(permission) : false
+  const requiredPermissions = permission
+    ? Array.isArray(permission)
+      ? permission
+      : [permission]
+    : []
+  const hasPermission = requiredPermissions.some((key) =>
+    session.data?.permissions.includes(key),
+  )
   if (session.error || !session.data?.allowedPages.includes(pageId) || !hasPermission) {
     return <RestrictedView record={['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P27', 'P29', 'P31', 'P32', 'P34', 'P38', 'P47', 'P50'].includes(pageId)} />
   }
@@ -38,7 +45,15 @@ export async function RoutePermission(queryClient: QueryClient, pageId: string) 
   try {
     const session = await queryClient.ensureQueryData(sessionQuery())
     const permission = routePermission[pageId]
-    return { permission: session.allowedPages.includes(pageId) && Boolean(permission && session.permissions.includes(permission)) }
+    const requiredPermissions = permission
+      ? Array.isArray(permission)
+        ? permission
+        : [permission]
+      : []
+    const hasPermission = requiredPermissions.some((key) =>
+      session.permissions.includes(key),
+    )
+    return { permission: session.allowedPages.includes(pageId) && hasPermission }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return { permission: false }
     return { permission: false }

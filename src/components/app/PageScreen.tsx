@@ -21,7 +21,7 @@ import {
   ViewState,
 } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
+import { useParams, useRouterState } from '@tanstack/react-router'
 
 import { ApiError, type PageEnvelope } from '@/lib/api'
 import { pageQuery } from '@/lib/queries'
@@ -30,6 +30,8 @@ import { pageTitles } from '@/lib/page-catalog'
 import { Stat } from '@/components/ds-next'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
+import { CommunityPage } from '@/components/app/community'
+import { SchedulePage } from '@/components/app/schedule'
 
 type Item = Record<string, unknown>
 
@@ -306,7 +308,7 @@ function BasicPage({ page }: { page: PageEnvelope }) {
 export function PageScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>
   const recordId = Object.values(params).at(-1)
-  const filters = typeof window === 'undefined' ? '' : window.location.search.slice(1)
+  const filters = useRouterState({ select: (state) => state.location.searchStr.slice(1) })
   const page = useQuery(pageQuery(pageId, pageId === 'P03' ? undefined : recordId, filters))
   return (
     <RequirePermission pageId={pageId}>
@@ -320,7 +322,11 @@ export function PageScreen({ pageId }: { pageId: string }) {
             <RetryView onRetry={() => void page.refetch()} />
           )
         ) : (
-          ['P18', 'P19', 'P20', 'P21', 'P22'].includes(pageId) ? <GrievancePage page={page.data} /> : <>
+          ['P04', 'P05', 'P06', 'P07', 'P08', 'P09', 'P10'].includes(pageId) ? (
+            <CommunityPage page={page.data} />
+          ) : ['P13', 'P14', 'P15', 'P16', 'P17'].includes(pageId) ? (
+            <SchedulePage page={page.data} />
+          ) : ['P18', 'P19', 'P20', 'P21', 'P22'].includes(pageId) ? <GrievancePage page={page.data} /> : <>
             <SectionHeader
               level={1}
               title={page.data.title || pageTitles[pageId] || 'ACCS'}

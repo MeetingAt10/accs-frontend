@@ -80,7 +80,41 @@ function Timeline({ report, handler = false }: { report: Item; handler?: boolean
   return <CaseTimeline events={events} label={handler ? 'Case history' : 'Report progress'} />
 }
 
-export function IdentityChoice({ value, onChange, allowAnonymous = true }: { value: Identity; onChange: (value: Identity) => void; allowAnonymous?: boolean }) {
+export function IdentityChoice({
+  value,
+  onChange,
+  allowAnonymous = true,
+  context = 'report',
+}: {
+  value: Identity
+  onChange: (value: Identity) => void
+  allowAnonymous?: boolean
+  context?: 'report' | 'post'
+}) {
+  if (context === 'post') {
+    return (
+      <div className="app-page">
+        <RadioGroup
+          label="How should readers see you?"
+          value={value}
+          onChange={(next) => onChange(next as Identity)}
+          isRequired
+        >
+          <Radio value="named" card description="Readers see your verified name.">
+            Show my name
+          </Radio>
+          {allowAnonymous && (
+            <Radio value="anonymous" card description="Readers see 'Anonymous student'.">
+              Post anonymously
+            </Radio>
+          )}
+        </RadioGroup>
+        <PrivacyNotice title="Your account stays linked">
+          Classmates see 'Anonymous student'. Your verified account stays linked for moderators.
+        </PrivacyNotice>
+      </div>
+    )
+  }
   return (
     <div className="app-page">
       <RadioGroup label="How should handlers see you?" value={value} onChange={(next) => onChange(next as Identity)} isRequired>

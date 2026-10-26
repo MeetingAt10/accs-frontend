@@ -1,0 +1,32 @@
+.ds-next-person-card {
+  display: grid;
+  align-content: start;
+  gap: var(--ds-space-12);
+}
+
+.ds-next-person-card .ds-card__body {
+  margin: 0;
+}
+
+.ds-next-profile-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-24);
+  padding-block: var(--ds-space-24);
+  border-bottom: 1px solid var(--ds-border-default);
+}
+
+.ds-next-profile-header__body {
+  display: grid;
+  flex: 1;
+  gap: var(--ds-space-8);
+}
+
+.ds-next-profile-header__body h1 {
+  margin: 0;
+}
+
+.ds-next-profile-header--compact {
+  gap: var(--ds-space-16);
+}

@@ -51,7 +51,7 @@ export const pageTitles: Record<string, string> = {
   P52: 'Monitoring',
 }
 
-export const routePermission: Record<string, string> = {
+export const routePermission: Record<string, string | string[]> = {
   P03: 'feed.read',
   P04: 'feed.read',
   P05: 'post.create',
@@ -63,9 +63,9 @@ export const routePermission: Record<string, string> = {
   P11: 'message.send',
   P12: 'message.send',
   P13: 'calendar.view',
-  P14: 'consultation.request',
+  P14: ['consultation.request', 'consultation.decide'],
   P15: 'consultation.request',
-  P16: 'consultation.request',
+  P16: ['consultation.request', 'consultation.decide'],
   P17: 'consultation.decide',
   P18: 'report.viewOwn',
   P19: 'report.create',
@@ -75,7 +75,7 @@ export const routePermission: Record<string, string> = {
   P23: 'cluster.review',
   P24: 'cluster.review',
   P25: 'analytics.view',
-  P26: 'evaluation.fill',
+  P26: ['evaluation.fill', 'evaluation.results', 'evaluation.configure'],
   P27: 'evaluation.fill',
   P28: 'evaluation.results',
   P29: 'evaluation.results',

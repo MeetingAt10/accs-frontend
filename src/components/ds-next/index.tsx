@@ -1,6 +1,13 @@
 import { Search } from '@meetingat10/design-system/react'
 import type { HTMLAttributes, ReactNode } from 'react'
 
+export { Comment, CommentThread, ReactionButton } from './community'
+export type { CommentProps, CommentThreadProps, ReactionButtonProps } from './community'
+export { EventCalendar } from './EventCalendar'
+export type { CalendarEvent, EventCalendarProps } from './EventCalendar'
+export { PersonCard, ProfileHeader } from './people'
+export type { PersonCardProps, ProfileHeaderProps } from './people'
+
 export interface StatProps {
   label: string
   value: ReactNode

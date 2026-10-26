@@ -1,0 +1,37 @@
+.community-composer-container,
+.community-form,
+.community-post-view,
+.community-space-card,
+.community-organization-card {
+  display: grid;
+  gap: var(--ds-space-24);
+}
+
+.community-composer-container {
+  padding-inline: 0;
+}
+
+.community-post-view {
+  padding-bottom: var(--ds-space-24);
+  border-bottom: 1px solid var(--ds-border-default);
+}
+
+.community-post-view time {
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-type-body-small-size);
+}
+
+.community-post-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.community-space-card,
+.community-organization-card {
+  align-content: start;
+  gap: var(--ds-space-16);
+}
+
+.community-organization-card .ds-card__body {
+  margin: 0;
+}
