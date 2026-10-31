@@ -75,12 +75,17 @@ function visibleEntries(session: Session, site?: SiteId) {
 
 /** Sites the session can open, each with its landing route. */
 export function siteDestinations(session: Session) {
+  // /home redirects administrators to /admin, so their Home destination skips it.
+  const isAdmin = session.user.roles.includes("administrator");
   return sites.flatMap((site) => {
     const entries = visibleEntries(session, site.id);
     const href =
-      siteLanding(site.id, (href) =>
-        session.allowedPages.includes(pageIdForPath(href) ?? ""),
-      ) ?? entries[0]?.href;
+      siteLanding(
+        site.id,
+        (href) =>
+          !(isAdmin && href === "/home") &&
+          session.allowedPages.includes(pageIdForPath(href) ?? ""),
+      ) ?? entries.find((entry) => !(isAdmin && entry.href === "/home"))?.href;
     return href ? [{ site, href, entries }] : [];
   });
 }
