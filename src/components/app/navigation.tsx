@@ -37,42 +37,19 @@ import {
   type Session,
 } from "@/lib/api";
 import { pageQuery } from "@/lib/queries";
+import { pageIdForPath } from "@/lib/page-catalog";
+import {
+  siteById,
+  siteForPath,
+  siteHref,
+  siteLanding,
+  sites,
+  type SiteId,
+} from "@/lib/sites";
+import { SiteDirectory, SiteHero, SiteSwitcher } from "@/components/app/site-chrome";
 
 type NavEntry = { label: string; href: string; pageId?: string; icon?: string };
 type NavGroup = { label: string; entries: NavEntry[] };
-type AppArea = "home" | "community" | "schedule" | "workspace";
-
-const areaLabels: Record<AppArea, string> = {
-  home: "Home",
-  community: "Community",
-  schedule: "Schedule",
-  workspace: "Workspace",
-};
-
-const areaOrder: AppArea[] = ["home", "community", "schedule", "workspace"];
-
-function areaForHref(href: string): AppArea {
-  if (href === "/home" || href === "/admin") return "home";
-  if (
-    ["/feed", "/spaces", "/organizations", "/messages", "/directory"].some(
-      (prefix) => href === prefix || href.startsWith(prefix + "/"),
-    )
-  ) {
-    return "community";
-  }
-  if (
-    ["/calendar", "/consultations"].some(
-      (prefix) => href === prefix || href.startsWith(prefix + "/"),
-    )
-  ) {
-    return "schedule";
-  }
-  return "workspace";
-}
-
-function areaForPath(path: string): AppArea {
-  return areaForHref(path);
-}
 
 function navigationGroups(session: Session) {
   return [
@@ -81,72 +58,31 @@ function navigationGroups(session: Session) {
   ];
 }
 
-function visibleEntries(session: Session, area?: AppArea) {
+function visibleEntries(session: Session, site?: SiteId) {
   const allowed = new Set(session.allowedPages);
+  const seen = new Set<string>();
   return navigationGroups(session).flatMap((group) =>
-    group.entries.filter(
-      (entry) =>
+    group.entries.filter((entry) => {
+      if (seen.has(entry.href)) return false;
+      const ok =
         (!entry.pageId || allowed.has(entry.pageId)) &&
-        (!area || areaForHref(entry.href) === area),
-    ),
+        (!site || siteForPath(entry.href) === site);
+      if (ok) seen.add(entry.href);
+      return ok;
+    }),
   );
 }
 
-function hasSidebarEntries(session: Session, area: AppArea) {
-  return visibleEntries(session, area).some(
-    (entry) => !(area === "home" && entry.href === "/home"),
-  );
-}
-
-function areaDestinations(session: Session) {
-  return areaOrder.flatMap((area) => {
-    const entries = visibleEntries(session, area);
-    const preferred =
-      area === "home"
-        ? ["/home", "/admin"]
-        : area === "community"
-          ? ["/feed"]
-          : area === "schedule"
-            ? ["/calendar", "/consultations"]
-            : [];
-    const entry =
-      preferred.map((href) => entries.find((item) => item.href === href)).find(Boolean) ??
-      entries[0];
-    return entry ? [{ area, href: entry.href }] : [];
+/** Sites the session can open, each with its landing route. */
+export function siteDestinations(session: Session) {
+  return sites.flatMap((site) => {
+    const entries = visibleEntries(session, site.id);
+    const href =
+      siteLanding(site.id, (href) =>
+        session.allowedPages.includes(pageIdForPath(href) ?? ""),
+      ) ?? entries[0]?.href;
+    return href ? [{ site, href, entries }] : [];
   });
-}
-
-function AreaLinks({ session, path }: { session: Session; path: string }) {
-  const activeArea = areaForPath(path);
-  const icons: Record<AppArea, string> = {
-    home: "house",
-    community: "chats",
-    schedule: "calendar",
-    workspace: "notepad",
-  };
-  return (
-    <>
-      {areaDestinations(session).map(({ area, href }) => (
-        <NavItem
-          key={area}
-          className="app-area-nav__item"
-          href={href}
-          icon={icons[area] as never}
-          isCurrent={activeArea === area}
-        >
-          {areaLabels[area]}
-        </NavItem>
-      ))}
-    </>
-  );
-}
-
-function AppAreaNavigation({ session, path }: { session: Session; path: string }) {
-  return (
-    <nav className="app-area-nav" aria-label="Main destinations">
-      <AreaLinks session={session} path={path} />
-    </nav>
-  );
 }
 
 const roleNavigation: Record<Role, NavGroup[]> = {
@@ -575,6 +511,9 @@ export const accountNavigation: NavGroup[] = [
   {
     label: "Account",
     entries: [
+      { label: "Notifications", href: "/notifications", pageId: "P40", icon: "bell" },
+      { label: "Assistant", href: "/assistant", pageId: "P41", icon: "chat" },
+      { label: "My profile", href: "/profile", pageId: "P39", icon: "user" },
       { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
       { label: "Help", href: "/help", pageId: "P42", icon: "question" },
       { label: "Settings", href: "/settings", pageId: "P43", icon: "gear" },
@@ -585,47 +524,48 @@ export const accountNavigation: NavGroup[] = [
 export function RoleNavigation({
   session,
   path,
-  area,
+  site,
 }: {
   session: Session;
   path: string;
-  area: AppArea;
+  site: SiteId;
 }) {
-  const groups = navigationGroups(session);
   const allowed = new Set(session.allowedPages);
+  const seen = new Set<string>();
+  const groups = navigationGroups(session).flatMap((group) => {
+    const entries = group.entries.filter((entry) => {
+      const ok =
+        !seen.has(entry.href) &&
+        (!entry.pageId || allowed.has(entry.pageId)) &&
+        siteForPath(entry.href) === site;
+      if (ok) seen.add(entry.href);
+      return ok;
+    });
+    return entries.length ? [{ ...group, entries }] : [];
+  });
+  // The deepest matching entry is current, so /cases/clusters does not also mark /cases.
+  const current = [...seen]
+    .filter((href) => path === href || path.startsWith(href + "/"))
+    .sort((x, y) => y.length - x.length)[0];
   return (
     <>
-      {groups.map((group, groupIndex) => {
-        const entries = group.entries.filter(
-          (entry) =>
-            (!entry.pageId || allowed.has(entry.pageId)) &&
-            areaForHref(entry.href) === area &&
-            !(area === "home" && entry.href === "/home"),
-        );
-        if (!entries.length) return null;
-        const label =
-          group.label === "Workspace" ||
-          (group.label === "Account" && area === "community")
-            ? areaLabels[area]
-            : group.label;
-        return (
-          <SidebarSection label={label} key={group.label + groupIndex}>
-            {entries.map((entry) => (
-              <NavItem
-                key={entry.href + entry.label}
-                href={entry.href}
-                icon={entry.icon as never}
-                isCurrent={
-                  path === entry.href ||
-                  (entry.href !== "/home" && path.startsWith(entry.href + "/"))
-                }
-              >
-                {entry.label}
-              </NavItem>
-            ))}
-          </SidebarSection>
-        );
-      })}
+      {groups.map((group, groupIndex) => (
+        <SidebarSection
+          label={group.label === "Workspace" ? siteById[site].label : group.label}
+          key={group.label + groupIndex}
+        >
+          {group.entries.map((entry) => (
+            <NavItem
+              key={entry.href + entry.label}
+              href={entry.href}
+              icon={entry.icon as never}
+              isCurrent={entry.href === current}
+            >
+              {entry.label}
+            </NavItem>
+          ))}
+        </SidebarSection>
+      ))}
     </>
   );
 }
@@ -633,16 +573,16 @@ export function RoleNavigation({
 export function RoleSidebar({
   session,
   path,
-  area,
+  site,
 }: {
   session: Session;
   path: string;
-  area: AppArea;
+  site: SiteId;
 }) {
   return (
     <Sidebar
-      label="ACCS"
-      brand={<DoorPlate size="sm" code="ACCS" />}
+      label={`ACCS ${siteById[site].label}`}
+      brand={<SiteBrand site={site} />}
       footer={
         <div className="app-sidebar-person">
           <Avatar name={session.user.name} size={32} />
@@ -657,7 +597,7 @@ export function RoleSidebar({
         </div>
       }
     >
-      <RoleNavigation session={session} path={path} area={area} />
+      <RoleNavigation session={session} path={path} site={site} />
       <SidebarNote>
         Sample data. Access follows your assigned role and scope.
       </SidebarNote>
@@ -731,7 +671,7 @@ export function AppTopBar({
                 event.preventDefault();
                 if (search.trim())
                   window.location.assign(
-                    "/feed?q=" + encodeURIComponent(search.trim()),
+                    siteHref("/feed?q=" + encodeURIComponent(search.trim())),
                   );
               }}
             >
@@ -880,6 +820,15 @@ function MobileAccountMenu({ session }: { session: Session }) {
   );
 }
 
+function SiteBrand({ site }: { site: SiteId }) {
+  return (
+    <span className="app-site-brand">
+      <DoorPlate size="sm" code="ACCS" />
+      <span className="app-site-brand__name">{siteById[site].label}</span>
+    </span>
+  );
+}
+
 export function AppChrome({
   session,
   title,
@@ -890,14 +839,24 @@ export function AppChrome({
   children: React.ReactNode;
 }) {
   const path = useRouterState({ select: (state) => state.location.pathname });
-  const area = areaForPath(path);
-  const hasSidebar = hasSidebarEntries(session, area);
+  const site = siteForPath(path);
+  const destinations = siteDestinations(session);
+  const hasSidebar = visibleEntries(session, site).length > 0;
   const navigation = (
     <>
-      <SidebarSection label="Areas">
-        <AreaLinks session={session} path={path} />
+      <SidebarSection label="Sites">
+        {destinations.map(({ site: entry, href }) => (
+          <NavItem
+            key={entry.id}
+            href={href}
+            icon={entry.icon as never}
+            isCurrent={entry.id === site}
+          >
+            {entry.label}
+          </NavItem>
+        ))}
       </SidebarSection>
-      <RoleNavigation session={session} path={path} area={area} />
+      <RoleNavigation session={session} path={path} site={site} />
     </>
   );
   const restricted =
@@ -942,7 +901,7 @@ export function AppChrome({
   }, [theme]);
 
   return (
-    <div className="app-chrome">
+    <div className="app-chrome" data-site={site} data-lane={siteById[site].lane}>
       {restricted && (
         <div className="app-restricted-banner">
           <Badge tone="warning" form="pending">
@@ -961,7 +920,7 @@ export function AppChrome({
                   .join("; ")
               : "Some account features are paused."}
           </span>
-          <a href="/standing">View account standing</a>
+          <a href={siteHref("/standing")}>View account standing</a>
         </div>
       )}
       <AppShell
@@ -974,20 +933,24 @@ export function AppChrome({
         }
         sidebar={
           hasSidebar ? (
-            <RoleSidebar session={session} path={path} area={area} />
+            <RoleSidebar session={session} path={path} site={site} />
           ) : undefined
         }
-        mobileBrand={<DoorPlate size="sm" code="ACCS" />}
+        mobileBrand={<SiteBrand site={site} />}
         mobileNav={navigation}
         mobileActions={<MobileAccountMenu session={session} />}
         topBar={
           <>
             <AppTopBar session={session} title={title} />
-            <AppAreaNavigation session={session} path={path} />
+            <SiteSwitcher destinations={destinations} current={site} />
           </>
         }
       >
-        <div className="app-shell__content" data-area={area}>
+        <div className="app-shell__content" data-site={site}>
+          {destinations.some((entry) => entry.href === path) && (
+            <SiteHero site={site} session={session} />
+          )}
+          {path === "/home" && <SiteDirectory destinations={destinations} />}
           {children}
         </div>
       </AppShell>

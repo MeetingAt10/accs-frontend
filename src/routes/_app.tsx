@@ -3,6 +3,8 @@ import { createFileRoute, Outlet, redirect, useRouterState } from '@tanstack/rea
 import { AppChrome } from '@/components/app/navigation'
 import { sessionQuery } from '@/lib/queries'
 import { titleForPath } from '@/lib/page-catalog'
+import { siteById, siteForPath } from '@/lib/sites'
+import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ context, location }) => {
@@ -19,8 +21,14 @@ export const Route = createFileRoute('/_app')({
 function AppLayout() {
   const { session } = Route.useRouteContext()
   const path = useRouterState({ select: (state) => state.location.pathname })
+  const title = titleForPath(path)
+  // Generic page names only, never record or case titles (grievance mode).
+  useEffect(() => {
+    const site = siteById[siteForPath(path)].label
+    document.title = title === site ? `${title} · ACCS` : `${title} · ACCS ${site}`
+  }, [title, path])
   return (
-    <AppChrome session={session} title={titleForPath(path)}>
+    <AppChrome session={session} title={title}>
       <Outlet />
     </AppChrome>
   )

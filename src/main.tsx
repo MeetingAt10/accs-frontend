@@ -12,7 +12,7 @@ import './styles.css'
 import { routeTree } from './routeTree.gen'
 
 const queryClient = new QueryClient()
-const router = createRouter({ routeTree, context: { queryClient } })
+const router = createRouter({ routeTree, context: { queryClient }, defaultViewTransition: true, defaultPreload: "intent" })
 
 declare module '@tanstack/react-router' {
   interface Register {

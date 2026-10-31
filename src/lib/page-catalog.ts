@@ -104,7 +104,7 @@ export const routePermission: Record<string, string | string[]> = {
   P52: 'audit.view',
 }
 
-export function titleForPath(path: string) {
+export function pageIdForPath(path: string) {
   const rules: Array<[RegExp, string]> = [
     [/^\/admin\/users\/[^/]+$/, 'P47'],
     [/^\/admin\/users$/, 'P46'],
@@ -157,6 +157,10 @@ export function titleForPath(path: string) {
     [/^\/settings$/, 'P43'],
     [/^\/home$/, 'P03'],
   ]
-  const matched = rules.find(([pattern]) => pattern.test(path))
-  return matched ? pageTitles[matched[1]] : 'ACCS'
+  return rules.find(([pattern]) => pattern.test(path))?.[1]
+}
+
+export function titleForPath(path: string) {
+  const pageId = pageIdForPath(path)
+  return pageId ? pageTitles[pageId] : 'ACCS'
 }

@@ -239,7 +239,8 @@ export function SystemStatus({ status }: { status: Item }) {
   return (
     <Card>
       <CardTitle>System status</CardTitle>
-      <CardBody>
+      {/* CardBody renders a <p>, which cannot contain a <dl>. */}
+      <div className="ds-card__body">
         <dl className="ds-record__facts">
           <div>
             <dt>API</dt>
@@ -256,7 +257,7 @@ export function SystemStatus({ status }: { status: Item }) {
             <dd>{word(status.storage, "Unknown")}</dd>
           </div>
         </dl>
-      </CardBody>
+      </div>
       <CardMeta>Prototype status for this process.</CardMeta>
     </Card>
   );

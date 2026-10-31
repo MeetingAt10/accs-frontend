@@ -1,0 +1,346 @@
+/* Module sites: brand, switcher, hero, directory, and motion. Lanes follow the design system:
+   community violet (accent), consult teal (secondary), navy action, and neutral for cases and records. */
+
+.app-chrome {
+  --site-tint: var(--ds-action-default);
+  --site-wash: color-mix(in srgb, var(--ds-action-default) 9%, var(--ds-surface));
+}
+
+.app-chrome[data-lane='community'] {
+  --site-tint: var(--ds-accent-default);
+  --site-wash: var(--ds-accent-bg);
+}
+
+.app-chrome[data-lane='consult'] {
+  --site-tint: var(--ds-secondary-700);
+  --site-wash: var(--ds-secondary-bg);
+}
+
+.app-chrome[data-lane='neutral'] {
+  --site-tint: var(--ds-text-secondary);
+  --site-wash: color-mix(in srgb, var(--ds-text-secondary) 7%, var(--ds-surface));
+}
+
+/* Brand: door plate plus the site name. */
+.app-site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-8);
+}
+
+.app-site-brand__name {
+  font-family: var(--ds-font-family-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ds-text-primary);
+}
+
+/* Site switcher (desktop top row; mobile uses the drawer's Sites section). */
+.app-site-switcher {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .app-site-switcher {
+    position: sticky;
+    top: var(--ds-size-topbar-h);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: var(--ds-space-4);
+    min-height: 3.25rem;
+    padding: var(--ds-space-8) var(--ds-space-24);
+    border-bottom: 1px solid var(--ds-border-subtle);
+    background: color-mix(in srgb, var(--ds-canvas) 88%, transparent);
+    backdrop-filter: blur(12px);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .app-site-switcher__item {
+    position: relative;
+    isolation: isolate;
+    flex: 0 0 auto;
+    min-height: 2.5rem;
+  }
+
+  .app-site-switcher__indicator {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: var(--ds-radius-control);
+    background: var(--site-tint);
+  }
+
+  /* The sliding indicator is the current item's fill (solid lane color under the design system's white current text). */
+  .app-site-switcher .ds-nav-item[aria-current='page'] {
+    background: transparent;
+    font-weight: 700;
+  }
+}
+
+/* Hero on each site's landing page. */
+.app-site-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ds-space-16);
+  overflow: hidden;
+  padding: var(--ds-space-24);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-radius-sheet);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--site-wash) 0%, transparent 60%),
+    var(--ds-surface);
+  animation: app-rise var(--ds-motion-duration-slow) var(--ds-motion-ease-out) both;
+}
+
+.app-site-hero__text {
+  display: grid;
+  gap: var(--ds-space-8);
+  max-width: 40rem;
+}
+
+.app-site-hero__title {
+  margin: 0;
+  font-family: var(--ds-font-family-display);
+  font-size: clamp(1.75rem, 1.2rem + 1.8vw, 2.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ds-text-primary);
+}
+
+.app-site-hero__purpose {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  color: var(--ds-text-secondary);
+}
+
+.app-site-hero__modules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+  margin: var(--ds-space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-site-hero__modules li {
+  padding: var(--ds-space-2) var(--ds-space-8);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-radius-chip);
+  background: var(--ds-surface);
+  font-family: var(--ds-font-family-mono);
+  font-size: 0.75rem;
+  color: var(--ds-text-secondary);
+  animation: app-rise var(--ds-motion-duration-deliberate) var(--ds-motion-ease-out) both;
+}
+
+.app-site-hero__modules li:nth-child(n + 2) { animation-delay: 40ms; }
+.app-site-hero__modules li:nth-child(n + 4) { animation-delay: 80ms; }
+.app-site-hero__modules li:nth-child(n + 7) { animation-delay: 120ms; }
+.app-site-hero__modules li:nth-child(n + 10) { animation-delay: 160ms; }
+
+.app-site-hero__stage {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .app-site-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--ds-space-32) var(--ds-space-40);
+  }
+
+  .app-site-hero__stage {
+    display: block;
+    width: clamp(9rem, 14vw, 12.5rem);
+    aspect-ratio: 1;
+    margin-block: calc(var(--ds-space-16) * -1);
+  }
+}
+
+.app-site-hero__art {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 24px color-mix(in srgb, var(--ds-identity-m10-navy) 22%, transparent));
+  animation:
+    app-art-in 640ms var(--ds-motion-ease-out) both,
+    app-float 7s ease-in-out 640ms infinite;
+}
+
+/* Home site directory. */
+.app-site-directory {
+  display: grid;
+  gap: var(--ds-space-16);
+}
+
+.app-site-directory__title {
+  margin: 0;
+  font-family: var(--ds-font-family-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-site-directory__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--ds-space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-site-directory__grid > li {
+  display: grid;
+  animation: app-rise var(--ds-motion-duration-slow) var(--ds-motion-ease-out) both;
+}
+
+.app-site-directory__grid > li:nth-child(2) { animation-delay: 50ms; }
+.app-site-directory__grid > li:nth-child(3) { animation-delay: 100ms; }
+.app-site-directory__grid > li:nth-child(4) { animation-delay: 150ms; }
+.app-site-directory__grid > li:nth-child(5) { animation-delay: 200ms; }
+.app-site-directory__grid > li:nth-child(n + 6) { animation-delay: 250ms; }
+
+.app-site-tile {
+  --site-tint: var(--ds-action-default);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  column-gap: var(--ds-space-12);
+  row-gap: var(--ds-space-4);
+  align-content: start;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform var(--ds-motion-duration-base) var(--ds-motion-ease-out),
+    box-shadow var(--ds-motion-duration-base) var(--ds-motion-ease-out),
+    border-color var(--ds-motion-duration-base) var(--ds-motion-ease-out);
+}
+
+.app-site-tile[data-lane='community'] { --site-tint: var(--ds-accent-default); }
+.app-site-tile[data-lane='consult'] { --site-tint: var(--ds-secondary-700); }
+.app-site-tile[data-lane='neutral'] { --site-tint: var(--ds-text-secondary); }
+
+.app-site-tile:hover,
+.app-site-tile[data-hovered] {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--site-tint) 45%, var(--ds-border-default));
+  box-shadow: var(--ds-shadow-lift);
+}
+
+.app-site-tile__art {
+  grid-row: 1 / span 3;
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
+  transition: transform var(--ds-motion-duration-slow) var(--ds-motion-ease-out);
+}
+
+.app-site-tile:hover .app-site-tile__art,
+.app-site-tile[data-hovered] .app-site-tile__art {
+  transform: rotate(-6deg) scale(1.08);
+}
+
+.app-site-tile__label {
+  font-family: var(--ds-font-family-display);
+  font-weight: 700;
+  font-size: 1.0625rem;
+}
+
+.app-site-tile__purpose {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+.app-site-tile__entries {
+  margin-top: var(--ds-space-4);
+  font-size: 0.8125rem;
+  color: var(--ds-text-secondary);
+}
+
+/* Page motion: sections of a newly opened page rise in sequence. */
+.app-shell__content > *,
+.app-page > * {
+  animation: app-rise var(--ds-motion-duration-slow) var(--ds-motion-ease-out) both;
+}
+
+.app-page > :nth-child(2) { animation-delay: 40ms; }
+.app-page > :nth-child(3) { animation-delay: 80ms; }
+.app-page > :nth-child(4) { animation-delay: 120ms; }
+.app-page > :nth-child(n + 5) { animation-delay: 160ms; }
+
+/* Route changes cross-fade where View Transitions are supported (router defaultViewTransition). */
+::view-transition-old(root) {
+  animation: app-fade-out var(--ds-motion-duration-quick) var(--ds-motion-ease-exit) both;
+}
+
+::view-transition-new(root) {
+  animation: app-fade-in var(--ds-motion-duration-base) var(--ds-motion-ease-out) both;
+}
+
+@keyframes app-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ds-motion-distance-rise, 8px));
+  }
+}
+
+@keyframes app-art-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92) rotate(-4deg);
+  }
+}
+
+@keyframes app-float {
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes app-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-site-hero,
+  .app-site-hero__art,
+  .app-site-hero__modules li,
+  .app-site-directory__grid > li,
+  .app-shell__content > *,
+  .app-page > *,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  .app-site-tile,
+  .app-site-tile__art {
+    transition: none;
+  }
+
+  .app-site-tile:hover,
+  .app-site-tile[data-hovered],
+  .app-site-tile:hover .app-site-tile__art,
+  .app-site-tile[data-hovered] .app-site-tile__art {
+    transform: none;
+  }
+}
+
+/* The sidebar's current item takes the site's lane color, matching the switcher. */
+.app-chrome .ds-sidebar .ds-nav-item[aria-current='page'] {
+  background: var(--site-tint);
+}
