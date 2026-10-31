@@ -476,6 +476,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
           : role === 'president' ? [['open', 'Awaiting action'], ['closed', 'Closed']]
             : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
   const validTab = tabDefs.some(([id]) => id === tab) ? tab : tabDefs[0][0]
+  const sortValue = (report: Item) => sort.column === 'id' ? reportReference(report) : words(report[String(sort.column)])
   const inTab = (report: Item, selected: string) => selected === 'closed' ? isClosed(report)
     : selected === 'history' ? report.historyOnly === true
       : selected === 'bypassed' ? report.bypassed === true && !report.historyOnly && !isClosed(report)
@@ -485,7 +486,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
             : selected === 'active' ? !report.historyOnly && !isClosed(report) && items(report.history).length > 1
               : !report.historyOnly && !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
   const filtered = records.filter((report) => inTab(report, validTab) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
-    .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : words(a[String(sort.column)]).localeCompare(words(b[String(sort.column)]))) * (sort.direction === 'descending' ? -1 : 1))
+    .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
@@ -504,13 +505,28 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
         <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>
       </FilterBar>
       {filtered.length ? <>
-        <div className="grievance-desktop">
+        <Grid columns={2} className="grievance-queue-sort">
+          <Select label="Sort by" selectedKey={String(sort.column)} onSelectionChange={(key) => setSort((current) => ({ ...current, column: String(key) }))}>
+            <SelectOption id="id">Reference</SelectOption>
+            <SelectOption id="category">Category</SelectOption>
+            <SelectOption id="severity">Severity</SelectOption>
+            <SelectOption id="status">Status</SelectOption>
+            <SelectOption id="createdAt">Received</SelectOption>
+            <SelectOption id="updatedAt">Last action</SelectOption>
+            <SelectOption id="waiting">Waiting (days)</SelectOption>
+          </Select>
+          <Select label="Sort direction" selectedKey={sort.direction} onSelectionChange={(key) => setSort((current) => ({ ...current, direction: String(key) as SortDescriptor['direction'] }))}>
+            <SelectOption id="ascending">Ascending</SelectOption>
+            <SelectOption id="descending">Descending</SelectOption>
+          </Select>
+        </Grid>
+        <div className="grievance-queue-desktop">
           <Table aria-label="Reports in this queue" sortDescriptor={sort} onSortChange={setSort}>
             <TableHeader><Column id="id" isRowHeader allowsSorting>Reference</Column><Column id="category" allowsSorting>Category</Column><Column id="severity" allowsSorting>Severity</Column><Column id="status" allowsSorting>Status</Column><Column id="createdAt" allowsSorting>Received</Column><Column id="updatedAt" allowsSorting>Last action</Column><Column id="waiting" allowsSorting>Waiting (days)</Column><Column>Open</Column></TableHeader>
             <TableBody>{shown.map((report) => <TableRow key={words(report.id)} id={words(report.id)}><Cell reference>{reportReference(report)}</Cell><Cell>{words(report.category, 'General concern')}{report.bypassed === true && <Badge form="restricted">Adviser bypassed</Badge>}</Cell><Cell><Severity level={severity(report)} /></Cell><Cell><Badge tone={reportTone(report)} form={reportForm(report)}>{words(report.status)}</Badge></Cell><Cell>{date(report.createdAt)}</Cell><Cell>{date(report.updatedAt)}</Cell><Cell>{waitingDays(report)}</Cell><Cell><Link href={'/cases/' + encodeURIComponent(words(report.id))}>Open</Link></Cell></TableRow>)}</TableBody>
           </Table>
         </div>
-        <div className="grievance-mobile ds-record-list">{shown.map((report) => <ReportRecord key={words(report.id)} reference={reportReference(report)} title={words(report.category, 'General concern')} status={words(report.status)} statusForm={reportForm(report)} statusTone={reportTone(report)} facts={[{ label: 'Severity', value: severity(report) }, { label: 'Received', value: date(report.createdAt) }, { label: 'Office', value: words(report.office) }]} href={'/cases/' + encodeURIComponent(words(report.id))} />)}</div>
+        <div className="grievance-queue-cards ds-record-list">{shown.map((report) => <ReportRecord key={words(report.id)} reference={reportReference(report)} title={words(report.category, 'General concern')} status={words(report.status)} statusForm={reportForm(report)} statusTone={reportTone(report)} facts={[{ label: 'Severity', value: severity(report) }, { label: 'Received', value: date(report.createdAt) }, { label: 'Last action', value: date(report.updatedAt) }, { label: 'Waiting (days)', value: String(waitingDays(report)) }, { label: 'Office', value: words(report.office, '—') }, ...(report.bypassed === true ? [{ label: 'Routing', value: 'Adviser bypassed' }] : [])]} href={'/cases/' + encodeURIComponent(words(report.id))} actionLabel="Open" />)}</div>
         <Pagination page={Math.min(currentPage, pageCount)} pageCount={pageCount} onPageChange={setCurrentPage} summary={'Showing ' + shown.length + ' of ' + filtered.length + ' reports'} />
       </> : query || level || category || status ? <ViewState kind="empty" title="No reports match these filters" description="Change or clear a filter to see other reports within your access." /> : <EmptyState title="No reports in this queue" description="Reports routed to your role and stage will appear here." />}
         </div></TabPanel>

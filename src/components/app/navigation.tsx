@@ -40,6 +40,114 @@ import { pageQuery } from "@/lib/queries";
 
 type NavEntry = { label: string; href: string; pageId?: string; icon?: string };
 type NavGroup = { label: string; entries: NavEntry[] };
+type AppArea = "home" | "community" | "schedule" | "workspace";
+
+const areaLabels: Record<AppArea, string> = {
+  home: "Home",
+  community: "Community",
+  schedule: "Schedule",
+  workspace: "Workspace",
+};
+
+const areaOrder: AppArea[] = ["home", "community", "schedule", "workspace"];
+
+function areaForHref(href: string): AppArea {
+  if (href === "/home" || href === "/admin") return "home";
+  if (
+    ["/feed", "/spaces", "/organizations", "/messages", "/directory"].some(
+      (prefix) => href === prefix || href.startsWith(prefix + "/"),
+    )
+  ) {
+    return "community";
+  }
+  if (
+    ["/calendar", "/consultations"].some(
+      (prefix) => href === prefix || href.startsWith(prefix + "/"),
+    )
+  ) {
+    return "schedule";
+  }
+  return "workspace";
+}
+
+function areaForPath(path: string): AppArea {
+  return areaForHref(path);
+}
+
+function navigationGroups(session: Session) {
+  return [
+    ...session.user.roles.flatMap((role) => roleNavigation[role] ?? []),
+    ...accountNavigation,
+  ];
+}
+
+function visibleEntries(session: Session, area?: AppArea) {
+  const allowed = new Set(session.allowedPages);
+  return navigationGroups(session).flatMap((group) =>
+    group.entries.filter(
+      (entry) =>
+        (!entry.pageId || allowed.has(entry.pageId)) &&
+        (!area || areaForHref(entry.href) === area),
+    ),
+  );
+}
+
+function hasSidebarEntries(session: Session, area: AppArea) {
+  return visibleEntries(session, area).some(
+    (entry) => !(area === "home" && entry.href === "/home"),
+  );
+}
+
+function areaDestinations(session: Session) {
+  return areaOrder.flatMap((area) => {
+    const entries = visibleEntries(session, area);
+    const preferred =
+      area === "home"
+        ? ["/home", "/admin"]
+        : area === "community"
+          ? ["/feed"]
+          : area === "schedule"
+            ? ["/calendar", "/consultations"]
+            : [];
+    const entry =
+      preferred.map((href) => entries.find((item) => item.href === href)).find(Boolean) ??
+      entries[0];
+    return entry ? [{ area, href: entry.href }] : [];
+  });
+}
+
+function AreaLinks({ session, path }: { session: Session; path: string }) {
+  const activeArea = areaForPath(path);
+  const icons: Record<AppArea, string> = {
+    home: "house",
+    community: "chats",
+    schedule: "calendar",
+    workspace: "notepad",
+  };
+  return (
+    <>
+      {areaDestinations(session).map(({ area, href }) => (
+        <NavItem
+          key={area}
+          className="app-area-nav__item"
+          href={href}
+          icon={icons[area] as never}
+          isCurrent={activeArea === area}
+        >
+          {areaLabels[area]}
+        </NavItem>
+      ))}
+    </>
+  );
+}
+
+function AppAreaNavigation({ session, path }: { session: Session; path: string }) {
+  return (
+    <nav className="app-area-nav" aria-label="Main destinations">
+      <AreaLinks session={session} path={path} />
+    </nav>
+  );
+}
 
 const roleNavigation: Record<Role, NavGroup[]> = {
   student: [
@@ -477,23 +585,31 @@ export const accountNavigation: NavGroup[] = [
 export function RoleNavigation({
   session,
   path,
+  area,
 }: {
   session: Session;
   path: string;
+  area: AppArea;
 }) {
-  const groups = session.user.roles.flatMap(
-    (role) => roleNavigation[role] ?? [],
-  );
+  const groups = navigationGroups(session);
   const allowed = new Set(session.allowedPages);
   return (
     <>
       {groups.map((group, groupIndex) => {
         const entries = group.entries.filter(
-          (entry) => !entry.pageId || allowed.has(entry.pageId),
+          (entry) =>
+            (!entry.pageId || allowed.has(entry.pageId)) &&
+            areaForHref(entry.href) === area &&
+            !(area === "home" && entry.href === "/home"),
         );
         if (!entries.length) return null;
+        const label =
+          group.label === "Workspace" ||
+          (group.label === "Account" && area === "community")
+            ? areaLabels[area]
+            : group.label;
         return (
-          <SidebarSection label={group.label} key={group.label + groupIndex}>
+          <SidebarSection label={label} key={group.label + groupIndex}>
             {entries.map((entry) => (
               <NavItem
                 key={entry.href + entry.label}
@@ -510,24 +626,6 @@ export function RoleNavigation({
           </SidebarSection>
         );
       })}
-      {accountNavigation.map((group) => (
-        <SidebarSection label={group.label} key={group.label}>
-          {group.entries
-            .filter((entry) => allowed.has(entry.pageId!))
-            .map((entry) => (
-              <NavItem
-                key={entry.href}
-                href={entry.href}
-                icon={entry.icon as never}
-                isCurrent={
-                  path === entry.href || path.startsWith(entry.href + "/")
-                }
-              >
-                {entry.label}
-              </NavItem>
-            ))}
-        </SidebarSection>
-      ))}
     </>
   );
 }
@@ -535,9 +633,11 @@ export function RoleNavigation({
 export function RoleSidebar({
   session,
   path,
+  area,
 }: {
   session: Session;
   path: string;
+  area: AppArea;
 }) {
   return (
     <Sidebar
@@ -557,7 +657,7 @@ export function RoleSidebar({
         </div>
       }
     >
-      <RoleNavigation session={session} path={path} />
+      <RoleNavigation session={session} path={path} area={area} />
       <SidebarNote>
         Sample data. Access follows your assigned role and scope.
       </SidebarNote>
@@ -728,6 +828,58 @@ export function AppTopBar({
   );
 }
 
+function MobileAccountMenu({ session }: { session: Session }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const allowed = new Set(session.allowedPages);
+  const canViewNotifications = allowed.has("P40");
+  const notifications = useQuery({
+    ...pageQuery("P40"),
+    enabled: canViewNotifications,
+  });
+  const notificationItems = notifications.data?.data.notifications;
+  const unreadCount = Array.isArray(notificationItems)
+    ? notificationItems.filter(
+        (notice) => (notice as Record<string, unknown>).read !== true,
+      ).length
+    : 0;
+
+  return (
+    <MenuButton
+      label={session.user.name}
+      icon="user"
+      iconOnly
+      placement="bottom end"
+      onAction={async (key) => {
+        if (key === "profile") router.history.push("/profile");
+        if (key === "notifications") router.history.push("/notifications");
+        if (key === "assistant") router.history.push("/assistant");
+        if (key === "settings") router.history.push("/settings");
+        if (key === "help") router.history.push("/help");
+        if (key === "sign-out") {
+          await signOut().catch(() => undefined);
+          queryClient.removeQueries();
+          router.history.push("/sign-in");
+        }
+      }}
+    >
+      {allowed.has("P39") && <MenuItem id="profile">Profile</MenuItem>}
+      {canViewNotifications && (
+        <MenuItem id="notifications">
+          {unreadCount
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"}
+        </MenuItem>
+      )}
+      {allowed.has("P41") && <MenuItem id="assistant">Assistant</MenuItem>}
+      {allowed.has("P43") && <MenuItem id="settings">Settings</MenuItem>}
+      {allowed.has("P42") && <MenuItem id="help">Help</MenuItem>}
+      <MenuSeparator />
+      <MenuItem id="sign-out">Sign out</MenuItem>
+    </MenuButton>
+  );
+}
+
 export function AppChrome({
   session,
   title,
@@ -738,7 +890,16 @@ export function AppChrome({
   children: React.ReactNode;
 }) {
   const path = useRouterState({ select: (state) => state.location.pathname });
-  const navigation = <RoleNavigation session={session} path={path} />;
+  const area = areaForPath(path);
+  const hasSidebar = hasSidebarEntries(session, area);
+  const navigation = (
+    <>
+      <SidebarSection label="Areas">
+        <AreaLinks session={session} path={path} />
+      </SidebarSection>
+      <RoleNavigation session={session} path={path} area={area} />
+    </>
+  );
   const restricted =
     session.user.restrictions.length > 0 &&
     session.user.roles.includes("student");
@@ -804,18 +965,31 @@ export function AppChrome({
         </div>
       )}
       <AppShell
+        className={hasSidebar ? undefined : "app-shell--no-sidebar"}
         contentId="main-content"
         density={
           savedDensity === "compact" || savedDensity === "comfortable"
             ? savedDensity
             : defaultDensity
         }
-        sidebar={<RoleSidebar session={session} path={path} />}
+        sidebar={
+          hasSidebar ? (
+            <RoleSidebar session={session} path={path} area={area} />
+          ) : undefined
+        }
         mobileBrand={<DoorPlate size="sm" code="ACCS" />}
         mobileNav={navigation}
-        topBar={<AppTopBar session={session} title={title} />}
+        mobileActions={<MobileAccountMenu session={session} />}
+        topBar={
+          <>
+            <AppTopBar session={session} title={title} />
+            <AppAreaNavigation session={session} path={path} />
+          </>
+        }
       >
-        <div className="app-shell__content">{children}</div>
+        <div className="app-shell__content" data-area={area}>
+          {children}
+        </div>
       </AppShell>
     </div>
   );

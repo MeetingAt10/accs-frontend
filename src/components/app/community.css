@@ -35,3 +35,34 @@
 .community-organization-card .ds-card__body {
   margin: 0;
 }
+
+.community-sections-cards,
+.community-members-cards {
+  display: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.community-member-card {
+  align-content: start;
+  gap: var(--ds-space-12);
+}
+
+.community-member-card .ds-card__title {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+  .community-sections-table,
+  .community-members-table {
+    display: none;
+  }
+
+  .community-sections-cards,
+  .community-members-cards {
+    display: grid;
+    gap: var(--ds-space-16);
+  }
+}

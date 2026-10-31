@@ -68,6 +68,8 @@ import {
 } from "@/lib/api";
 import { pageQuery, sessionQuery } from "@/lib/queries";
 
+import "./evaluations.css";
+
 type Item = Record<string, unknown>;
 type Answers = Record<string, string | number>;
 type EvaluationForm = "student" | "peer" | "upward-chair" | "upward-dean";
@@ -251,62 +253,118 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
         </TabList>
         <TabPanel id="forms">
           {assignments.length ? (
-            <Table aria-label="Assigned evaluations">
-              <TableHeader>
-                <Column isRowHeader>Evaluated person</Column>
-                <Column>Subject or relation</Column>
-                <Column>Due</Column>
-                <Column>Status</Column>
-                <Column>Action</Column>
-              </TableHeader>
-              <TableBody>
-                {assignments.map((assignment) => {
-                  const faculty = object(assignment.faculty);
-                  return (
-                    <TableRow
-                      id={words(assignment.id)}
-                      key={words(assignment.id)}
-                    >
-                      <Cell>
-                        <Row gap={8}>
-                          <Avatar name={words(faculty.name)} size={32} />
-                          {words(faculty.name)}
-                        </Row>
-                      </Cell>
-                      <Cell>
-                        {words(assignment.subject)}
-                        <br />
-                        {words(assignment.relation)}
-                      </Cell>
-                      <Cell>{date(assignment.due)}</Cell>
-                      <Cell>
-                        <Badge
-                          tone={
-                            assignment.status === "Submitted"
-                              ? "success"
-                              : "neutral"
-                          }
+            <>
+              <div className="evaluation-responsive-desktop">
+                <Table aria-label="Assigned evaluations">
+                  <TableHeader>
+                    <Column isRowHeader>Evaluated person</Column>
+                    <Column>Subject or relation</Column>
+                    <Column>Due</Column>
+                    <Column>Status</Column>
+                    <Column>Action</Column>
+                  </TableHeader>
+                  <TableBody>
+                    {assignments.map((assignment) => {
+                      const faculty = object(assignment.faculty);
+                      return (
+                        <TableRow
+                          id={words(assignment.id)}
+                          key={words(assignment.id)}
                         >
-                          {words(assignment.status)}
-                        </Badge>
-                      </Cell>
-                      <Cell>
-                        <Link
-                          href={
-                            "/evaluations/forms/" +
-                            encodeURIComponent(words(assignment.id))
-                          }
-                        >
-                          {assignment.status === "Submitted"
-                            ? "View receipt"
-                            : "Start"}
-                        </Link>
-                      </Cell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                          <Cell>
+                            <Row gap={8}>
+                              <Avatar name={words(faculty.name)} size={32} />
+                              {words(faculty.name)}
+                            </Row>
+                          </Cell>
+                          <Cell>
+                            {words(assignment.subject)}
+                            <br />
+                            {words(assignment.relation)}
+                          </Cell>
+                          <Cell>{date(assignment.due)}</Cell>
+                          <Cell>
+                            <Badge
+                              tone={
+                                assignment.status === "Submitted"
+                                  ? "success"
+                                  : "neutral"
+                              }
+                            >
+                              {words(assignment.status)}
+                            </Badge>
+                          </Cell>
+                          <Cell>
+                            <Link
+                              href={
+                                "/evaluations/forms/" +
+                                encodeURIComponent(words(assignment.id))
+                              }
+                            >
+                              {assignment.status === "Submitted"
+                                ? "View receipt"
+                                : "Start"}
+                            </Link>
+                          </Cell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <ul
+                className="evaluation-responsive-mobile ds-record-list"
+                aria-label="Assigned evaluations"
+              >
+                {assignments.map((assignment) => (
+                  <li key={words(assignment.id)}>
+                    <article className="ds-record">
+                      <h3 className="ds-record__title">
+                        {words(object(assignment.faculty).name)}
+                      </h3>
+                      <dl className="ds-record__facts">
+                        <div>
+                          <dt>Subject or relation</dt>
+                          <dd>
+                            {words(assignment.subject)}
+                            <br />
+                            {words(assignment.relation)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Due</dt>
+                          <dd>{date(assignment.due)}</dd>
+                        </div>
+                        <div>
+                          <dt>Status</dt>
+                          <dd>
+                            <Badge
+                              tone={
+                                assignment.status === "Submitted"
+                                  ? "success"
+                                  : "neutral"
+                              }
+                            >
+                              {words(assignment.status)}
+                            </Badge>
+                          </dd>
+                        </div>
+                      </dl>
+                      <Link
+                        href={
+                          "/evaluations/forms/" +
+                          encodeURIComponent(words(assignment.id))
+                        }
+                      >
+                        {assignment.status === "Submitted"
+                          ? "View receipt"
+                          : "Start"}
+                      </Link>
+                    </article>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <EmptyState
               title="No evaluations open"
@@ -784,33 +842,76 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             )}
           </FilterBar>
           {filtered.length ? (
-            <Table aria-label="Faculty evaluation results">
-              <TableHeader>
-                <Column isRowHeader>Faculty</Column>
-                <Column>Program</Column>
-                <Column numeric>Responses</Column>
-                <Column numeric>Overall average</Column>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((result) => (
-                  <TableRow id={words(result.id)} key={words(result.id)}>
-                    <Cell>
-                      <Link
-                        href={
-                          "/evaluations/results/" +
-                          encodeURIComponent(words(result.id))
-                        }
-                      >
-                        {words(object(result.faculty).name)}
-                      </Link>
-                    </Cell>
-                    <Cell>{words(object(result.faculty).program, "CCS")}</Cell>
-                    <Cell numeric>{number(result.responses)}</Cell>
-                    <Cell numeric>{number(result.average).toFixed(2)}</Cell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="evaluation-responsive-desktop">
+                <Table aria-label="Faculty evaluation results">
+                  <TableHeader>
+                    <Column isRowHeader>Faculty</Column>
+                    <Column>Program</Column>
+                    <Column numeric>Responses</Column>
+                    <Column numeric>Overall average</Column>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((result) => (
+                      <TableRow id={words(result.id)} key={words(result.id)}>
+                        <Cell>
+                          <Link
+                            href={
+                              "/evaluations/results/" +
+                              encodeURIComponent(words(result.id))
+                            }
+                          >
+                            {words(object(result.faculty).name)}
+                          </Link>
+                        </Cell>
+                        <Cell>{words(object(result.faculty).program, "CCS")}</Cell>
+                        <Cell numeric>{number(result.responses)}</Cell>
+                        <Cell numeric>{number(result.average).toFixed(2)}</Cell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <ul
+                className="evaluation-responsive-mobile ds-record-list"
+                aria-label="Faculty evaluation results"
+              >
+                {filtered.map((result) => {
+                  const faculty = object(result.faculty);
+                  const name = words(faculty.name);
+                  return (
+                    <li key={words(result.id)}>
+                      <article className="ds-record">
+                        <h3 className="ds-record__title">
+                          <Link
+                            href={
+                              "/evaluations/results/" +
+                              encodeURIComponent(words(result.id))
+                            }
+                          >
+                            {name}
+                          </Link>
+                        </h3>
+                        <dl className="ds-record__facts">
+                          <div>
+                            <dt>Program</dt>
+                            <dd>{words(faculty.program, "CCS")}</dd>
+                          </div>
+                          <div>
+                            <dt>Responses</dt>
+                            <dd>{number(result.responses)}</dd>
+                          </div>
+                          <div>
+                            <dt>Overall average</dt>
+                            <dd>{number(result.average).toFixed(2)}</dd>
+                          </div>
+                        </dl>
+                      </article>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           ) : (
             <ViewState kind="empty" title="No faculty match" />
           )}
@@ -862,53 +963,110 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
         }
       />
       {cycles.length ? (
-        <Table aria-label="Evaluation cycles">
-          <TableHeader>
-            <Column isRowHeader>Cycle</Column>
-            <Column>Term and forms</Column>
-            <Column>Status</Column>
-            <Column>Completion</Column>
-            <Column>Dates</Column>
-          </TableHeader>
-          <TableBody>
+        <>
+          <div className="evaluation-responsive-desktop">
+            <Table aria-label="Evaluation cycles">
+              <TableHeader>
+                <Column isRowHeader>Cycle</Column>
+                <Column>Term and forms</Column>
+                <Column>Status</Column>
+                <Column>Completion</Column>
+                <Column>Dates</Column>
+              </TableHeader>
+              <TableBody>
+                {cycles.map((cycle) => (
+                  <TableRow id={words(cycle.id)} key={words(cycle.id)}>
+                    <Cell>
+                      <Link
+                        href={
+                          "/evaluations/cycles/" +
+                          encodeURIComponent(words(cycle.id))
+                        }
+                      >
+                        {words(cycle.title)}
+                      </Link>
+                    </Cell>
+                    <Cell>
+                      {words(cycle.term)}
+                      <br />
+                      {strings(cycle.forms)
+                        .map((form) => formLabels[form as EvaluationForm] ?? form)
+                        .join(", ") || "No forms configured"}
+                    </Cell>
+                    <Cell>
+                      <Badge>{words(cycle.status)}</Badge>
+                    </Cell>
+                    <Cell>
+                      <Meter
+                        label="Submitted"
+                        minValue={0}
+                        maxValue={Math.max(1, number(cycle.assigned))}
+                        value={number(cycle.completion)}
+                        valueLabel={`${number(cycle.completion)} of ${number(cycle.assigned)}`}
+                      />
+                    </Cell>
+                    <Cell>
+                      {date(cycle.opens)}–{date(cycle.closes)}
+                    </Cell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ul
+            className="evaluation-responsive-mobile ds-record-list"
+            aria-label="Evaluation cycles"
+          >
             {cycles.map((cycle) => (
-              <TableRow id={words(cycle.id)} key={words(cycle.id)}>
-                <Cell>
-                  <Link
-                    href={
-                      "/evaluations/cycles/" +
-                      encodeURIComponent(words(cycle.id))
-                    }
-                  >
-                    {words(cycle.title)}
-                  </Link>
-                </Cell>
-                <Cell>
-                  {words(cycle.term)}
-                  <br />
-                  {strings(cycle.forms)
-                    .map((form) => formLabels[form as EvaluationForm] ?? form)
-                    .join(", ") || "No forms configured"}
-                </Cell>
-                <Cell>
-                  <Badge>{words(cycle.status)}</Badge>
-                </Cell>
-                <Cell>
-                  <Meter
-                    label="Submitted"
-                    minValue={0}
-                    maxValue={Math.max(1, number(cycle.assigned))}
-                    value={number(cycle.completion)}
-                    valueLabel={`${number(cycle.completion)} of ${number(cycle.assigned)}`}
-                  />
-                </Cell>
-                <Cell>
-                  {date(cycle.opens)}–{date(cycle.closes)}
-                </Cell>
-              </TableRow>
+              <li key={words(cycle.id)}>
+                <article className="ds-record">
+                  <h3 className="ds-record__title">
+                    <Link
+                      href={
+                        "/evaluations/cycles/" +
+                        encodeURIComponent(words(cycle.id))
+                      }
+                    >
+                      {words(cycle.title)}
+                    </Link>
+                  </h3>
+                  <dl className="ds-record__facts">
+                    <div>
+                      <dt>Term and forms</dt>
+                      <dd>
+                        {words(cycle.term)}
+                        <br />
+                        {strings(cycle.forms)
+                          .map((form) => formLabels[form as EvaluationForm] ?? form)
+                          .join(", ") || "No forms configured"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd><Badge>{words(cycle.status)}</Badge></dd>
+                    </div>
+                    <div>
+                      <dt>Completion</dt>
+                      <dd>
+                        <Meter
+                          label={`Submitted for ${words(cycle.title)}`}
+                          minValue={0}
+                          maxValue={Math.max(1, number(cycle.assigned))}
+                          value={number(cycle.completion)}
+                          valueLabel={`${number(cycle.completion)} of ${number(cycle.assigned)}`}
+                        />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Dates</dt>
+                      <dd>{date(cycle.opens)}–{date(cycle.closes)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              </li>
             ))}
-          </TableBody>
-        </Table>
+          </ul>
+        </>
       ) : (
         <EmptyState
           title="No cycles yet"
@@ -993,96 +1151,137 @@ export function QuestionEditor({
     onChange(next);
   }
 
+  function questionFields(question: EvaluationQuestion, index: number) {
+    return {
+      criterion: (
+        <TextField
+          label={`Criterion ${index + 1}`}
+          value={question.criterion}
+          onChange={(criterion) => update(question.id, { criterion })}
+          isReadOnly={isReadOnly}
+          isRequired
+        />
+      ),
+      text: (
+        <TextArea
+          label={`Question ${index + 1}`}
+          value={question.text}
+          onChange={(text) => update(question.id, { text })}
+          isReadOnly={isReadOnly}
+          isRequired
+          maxLength={4000}
+        />
+      ),
+      type: (
+        <Select
+          label={`Question ${index + 1} type`}
+          selectedKey={question.type}
+          onSelectionChange={(key) =>
+            update(question.id, {
+              type: key === "text" ? "text" : "rating",
+            })
+          }
+          isDisabled={isReadOnly}
+        >
+          <SelectOption id="rating">Rating 1–5</SelectOption>
+          <SelectOption id="text">Text</SelectOption>
+        </Select>
+      ),
+      required: (
+        <Switch
+          isSelected={question.required}
+          onChange={(required) => update(question.id, { required })}
+          isDisabled={isReadOnly}
+        >
+          Required
+        </Switch>
+      ),
+      actions: !isReadOnly ? (
+        <MenuButton
+          label={`Actions for question ${index + 1}`}
+          iconOnly
+          onAction={(key) => {
+            if (key === "up") move(index, -1);
+            if (key === "down") move(index, 1);
+            if (key === "delete")
+              onChange(value.filter((entry) => entry.id !== question.id));
+          }}
+        >
+          <MenuItem id="up" isDisabled={index === 0}>
+            Move up
+          </MenuItem>
+          <MenuItem id="down" isDisabled={index === value.length - 1}>
+            Move down
+          </MenuItem>
+          <MenuItem id="delete" danger>
+            Delete
+          </MenuItem>
+        </MenuButton>
+      ) : null,
+    };
+  }
+
   return (
     <Stack gap={16}>
       {value.length ? (
-        <Table aria-label="Evaluation questions">
-          <TableHeader>
-            <Column isRowHeader>Criterion</Column>
-            <Column>Question</Column>
-            <Column>Type</Column>
-            <Column>Required</Column>
-            <Column>Order</Column>
-          </TableHeader>
-          <TableBody>
-            {value.map((question, index) => (
-              <TableRow id={question.id} key={question.id}>
-                <Cell>
-                  <TextField
-                    label={`Criterion ${index + 1}`}
-                    value={question.criterion}
-                    onChange={(criterion) => update(question.id, { criterion })}
-                    isReadOnly={isReadOnly}
-                    isRequired
-                  />
-                </Cell>
-                <Cell>
-                  <TextArea
-                    label={`Question ${index + 1}`}
-                    value={question.text}
-                    onChange={(text) => update(question.id, { text })}
-                    isReadOnly={isReadOnly}
-                    isRequired
-                    maxLength={4000}
-                  />
-                </Cell>
-                <Cell>
-                  <Select
-                    label={`Question ${index + 1} type`}
-                    selectedKey={question.type}
-                    onSelectionChange={(key) =>
-                      update(question.id, {
-                        type: key === "text" ? "text" : "rating",
-                      })
-                    }
-                    isDisabled={isReadOnly}
+        <>
+          <div className="evaluation-responsive-desktop">
+            <Table aria-label="Evaluation questions">
+              <TableHeader>
+                <Column isRowHeader>Criterion</Column>
+                <Column>Question</Column>
+                <Column>Type</Column>
+                <Column>Required</Column>
+                <Column>Order</Column>
+              </TableHeader>
+              <TableBody>
+                {value.map((question, index) => {
+                  const fields = questionFields(question, index);
+                  return (
+                    <TableRow id={question.id} key={question.id}>
+                      <Cell>{fields.criterion}</Cell>
+                      <Cell>{fields.text}</Cell>
+                      <Cell>{fields.type}</Cell>
+                      <Cell>{fields.required}</Cell>
+                      <Cell>{fields.actions}</Cell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <ol
+            className="evaluation-responsive-mobile evaluation-question-list"
+            aria-label="Evaluation questions"
+          >
+            {value.map((question, index) => {
+              const fields = questionFields(question, index);
+              const headingId = `evaluation-question-${index + 1}`;
+              return (
+                <li key={question.id}>
+                  <section
+                    className="evaluation-question-card"
+                    aria-labelledby={headingId}
                   >
-                    <SelectOption id="rating">Rating 1–5</SelectOption>
-                    <SelectOption id="text">Text</SelectOption>
-                  </Select>
-                </Cell>
-                <Cell>
-                  <Switch
-                    isSelected={question.required}
-                    onChange={(required) => update(question.id, { required })}
-                    isDisabled={isReadOnly}
-                  >
-                    Required
-                  </Switch>
-                </Cell>
-                <Cell>
-                  {!isReadOnly && (
-                    <MenuButton
-                      label={`Actions for question ${index + 1}`}
-                      iconOnly
-                      onAction={(key) => {
-                        if (key === "up") move(index, -1);
-                        if (key === "down") move(index, 1);
-                        if (key === "delete")
-                          onChange(
-                            value.filter((entry) => entry.id !== question.id),
-                          );
-                      }}
-                    >
-                      <MenuItem id="up" isDisabled={index === 0}>
-                        Move up
-                      </MenuItem>
-                      <MenuItem
-                        id="down"
-                        isDisabled={index === value.length - 1}
-                      >
-                        Move down
-                      </MenuItem>
-                      <MenuItem id="delete" danger>
-                        Delete
-                      </MenuItem>
-                    </MenuButton>
-                  )}
-                </Cell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    <h3 id={headingId}>Question {index + 1}</h3>
+                    <p className="evaluation-question-card__order">
+                      Order position: {index + 1}
+                    </p>
+                    <Stack gap={16}>
+                      {fields.criterion}
+                      {fields.text}
+                      {fields.type}
+                      {fields.required}
+                      {fields.actions && (
+                        <Row justify="end">{fields.actions}</Row>
+                      )}
+                    </Stack>
+                  </section>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       ) : (
         <ViewState
           kind="empty"
@@ -1141,33 +1340,77 @@ function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
     <Stack gap={16}>
       <SectionHeader level={2} title={title} />
       {rows.length ? (
-        <Table aria-label={title}>
-          <TableHeader>
-            <Column isRowHeader>Name</Column>
-            <Column>Program</Column>
-            <Column numeric>Assigned</Column>
-            <Column numeric>Submitted</Column>
-            <Column>Completion</Column>
-          </TableHeader>
-          <TableBody>
-            {rows.map((entry) => (
-              <TableRow id={words(entry.id)} key={words(entry.id)}>
-                <Cell>{words(entry.title, words(entry.name))}</Cell>
-                <Cell>{words(entry.program, "CCS")}</Cell>
-                <Cell numeric>{number(entry.assigned)}</Cell>
-                <Cell numeric>{number(entry.submitted)}</Cell>
-                <Cell>
-                  <Meter
-                    label="Submitted"
-                    value={number(entry.submitted)}
-                    maxValue={Math.max(1, number(entry.assigned))}
-                    valueLabel={`${number(entry.submitted)} of ${number(entry.assigned)}`}
-                  />
-                </Cell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <>
+          <div className="evaluation-responsive-desktop">
+            <Table aria-label={title}>
+              <TableHeader>
+                <Column isRowHeader>Name</Column>
+                <Column>Program</Column>
+                <Column numeric>Assigned</Column>
+                <Column numeric>Submitted</Column>
+                <Column>Completion</Column>
+              </TableHeader>
+              <TableBody>
+                {rows.map((entry) => (
+                  <TableRow id={words(entry.id)} key={words(entry.id)}>
+                    <Cell>{words(entry.title, words(entry.name))}</Cell>
+                    <Cell>{words(entry.program, "CCS")}</Cell>
+                    <Cell numeric>{number(entry.assigned)}</Cell>
+                    <Cell numeric>{number(entry.submitted)}</Cell>
+                    <Cell>
+                      <Meter
+                        label="Submitted"
+                        value={number(entry.submitted)}
+                        maxValue={Math.max(1, number(entry.assigned))}
+                        valueLabel={`${number(entry.submitted)} of ${number(entry.assigned)}`}
+                      />
+                    </Cell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ul
+            className="evaluation-responsive-mobile ds-record-list"
+            aria-label={title}
+          >
+            {rows.map((entry) => {
+              const name = words(entry.title, words(entry.name));
+              return (
+                <li key={words(entry.id)}>
+                  <article className="ds-record">
+                    <h3 className="ds-record__title">{name}</h3>
+                    <dl className="ds-record__facts">
+                      <div>
+                        <dt>Program</dt>
+                        <dd>{words(entry.program, "CCS")}</dd>
+                      </div>
+                      <div>
+                        <dt>Assigned</dt>
+                        <dd>{number(entry.assigned)}</dd>
+                      </div>
+                      <div>
+                        <dt>Submitted</dt>
+                        <dd>{number(entry.submitted)}</dd>
+                      </div>
+                      <div>
+                        <dt>Completion</dt>
+                        <dd>
+                          <Meter
+                            label={`Submitted for ${name}`}
+                            value={number(entry.submitted)}
+                            maxValue={Math.max(1, number(entry.assigned))}
+                            valueLabel={`${number(entry.submitted)} of ${number(entry.assigned)}`}
+                          />
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       ) : (
         <ViewState kind="empty" title="No assignments in this scope" />
       )}
@@ -1412,34 +1655,74 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           <Stack gap={24}>
             <SectionHeader level={2} title="Faculty review" />
             {facultyReviews.length ? (
-              <Table aria-label="Faculty question reviews">
-                <TableHeader>
-                  <Column isRowHeader>Professor</Column>
-                  <Column>Status</Column>
-                  <Column>Comments</Column>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="evaluation-responsive-desktop">
+                  <Table aria-label="Faculty question reviews">
+                    <TableHeader>
+                      <Column isRowHeader>Professor</Column>
+                      <Column>Status</Column>
+                      <Column>Comments</Column>
+                    </TableHeader>
+                    <TableBody>
+                      {facultyReviews.map((review) => (
+                        <TableRow id={words(review.id)} key={words(review.id)}>
+                          <Cell>{words(review.name)}</Cell>
+                          <Cell>
+                            <Badge>{words(review.status)}</Badge>
+                          </Cell>
+                          <Cell>
+                            {review.note ? (
+                              <Disclosure title="Read comments">
+                                <p style={{ whiteSpace: "pre-wrap" }}>
+                                  {words(review.note)}
+                                </p>
+                              </Disclosure>
+                            ) : (
+                              "No comment yet"
+                            )}
+                          </Cell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <ul
+                  className="evaluation-responsive-mobile ds-record-list"
+                  aria-label="Faculty question reviews"
+                >
                   {facultyReviews.map((review) => (
-                    <TableRow id={words(review.id)} key={words(review.id)}>
-                      <Cell>{words(review.name)}</Cell>
-                      <Cell>
-                        <Badge>{words(review.status)}</Badge>
-                      </Cell>
-                      <Cell>
-                        {review.note ? (
-                          <Disclosure title="Read comments">
-                            <p style={{ whiteSpace: "pre-wrap" }}>
-                              {words(review.note)}
-                            </p>
-                          </Disclosure>
-                        ) : (
-                          "No comment yet"
-                        )}
-                      </Cell>
-                    </TableRow>
+                    <li key={words(review.id)}>
+                      <article className="ds-record">
+                        <h3 className="ds-record__title">
+                          {words(review.name)}
+                        </h3>
+                        <dl className="ds-record__facts">
+                          <div>
+                            <dt>Status</dt>
+                            <dd>
+                              <Badge>{words(review.status)}</Badge>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Comments</dt>
+                            <dd>
+                              {review.note ? (
+                                <Disclosure title="Read comments">
+                                  <p style={{ whiteSpace: "pre-wrap" }}>
+                                    {words(review.note)}
+                                  </p>
+                                </Disclosure>
+                              ) : (
+                                "No comment yet"
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    </li>
                   ))}
-                </TableBody>
-              </Table>
+                </ul>
+              </>
             ) : (
               <ViewState
                 kind="empty"

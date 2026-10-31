@@ -1,0 +1,44 @@
+.evaluation-responsive-mobile {
+  display: none;
+}
+
+.evaluation-question-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evaluation-question-card {
+  display: grid;
+  gap: var(--ds-space-12);
+  padding-block: var(--ds-space-16);
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.evaluation-question-card h3,
+.evaluation-question-card__order {
+  margin: 0;
+}
+
+.evaluation-question-card h3 {
+  font: var(--ds-type-label-font-weight) 1rem / 1.5rem var(--ds-type-label-font-family);
+}
+
+.evaluation-question-card__order {
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-type-caption-size);
+}
+
+@media (max-width: 767.98px) {
+  .evaluation-responsive-desktop {
+    display: none;
+  }
+
+  .evaluation-responsive-mobile {
+    display: grid;
+  }
+
+  .evaluation-responsive-mobile.ds-record-list {
+    gap: var(--ds-space-12);
+  }
+}

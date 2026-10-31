@@ -1475,44 +1475,89 @@ function MemberTable({
       />
       {filtered.length ? (
         <>
-          <Table aria-label={academic ? 'Class roster' : 'Member names'}>
-            <TableHeader>
-              <Column id="name" isRowHeader>
-                Name
-              </Column>
-              {academic && <Column id="studentId">Student ID</Column>}
-              {academic && <Column id="program">Program</Column>}
-              <Column id="role">{academic ? 'Status' : 'Role'}</Column>
-            </TableHeader>
-            <TableBody>
-              {visible.map((member, index) => (
-                <TableRow
-                  id={member.id ?? `member-${index}`}
-                  key={member.id ?? `member-${index}`}
-                >
-                  <Cell>
-                    <Row gap={8}>
-                      <Avatar name={member.name} size={32} />
-                      {member.name}
-                    </Row>
-                  </Cell>
-                  {academic && <Cell reference>{member.studentId ?? '—'}</Cell>}
-                  {academic && <Cell>{member.program ?? '—'}</Cell>}
-                  <Cell>
-                    {academic ? (
-                      <Badge tone="neutral" outline>
-                        Enrolled
-                      </Badge>
-                    ) : organization ? (
-                      (member.organizationRole ?? member.role ?? 'Member')
-                    ) : (
-                      personRole(member)
+          <div className="community-members-table">
+            <Table aria-label={academic ? 'Class roster' : 'Member names'}>
+              <TableHeader>
+                <Column id="name" isRowHeader>
+                  Name
+                </Column>
+                {academic && <Column id="studentId">Student ID</Column>}
+                {academic && <Column id="program">Program</Column>}
+                <Column id="role">{academic ? 'Status' : 'Role'}</Column>
+              </TableHeader>
+              <TableBody>
+                {visible.map((member, index) => (
+                  <TableRow
+                    id={member.id ?? `member-${index}`}
+                    key={member.id ?? `member-${index}`}
+                  >
+                    <Cell>
+                      <Row gap={8}>
+                        <Avatar name={member.name} size={32} />
+                        {member.name}
+                      </Row>
+                    </Cell>
+                    {academic && <Cell reference>{member.studentId ?? '—'}</Cell>}
+                    {academic && <Cell>{member.program ?? '—'}</Cell>}
+                    <Cell>
+                      {academic ? (
+                        <Badge tone="neutral" outline>
+                          Enrolled
+                        </Badge>
+                      ) : organization ? (
+                        (member.organizationRole ?? member.role ?? 'Member')
+                      ) : (
+                        personRole(member)
+                      )}
+                    </Cell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ul
+            className="community-members-cards"
+            aria-label={academic ? 'Class roster' : 'Member names'}
+          >
+            {visible.map((member, index) => (
+              <li key={member.id ?? `member-${index}`}>
+                <Card className="community-member-card">
+                  <CardHeader>
+                    <Avatar name={member.name} size={36} />
+                  </CardHeader>
+                  <CardTitle>{member.name}</CardTitle>
+                  <dl className="ds-record__facts">
+                    {academic && (
+                      <>
+                        <div>
+                          <dt>Student ID</dt>
+                          <dd>{member.studentId ?? '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Program</dt>
+                          <dd>{member.program ?? '—'}</dd>
+                        </div>
+                      </>
                     )}
-                  </Cell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <div>
+                      <dt>{academic ? 'Status' : 'Role'}</dt>
+                      <dd>
+                        {academic ? (
+                          <Badge tone="neutral" outline>
+                            Enrolled
+                          </Badge>
+                        ) : organization ? (
+                          (member.organizationRole ?? member.role ?? 'Member')
+                        ) : (
+                          personRole(member)
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                </Card>
+              </li>
+            ))}
+          </ul>
           <Pagination
             page={currentPage}
             pageCount={pageCount}
@@ -1610,44 +1655,95 @@ function SpacesPage({
       {spaces.length ? (
         oversight ? (
           <>
-            <Table aria-label="Program sections">
-              <TableHeader>
-                <Column id="section" isRowHeader>
-                  Section
-                </Column>
-                <Column id="program">Program</Column>
-                <Column id="year">Year</Column>
-                <Column id="adviser">Adviser</Column>
-                <Column id="students" numeric>
-                  Students
-                </Column>
-                <Column id="subject">Subject</Column>
-              </TableHeader>
-              <TableBody>
-                {visible.map((space) => (
-                  <TableRow
-                    id={space.id}
-                    key={space.id}
-                    href={`/spaces/${encodeURIComponent(space.id)}`}
-                  >
-                    <Cell>{space.title}</Cell>
-                    <Cell>{space.program}</Cell>
-                    <Cell>
-                      {space.year ?? space.title.match(/\d/)?.[0] ?? '—'}
-                    </Cell>
-                    <Cell>
-                      {space.professors
-                        ?.map((person) => person.name)
-                        .join(', ') || 'Unassigned'}
-                    </Cell>
-                    <Cell numeric>
-                      {space.studentCount ?? space.studentIds?.length ?? 0}
-                    </Cell>
-                    <Cell>{space.subject}</Cell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="community-sections-table">
+              <Table aria-label="Program sections">
+                <TableHeader>
+                  <Column id="section" isRowHeader>
+                    Section
+                  </Column>
+                  <Column id="program">Program</Column>
+                  <Column id="year">Year</Column>
+                  <Column id="adviser">Adviser</Column>
+                  <Column id="students" numeric>
+                    Students
+                  </Column>
+                  <Column id="subject">Subject</Column>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((space) => (
+                    <TableRow
+                      id={space.id}
+                      key={space.id}
+                      href={`/spaces/${encodeURIComponent(space.id)}`}
+                    >
+                      <Cell>{space.title}</Cell>
+                      <Cell>{space.program}</Cell>
+                      <Cell>
+                        {space.year ?? space.title.match(/\d/)?.[0] ?? '—'}
+                      </Cell>
+                      <Cell>
+                        {space.professors
+                          ?.map((person) => person.name)
+                          .join(', ') || 'Unassigned'}
+                      </Cell>
+                      <Cell numeric>
+                        {space.studentCount ?? space.studentIds?.length ?? 0}
+                      </Cell>
+                      <Cell>{space.subject}</Cell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <ul
+              className="community-sections-cards"
+              aria-label="Program sections"
+            >
+              {visible.map((space) => (
+                <li key={space.id}>
+                  <Card link className="community-section-card">
+                    <CardHeader>
+                      <span className="ds-card__ref">Section</span>
+                    </CardHeader>
+                    <CardTitle
+                      href={`/spaces/${encodeURIComponent(space.id)}`}
+                    >
+                      {space.title}
+                    </CardTitle>
+                    <dl className="ds-record__facts">
+                      <div>
+                        <dt>Program</dt>
+                        <dd>{space.program}</dd>
+                      </div>
+                      <div>
+                        <dt>Year</dt>
+                        <dd>
+                          {space.year ?? space.title.match(/\d/)?.[0] ?? '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Adviser</dt>
+                        <dd>
+                          {space.professors
+                            ?.map((person) => person.name)
+                            .join(', ') || 'Unassigned'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Students</dt>
+                        <dd>
+                          {space.studentCount ?? space.studentIds?.length ?? 0}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Subject</dt>
+                        <dd>{space.subject}</dd>
+                      </div>
+                    </dl>
+                  </Card>
+                </li>
+              ))}
+            </ul>
             <Pagination
               page={pageNumber}
               pageCount={pageCount}

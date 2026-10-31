@@ -477,8 +477,16 @@ function CalendarPage({
     })),
   ].filter((entry) => selectedLayers.includes(entry.layer))
   const days = weekDays(selectedDate)
-  const weekEvents: TimetableEvent[] = entries
+  const weekEntries = entries
     .filter((entry) => days.some((day) => day.id === entry.date))
+    .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))
+  const weekEventDays = days
+    .map((day) => ({
+      day,
+      events: weekEntries.filter((entry) => entry.date === day.id),
+    }))
+    .filter(({ events }) => events.length)
+  const weekEvents: TimetableEvent[] = weekEntries
     .map((entry) => ({
       id: entry.id,
       day: entry.date,
@@ -705,19 +713,60 @@ function CalendarPage({
             level={2}
             title={`Week of ${displayDate(weekStart(selectedDate))}`}
           />
-          <Timetable
-            label="Calendar week, local campus time"
-            days={days}
-            events={weekEvents}
-            startHour={7}
-            endHour={19}
-          />
-          {!weekEvents.length && (
-            <ViewState
-              kind="empty"
-              title="No events in this week"
-              description="No events are substituted from a different date or layer."
-            />
+          {small ? (
+            weekEventDays.length ? (
+              <div
+                className="schedule-week-list"
+                role="region"
+                aria-label="Calendar week events"
+              >
+                {weekEventDays.map(({ day, events }) => (
+                  <section className="schedule-week-list__day" key={day.id}>
+                    <h3>
+                      <time dateTime={day.id}>
+                        {parseDate(day.id).toLocaleDateString('en-PH', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </time>
+                    </h3>
+                    <ul className="schedule-week-list__events">
+                      {events.map((entry) => (
+                        <li key={entry.id}>
+                          {renderCalendarEvent(entry)}
+                          {entry.type && <p>{entry.type}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <ViewState
+                kind="empty"
+                title="No events in this week"
+                description="No events are substituted from a different date or layer."
+              />
+            )
+          ) : (
+            <>
+              <Timetable
+                label="Calendar week, local campus time"
+                days={days}
+                events={weekEvents}
+                startHour={7}
+                endHour={19}
+              />
+              {!weekEvents.length && (
+                <ViewState
+                  kind="empty"
+                  title="No events in this week"
+                  description="No events are substituted from a different date or layer."
+                />
+              )}
+            </>
           )}
         </>
       ) : (
@@ -793,46 +842,104 @@ function ConsultationTable({
   const current = Math.min(page, pageCount)
   return consultations.length ? (
     <div className="app-page">
-      <Table
+      <div className="schedule-consultation-table">
+        <Table
+          aria-label={
+            facultyView
+              ? 'Consultation requests from students'
+              : 'Your consultation requests'
+          }
+        >
+          <TableHeader>
+            <Column id="person" isRowHeader>
+              {facultyView ? 'Student' : 'Professor'}
+            </Column>
+            <Column id="time">Date and time</Column>
+            <Column id="status">Status</Column>
+            <Column id="updated">Updated</Column>
+            {facultyView && <Column id="topic">Topic</Column>}
+          </TableHeader>
+          <TableBody>
+            {consultations
+              .slice((current - 1) * 20, current * 20)
+              .map((consultation) => (
+                <TableRow
+                  id={consultation.id}
+                  key={consultation.id}
+                  href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
+                >
+                  <Cell>
+                    {facultyView
+                      ? consultation.student.name
+                      : consultation.faculty.name}
+                  </Cell>
+                  <Cell>{slotTime(consultation.slot)}</Cell>
+                  <Cell>
+                    <StatusBadge status={consultation.status} />
+                  </Cell>
+                  <Cell>{displayDate(consultation.updatedAt, true)}</Cell>
+                  {facultyView && <Cell>{consultation.purpose}</Cell>}
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+      </div>
+      <ul
+        className="schedule-consultation-cards"
         aria-label={
           facultyView
             ? 'Consultation requests from students'
             : 'Your consultation requests'
         }
       >
-        <TableHeader>
-          <Column id="person" isRowHeader>
-            {facultyView ? 'Student' : 'Professor'}
-          </Column>
-          <Column id="time">Date and time</Column>
-          <Column id="status">Status</Column>
-          <Column id="updated">Updated</Column>
-          {facultyView && <Column id="topic">Topic</Column>}
-        </TableHeader>
-        <TableBody>
-          {consultations
-            .slice((current - 1) * 20, current * 20)
-            .map((consultation) => (
-              <TableRow
-                id={consultation.id}
-                key={consultation.id}
-                href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
-              >
-                <Cell>
-                  {facultyView
-                    ? consultation.student.name
-                    : consultation.faculty.name}
-                </Cell>
-                <Cell>{slotTime(consultation.slot)}</Cell>
-                <Cell>
-                  <StatusBadge status={consultation.status} />
-                </Cell>
-                <Cell>{displayDate(consultation.updatedAt, true)}</Cell>
-                {facultyView && <Cell>{consultation.purpose}</Cell>}
-              </TableRow>
-            ))}
-        </TableBody>
-      </Table>
+        {consultations
+          .slice((current - 1) * 20, current * 20)
+          .map((consultation) => (
+            <li key={consultation.id}>
+              <article className="schedule-consultation-card">
+                <h3>
+                  <Link
+                    href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
+                  >
+                    {facultyView
+                      ? consultation.student.name
+                      : consultation.faculty.name}
+                  </Link>
+                </h3>
+                <p className="schedule-consultation-card__time">
+                  <span>Date and time</span>
+                  <time
+                    dateTime={`${consultation.slot.date}T${consultation.slot.start}`}
+                  >
+                    {slotTime(consultation.slot)}
+                  </time>
+                </p>
+                <dl className="schedule-consultation-card__details">
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      <StatusBadge status={consultation.status} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Updated</dt>
+                    <dd>
+                      <time dateTime={consultation.updatedAt}>
+                        {displayDate(consultation.updatedAt, true)}
+                      </time>
+                    </dd>
+                  </div>
+                  {facultyView && (
+                    <div>
+                      <dt>Topic</dt>
+                      <dd>{consultation.purpose}</dd>
+                    </div>
+                  )}
+                </dl>
+              </article>
+            </li>
+          ))}
+      </ul>
       <Pagination
         page={current}
         pageCount={pageCount}

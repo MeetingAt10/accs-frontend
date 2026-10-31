@@ -49,12 +49,33 @@
   display: none;
 }
 
+.grievance-queue-desktop {
+  display: block;
+}
+
+.grievance-queue-cards.ds-record-list,
+.grievance-queue-sort.ds-cols {
+  display: none;
+}
+
 @media (max-width: 767.98px) {
   .grievance-desktop {
     display: none;
   }
 
   .grievance-mobile {
+    display: grid;
+    gap: var(--ds-space-16);
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .grievance-queue-desktop {
+    display: none;
+  }
+
+  .grievance-queue-cards.ds-record-list,
+  .grievance-queue-sort.ds-cols {
     display: grid;
     gap: var(--ds-space-16);
   }

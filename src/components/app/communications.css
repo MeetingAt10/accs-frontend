@@ -1,0 +1,14 @@
+.communications-thread-back {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  .communications-messages--thread .communications-messages__inbox,
+  .communications-messages--inbox .communications-messages__thread {
+    display: none;
+  }
+
+  .communications-thread-back {
+    display: flex;
+  }
+}

@@ -61,6 +61,7 @@ import {
   NotificationItem,
   NotificationList,
 } from "@/components/ds-next";
+import "./communications.css";
 
 type Item = Record<string, unknown>;
 type Priority = "high" | "normal" | "muted";
@@ -258,8 +259,18 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           />
         }
       />
-      <Grid columns="split">
-        <section aria-label="Conversation list">
+      <Grid
+        columns="split"
+        className={
+          isThread
+            ? "communications-messages communications-messages--thread"
+            : "communications-messages communications-messages--inbox"
+        }
+      >
+        <section
+          aria-label="Conversation list"
+          className="communications-messages__inbox"
+        >
           <Stack gap={16}>
             <Search
               label="Search conversations"
@@ -315,12 +326,23 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           </Stack>
         </section>
         <section
+          className="communications-messages__thread"
           aria-label={
             isThread
               ? words(conversation.title, "Conversation")
               : "Conversation"
           }
         >
+          {isThread && (
+            <Button
+              className="communications-thread-back"
+              href="/messages"
+              size="sm"
+              variant="tertiary"
+            >
+              Back to conversations
+            </Button>
+          )}
           {!isThread ? (
             <EmptyState
               title="Pick a conversation"

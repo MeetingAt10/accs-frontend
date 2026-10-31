@@ -1,4 +1,4 @@
-import { Button, ViewState } from '@meetingat10/design-system/react'
+import { Button, TextField, ViewState } from '@meetingat10/design-system/react'
 import type { ReactNode } from 'react'
 
 import './EventCalendar.css'
@@ -43,6 +43,10 @@ export function EventCalendar({
     12,
   )
   const month = isoDate(start).slice(0, 7)
+  const monthLabel = selectedDate.toLocaleDateString('en-PH', {
+    month: 'long',
+    year: 'numeric',
+  })
   const monthEvents = events
     .filter((event) => event.date.startsWith(month))
     .sort((a, b) =>
@@ -66,32 +70,37 @@ export function EventCalendar({
     )
   }
 
+  const monthEventList = monthEvents.length ? (
+    <ol
+      className="ds-next-event-calendar-list"
+      aria-label={`${label}, events for ${monthLabel}`}
+    >
+      {monthEvents.map((event) => (
+        <li key={event.id} className="ds-next-event-calendar-list__item">
+          <time dateTime={event.date}>
+            {new Date(`${event.date}T12:00:00`).toLocaleDateString('en-PH', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short',
+            })}
+          </time>
+          <div>
+            {eventControl(event)}
+            {event.type && <p>{event.type}</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  ) : (
+    <ViewState
+      kind="empty"
+      title="No events in this month"
+      description="Change the date or calendar layers to see other permitted events."
+    />
+  )
+
   if (view === 'list') {
-    return monthEvents.length ? (
-      <ol className="ds-next-event-calendar-list" aria-label={label}>
-        {monthEvents.map((event) => (
-          <li key={event.id} className="ds-next-event-calendar-list__item">
-            <time dateTime={event.date}>
-              {new Date(`${event.date}T12:00:00`).toLocaleDateString('en-PH', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              })}
-            </time>
-            <div>
-              {eventControl(event)}
-              {event.type && <p>{event.type}</p>}
-            </div>
-          </li>
-        ))}
-      </ol>
-    ) : (
-      <ViewState
-        kind="empty"
-        title="No events in this month"
-        description="Change the date or calendar layers to see other permitted events."
-      />
-    )
+    return monthEventList
   }
 
   const firstDay = new Date(start)
@@ -103,68 +112,82 @@ export function EventCalendar({
   })
 
   return (
-    <div className="ds-next-event-calendar-wrap">
-      <table className="ds-next-event-calendar" aria-label={label}>
-        <caption>
-          {selectedDate.toLocaleDateString('en-PH', {
-            month: 'long',
-            year: 'numeric',
-          })}
-        </caption>
-        <thead>
-          <tr>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
-              (weekday) => (
-                <th scope="col" key={weekday}>
-                  {weekday}
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: 6 }, (_, week) => (
-            <tr key={week}>
-              {days.slice(week * 7, week * 7 + 7).map((day) => {
-                const value = isoDate(day)
-                const dayEvents = events.filter((event) => event.date === value)
-                return (
-                  <td
-                    key={value}
-                    className={
-                      day.getMonth() === selectedDate.getMonth()
-                        ? undefined
-                        : 'ds-next-event-calendar__outside'
-                    }
-                  >
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      onPress={() => onDateChange?.(value)}
-                      aria-current={value === today ? 'date' : undefined}
-                      aria-label={day.toLocaleDateString('en-PH', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    >
-                      <time dateTime={value}>{day.getDate()}</time>
-                    </Button>
-                    <ul className="ds-next-event-calendar__events">
-                      {dayEvents.map((event) => (
-                        <li key={event.id} data-lane={event.lane}>
-                          {eventControl(event)}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                )
-              })}
+    <>
+      <div
+        className="ds-next-event-calendar-wrap"
+        role="region"
+        aria-label={`${label}, month view`}
+        tabIndex={0}
+      >
+        <table className="ds-next-event-calendar" aria-label={label}>
+          <caption>{monthLabel}</caption>
+          <thead>
+            <tr>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                (weekday) => (
+                  <th scope="col" key={weekday}>
+                    {weekday}
+                  </th>
+                ),
+              )}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {Array.from({ length: 6 }, (_, week) => (
+              <tr key={week}>
+                {days.slice(week * 7, week * 7 + 7).map((day) => {
+                  const value = isoDate(day)
+                  const dayEvents = events.filter(
+                    (event) => event.date === value,
+                  )
+                  return (
+                    <td
+                      key={value}
+                      className={
+                        day.getMonth() === selectedDate.getMonth()
+                          ? undefined
+                          : 'ds-next-event-calendar__outside'
+                      }
+                    >
+                      <Button
+                        variant="tertiary"
+                        size="sm"
+                        onPress={() => onDateChange?.(value)}
+                        aria-current={value === today ? 'date' : undefined}
+                        aria-label={day.toLocaleDateString('en-PH', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      >
+                        <time dateTime={value}>{day.getDate()}</time>
+                      </Button>
+                      <ul className="ds-next-event-calendar__events">
+                        {dayEvents.map((event) => (
+                          <li key={event.id} data-lane={event.lane}>
+                            {eventControl(event)}
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="ds-next-event-calendar-month-mobile">
+        <h2 className="ds-next-event-calendar-month-heading">{monthLabel}</h2>
+        <TextField
+          type="date"
+          label="Date for Week view"
+          value={date}
+          onChange={(value) => value && onDateChange?.(value)}
+        />
+        {monthEventList}
+      </div>
+    </>
   )
 }
