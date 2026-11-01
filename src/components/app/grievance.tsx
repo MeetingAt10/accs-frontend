@@ -5,7 +5,7 @@ import {
   type SortDescriptor,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AnimatePresence, LayoutGroup, MotionConfig, animate, motion, useMotionValue, useTransform, type Variants } from 'motion/react'
+import { AnimatePresence, LayoutGroup, MotionConfig, motion, type Variants } from 'motion/react'
 import { useEffect, useState } from 'react'
 
 import { performPageAction, type PageAction, type PageEnvelope } from '@/lib/api'
@@ -60,7 +60,7 @@ function useAction(pageId: string) {
 }
 
 function ActionError({ error }: { error: unknown }) {
-  return error ? <Alert tone="danger" title="The change couldn't be saved">{error instanceof Error ? error.message : 'Try again. Your entered text is kept.'}</Alert> : null
+  return error ? <Alert tone="danger" title="Couldn't save your change">{error instanceof Error ? error.message : 'Try again. Your entered text is kept.'}</Alert> : null
 }
 
 /** Quiet one-line privacy explanation. */
@@ -70,16 +70,6 @@ function Note({ children }: { children: React.ReactNode }) {
 
 function Facts({ values }: { values: Array<[string, React.ReactNode]> }) {
   return <dl className="gv-facts">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-}
-
-function Count({ value }: { value: number }) {
-  const motionValue = useMotionValue(0)
-  const rounded = useTransform(motionValue, (latest) => Math.round(latest))
-  useEffect(() => {
-    const controls = animate(motionValue, value, { duration: 0.7, ease })
-    return () => controls.stop()
-  }, [motionValue, value])
-  return <motion.span>{rounded}</motion.span>
 }
 
 function SeverityChip({ report }: { report: Item }) {
@@ -102,37 +92,9 @@ function PillGroup({ id, label, value, options, onChange }: { id: string; label:
   )
 }
 
-/** Horizontal stage strip with counts. Segments filter when `onSelect` is given. */
-function Pipeline({ records, active = '', onSelect }: { records: Item[]; active?: string; onSelect?: (key: string) => void }) {
-  return (
-    <nav className="gv-pipe" aria-label="Reports by stage">
-      <LayoutGroup id="gv-pipe">
-        <ol>
-          {stages.map(([key, name]) => {
-            const on = active === key
-            const count = records.filter((report) => stageOf(report) === key).length
-            const inner = <>
-              {on && <motion.span layoutId="gv-pipe-ind" className="gv-pipe__ind" transition={spring} />}
-              <span className="gv-pipe__name">{name}</span>
-              <span className="gv-pipe__count"><Count value={count} /></span>
-            </>
-            return (
-              <li key={key} data-empty={count === 0 || undefined} data-last={key === 'resolved' || undefined}>
-                {onSelect
-                  ? <button type="button" className="gv-pipe__seg" aria-pressed={on} onClick={() => onSelect(on ? '' : key)}>{inner}</button>
-                  : <div className="gv-pipe__seg">{inner}</div>}
-              </li>
-            )
-          })}
-        </ol>
-      </LayoutGroup>
-    </nav>
-  )
-}
-
 function Timeline({ report, handler = false }: { report: Item; handler?: boolean }) {
   const history = items(report.history)
-  if (!history.length) return <Empty title="No updates yet">Updates recorded by the responsible office will appear here.</Empty>
+  if (!history.length) return <Empty title="No updates yet">Updates from the responsible office show here.</Empty>
   const hasCurrent = history.some((entry) => entry.state === 'current')
   return (
     <ol className="accs-timeline gv-timeline" aria-label={handler ? 'Case history' : 'Report progress'}>
@@ -209,8 +171,8 @@ export function DiscloseIdentityDialog({ report, isOpen, onOpenChange }: { repor
   return (
     <Modal role="alertdialog" title={'Share your name with ' + report.office + '?'} isOpen={isOpen} onOpenChange={onOpenChange}>
       <ModalBody>
-        <p>Your verified name will be shared with the office currently handling this report. This action is recorded for this office.</p>
-        <p>Other offices do not receive this disclosure automatically.</p>
+        <p>Your verified name goes to the office handling this report now. We record the disclosure for that office.</p>
+        <p>Other offices don't get your name automatically.</p>
         <ActionError error={action.error} />
       </ModalBody>
       <ModalActions>
@@ -228,7 +190,7 @@ function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: stri
   return (
     <Drawer title="Help with your draft" isOpen={isOpen} onOpenChange={onOpenChange}>
       <div className="gv-stack">
-        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. It offers approved writing guidance only.</Alert>
+        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. It gives approved writing tips only.</Alert>
         <Button variant="secondary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Show writing guidance</Button>
         <ActionError error={action.error} />
         {reply && <p className="ds-prose">{reply}</p>}
@@ -305,7 +267,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
   const saveDraft = () => action.mutate({ action: 'saveDraft', payload: { narrative: draft.narrative, ...(draft.category ? { category: draft.category } : {}), ...(draft.severity ? { severity: draft.severity } : {}), identity: draft.identity } })
   const submit = () => {
     if (!draft.narrative.trim() || !draft.category || !draft.severity) {
-      setError('Complete the description, category, and severity before submitting.')
+      setError('Add a description, category, and severity before you submit.')
       return
     }
     action.mutate({
@@ -340,13 +302,13 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
       <div className="gv-wizard gv-page">
         <PageHeader
           title="New report"
-          description="Tell the right office what happened. You review everything before it is sent."
+          description="You review everything before you send it."
           crumbs={[{ label: 'My reports', href: '/reports' }, { label: 'New report' }]}
           actions={<MenuButton label="Draft" onAction={(key) => key === 'save' ? saveDraft() : setDiscardOpen(true)}><MenuItem id="save">Save draft</MenuItem><MenuItem id="discard" danger>Discard draft</MenuItem></MenuButton>}
         />
         <div className="gv-stack accs-reveal">
           <StepIndicator current={step} />
-          {words(source.id) && <Alert tone="info" title={'Linked to your discussion "' + words(source.title) + '"'}>The link is kept only if you choose to submit this report.</Alert>}
+          {words(source.id) && <Alert tone="info" title={'Linked to your discussion "' + words(source.title) + '"'}>The link is saved only if you submit this report.</Alert>}
           {error && <Alert tone="danger" title="Check this step">{error}</Alert>}
           {action.error && action.variables?.action === 'saveDraft' ? <Alert tone="danger" title="Couldn't save your draft">Your text is kept on this device. Try saving again.</Alert> : <ActionError error={action.error} />}
           <Panel className="gv-form">
@@ -359,7 +321,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                     <TextField label="Where" value={draft.location} onChange={(value) => update('location', value)} maxLength={200} description="Optional" />
                   </Grid>
                   {/* TBD(D-08): attachment access and retention policy is not approved. */}
-                  <p className="gv-hint">Attachments are not enabled while access and retention rules are being defined.</p>
+                  <p className="gv-hint">Attachments are off until access and retention rules are set.</p>
                   <div><Button variant="secondary" onPress={() => setHelpOpen(true)}>Help me write this</Button></div>
                   <Note>The assistant helps you write. It doesn't decide what happened or what happens next.</Note>
                 </>}
@@ -368,11 +330,11 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                     {categories.map((category) => <SelectOption id={category} key={category}>{category}</SelectOption>)}
                   </Select>
                   <RadioGroup label="How serious is it?" value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)} isRequired>
-                    <Radio value="low" card description="A concern with limited immediate impact.">Low</Radio>
-                    <Radio value="medium" card description="A concern affecting ongoing activities or support.">Medium</Radio>
-                    <Radio value="high" card description="A concern that needs prompt human review.">High</Radio>
+                    <Radio value="low" card description="Limited impact right now.">Low</Radio>
+                    <Radio value="medium" card description="Affects ongoing activities or support.">Medium</Radio>
+                    <Radio value="high" card description="Needs prompt review by a person.">High</Radio>
                   </RadioGroup>
-                  <Checkbox isSelected={draft.conflictedAdviser} onChange={(value) => update('conflictedAdviser', value)} description="This routes the report for independent review. It is not a finding.">The assigned adviser may be involved</Checkbox>
+                  <Checkbox isSelected={draft.conflictedAdviser} onChange={(value) => update('conflictedAdviser', value)} description="The report goes to independent review. This is not a finding.">The assigned adviser may be involved</Checkbox>
                 </>}
                 {step === 2 && <IdentityChoice value={draft.identity} onChange={(value) => update('identity', value)} allowAnonymous={page.data.anonymityAllowed !== false} />}
                 {step === 3 && <>
@@ -433,7 +395,7 @@ function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22
   return (
     <div className="gv-stack">
       <Note>{pageId === 'P20' ? report.identity === 'anonymous' ? 'You appear as ' + words(report.alias) + ' unless you share your name with this office.' : 'The handling office sees your verified name.' : 'The reporter sees messages you send here. Keep internal coordination in Notes.'}</Note>
-      {messages.length ? <Thread entries={messages} label="Report messages" /> : <Empty title="No messages yet">Use this conversation to share information with the responsible office.</Empty>}
+      {messages.length ? <Thread entries={messages} label="Report messages" /> : <Empty title="No messages yet">{pageId === 'P20' ? 'Messages you send here go to the office handling your report.' : 'Messages you send here go to the reporter.'}</Empty>}
       <ActionError error={action.error} />
       {closed ? <Alert tone="neutral" title="This conversation is closed">The report is resolved or closed.</Alert> : <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); if (body.trim()) action.mutate({ action: 'sendReportMessage', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) }}>
         <TextArea label={pageId === 'P20' ? 'Message to the handling office' : 'Message to the reporter'} value={body} onChange={setBody} isRequired maxLength={4000} showCount />
@@ -446,15 +408,15 @@ function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22
 function ReportList({ page }: { page: PageEnvelope }) {
   const [view, setView] = useState('active')
   const all = items(page.data.reports)
+  const closedCount = all.filter(isClosed).length
   const records = all.filter((report) => view === 'closed' ? isClosed(report) : !isClosed(report))
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
-        <PageHeader title="My reports" description="Follow each report from the office that has it now through to resolution." actions={<Button icon="plus" href="/reports/new">New report</Button>} />
+        <PageHeader title="My reports" actions={<Button icon="plus" href="/reports/new">New report</Button>} />
         <div className="gv-page accs-stagger">
-          <Pipeline records={all} />
           <div className="gv-listbar">
-            <PillGroup id="view" label="Report view" value={view} onChange={setView} options={[{ id: 'active', label: 'Active' }, { id: 'closed', label: 'Closed' }]} />
+            <PillGroup id="view" label="Report view" value={view} onChange={setView} options={[{ id: 'active', label: 'Active ' + (all.length - closedCount) }, { id: 'closed', label: 'Closed ' + closedCount }]} />
             <Note>Only you and the office handling each report can open it.</Note>
           </div>
           {records.length ? (
@@ -483,7 +445,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
                 })}
               </ul>
             </Panel>
-          ) : <Panel><Empty title={view === 'closed' ? 'No closed reports' : 'No reports yet'} action={view === 'active' ? <Button href="/reports/new">New report</Button> : undefined}>If something is wrong, you can tell the right office here.</Empty></Panel>}
+          ) : <Panel><Empty title={view === 'closed' ? 'No closed reports' : 'No reports yet'} action={view === 'active' ? <Button href="/reports/new">New report</Button> : undefined}>You haven't filed a report. Start one when you want an office to look into something.</Empty></Panel>}
         </div>
       </div>
     </MotionConfig>
@@ -511,7 +473,7 @@ function Narrative({ report, title }: { report: Report; title: string }) {
   const text = words(report.narrative)
   return (
     <Panel title={title}>
-      {text ? <p className="gv-narrative">{text}</p> : <p className="gv-hint">No description was recorded.</p>}
+      {text ? <p className="gv-narrative">{text}</p> : <p className="gv-hint">No description on file.</p>}
       {words(report.sourcePostId) && <p><Link href={'/feed/' + encodeURIComponent(words(report.sourcePostId))}>Linked discussion</Link></p>}
     </Panel>
   )
@@ -554,14 +516,14 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
           </aside>
         </div>
         <DiscloseIdentityDialog report={report} isOpen={discloseOpen} onOpenChange={setDiscloseOpen} />
-        <Drawer title="About this stage" isOpen={helpOpen} onOpenChange={setHelpOpen}><div className="gv-stack"><Alert tone="neutral" title="People decide the next steps">The assistant explains approved process information.</Alert><ActionError error={assistant.error} />{assistant.isPending ? <ViewState kind="loading" title="Loading explanation" /> : <p className="ds-prose">{words(object(assistant.data?.record).reply)}</p>}<Link href="/assistant">Open assistant</Link></div></Drawer>
+        <Drawer title="About this stage" isOpen={helpOpen} onOpenChange={setHelpOpen}><div className="gv-stack"><Alert tone="neutral" title="People decide the next steps">It explains the process using approved information.</Alert><ActionError error={assistant.error} />{assistant.isPending ? <ViewState kind="loading" title="Loading explanation" /> : <p className="ds-prose">{words(object(assistant.data?.record).reply)}</p>}<Link href="/assistant">Open assistant</Link></div></Drawer>
       </div>
     </MotionConfig>
   )
 }
 
 export function ConflictNotice() {
-  return <Alert tone="warning" title="Routed to you because the assigned adviser may be involved">Detection only suggests routing. It isn't a finding.</Alert>
+  return <Alert tone="warning" title="Routed to you because the assigned adviser may be involved">The system only suggests the routing. It is not a finding.</Alert>
 }
 
 export function CaseNotes({ report }: { report: Report }) {
@@ -596,7 +558,7 @@ export function CaseActionBar({ report }: { report: Report }) {
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
   // TBD(D-04): offer only server-approved chain transitions; no undefined bypass or executive power.
-  if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions are available. This view is read only at the current stage.</p></Panel>
+  if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions available. You can only read this report at its current stage.</p></Panel>
   const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
     <Panel title="Next action">
@@ -610,15 +572,15 @@ export function CaseActionBar({ report }: { report: Report }) {
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
             <TextArea label="Reason" value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
             <TextArea label="Update shown to the reporter" value={update} onChange={setUpdate} isRequired maxLength={4000} showCount />
-            <Note>The reason stays in the handler history. The reporter receives the update you write above.</Note>
-            {error && <Alert tone="danger" title="Complete the action">{error}</Alert>}
+            <Note>The reason stays in the handler history. The reporter sees the update you write above.</Note>
+            {error && <Alert tone="danger" title="Missing information">{error}</Alert>}
             <ActionError error={action.error} />
           </div>
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" isDisabled={action.isPending} onPress={() => setSelected('')}>Cancel</Button>
           <Button loading={action.isPending} onPress={() => {
-            if (!reason.trim() || !update.trim()) { setError('A reason and reporter update are required.'); return }
+            if (!reason.trim() || !update.trim()) { setError('Add a reason and an update for the reporter.'); return }
             action.mutate({ action: 'caseAction', recordId: report.id, reason, payload: { type: selected, update, ...(transition && next ? { nextStage: next.stage } : {}) } }, { onSuccess: () => setSelected('') })
           }}>{label(selected) || 'Save action'}</Button>
         </ModalActions>
@@ -664,7 +626,7 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
                 ['Reporter', words(object(report.reporter).name, words(report.alias, '—'))],
                 ['Identity', report.identity === 'anonymous' ? 'Alias unless disclosed to this office' : 'Named'],
               ]} />
-              <Note>Only authorized handlers may open this record. Every action is recorded.</Note>
+              <Note>Only authorized handlers can open this record. We record every action.</Note>
             </Panel>
             <CaseActionBar report={report} />
             <CaseNotes report={report} />
@@ -721,13 +683,13 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
       <div className="gv-page">
         <PageHeader title={title} description={page.scope} actions={<Note>You see only reports routed to you. Every action is recorded.</Note>} />
         <div className="gv-page accs-stagger">
-          <Pipeline records={inQueue} active={stage} onSelect={(key) => reset(() => setStage(key))} />
           <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabDefs} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">
             <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
             <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
             <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
             <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            <Select label="Stage" selectedKey={stage} onSelectionChange={(key) => reset(() => setStage(String(key ?? '')))}><SelectOption id="">All stages</SelectOption>{stages.map(([key, name]) => <SelectOption id={key} key={key}>{name + ' (' + inQueue.filter((report) => stageOf(report) === key).length + ')'}</SelectOption>)}</Select>
             <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>
             <div className="gv-sortbar">
               <Select label="Sort by" selectedKey={String(sort.column)} onSelectionChange={(key) => setSort((current) => ({ ...current, column: String(key) }))}>
@@ -780,8 +742,8 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
             </div>
             <Pagination page={Math.min(currentPage, pageCount)} pageCount={pageCount} onPageChange={setCurrentPage} summary={'Showing ' + shown.length + ' of ' + filtered.length + ' reports'} />
           </> : <Panel>{query || level || category || status || stage
-            ? <Empty title="No reports match these filters">Change or clear a filter to see other reports within your access.</Empty>
-            : <Empty title="No reports in this queue">Reports routed to your role and stage will appear here.</Empty>}</Panel>}
+            ? <Empty title="No reports match these filters">Clear a filter to see more of your reports.</Empty>
+            : <Empty title="No reports in this queue">Nothing is routed to you right now.</Empty>}</Panel>}
         </div>
       </div>
     </MotionConfig>

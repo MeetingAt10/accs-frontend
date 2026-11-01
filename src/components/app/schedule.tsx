@@ -26,11 +26,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useRouterState } from '@tanstack/react-router'
 import {
   AnimatePresence,
-  animate,
   motion,
-  useMotionValue,
   useReducedMotion,
-  useTransform,
   type Variants,
 } from 'motion/react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
@@ -38,8 +35,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { RestrictedView } from '@/components/app/guards'
 import {
   Empty,
-  Kpi,
-  Kpis,
   PageHeader,
   Panel,
   StatusChip,
@@ -233,7 +228,7 @@ function useScheduleAction(pageId: string) {
 
 function ActionError({
   error,
-  title = "The change couldn't be saved",
+  title = "Couldn't save the change",
 }: {
   error: unknown
   title?: string
@@ -242,7 +237,7 @@ function ActionError({
     <Alert tone="danger" title={title}>
       {error instanceof Error
         ? error.message
-        : 'Try again. Your entered text is kept.'}
+        : 'Try again. Your text is still here.'}
     </Alert>
   ) : null
 }
@@ -276,21 +271,6 @@ function useSmallScreen() {
     return () => query.removeEventListener('change', change)
   }, [])
   return small
-}
-
-/** Number that counts up to its value. */
-function CountUp({ value }: { value: number }) {
-  const reduce = useReducedMotion()
-  const motionValue = useMotionValue(reduce ? value : 0)
-  const text = useTransform(motionValue, (latest) => String(Math.round(latest)))
-  useEffect(() => {
-    const controls = animate(motionValue, value, {
-      duration: reduce ? 0 : 0.8,
-      ease,
-    })
-    return () => controls.stop()
-  }, [value, reduce, motionValue])
-  return <motion.span>{text}</motion.span>
 }
 
 /** Pill group with one thumb that slides to the active item. */
@@ -594,8 +574,8 @@ function CalendarPage({
             </Button>
           )}
         {entry.slot && entry.slot.state !== 'open' && (
-          <Alert tone="neutral" title="This time is not open">
-            Unavailable, requested, and booked times cannot be requested.
+          <Alert tone="neutral" title="This time is closed">
+            You can only request open times.
           </Alert>
         )}
         {entry.consultation && (
@@ -657,7 +637,7 @@ function CalendarPage({
     <>
       <PageHeader
         title="Calendar"
-        description="Campus events, faculty availability and your consultations, in local campus time."
+        description="All times are campus time."
         actions={
           <>
             {canTodo && (
@@ -728,7 +708,7 @@ function CalendarPage({
             <ActionError error={action.error} />
           </div>
           <div className="accs-stack">
-            <Panel title="Calendar layers" className="sc-rail-layers">
+            <Panel title="Show on calendar" className="sc-rail-layers">
               {layerPills}
             </Panel>
             <Panel flush title="Upcoming">
@@ -759,7 +739,7 @@ function CalendarPage({
                 </ul>
               ) : (
                 <Empty title="Nothing coming up">
-                  Events in your selected layers appear here.
+                  No events in the layers you selected.
                 </Empty>
               )}
             </Panel>
@@ -821,7 +801,7 @@ function CalendarPage({
                   </ul>
                 ) : (
                   <Empty title="No to-dos yet">
-                    Add a personal reminder. Only you can see it.
+                    Only you can see your to-dos.
                   </Empty>
                 )}
               </Panel>
@@ -1024,8 +1004,8 @@ function ConsultationsPage({
         title={professor ? 'Consultation requests' : 'Consultations'}
         description={
           professor
-            ? 'Decide on student requests and manage the times you offer.'
-            : 'Track your requests and book time with a professor.'
+            ? 'Approve or decline requests, and set the times you offer.'
+            : 'Track your requests or book a professor.'
         }
         actions={
           professor ? (
@@ -1097,15 +1077,15 @@ function ConsultationsPage({
               }
               emptyHint={
                 professor
-                  ? 'Requests in this view will appear here.'
+                  ? 'No requests match this filter.'
                   : status === 'All'
-                    ? 'Request an open time with a professor assigned to you.'
+                    ? 'Pick an open time with one of your professors.'
                     : `You have no ${status.toLowerCase()} requests.`
               }
               emptyAction={
                 !professor &&
                 status === 'All' && (
-                  <Button onPress={() => setMode('faculty')}>Find a time</Button>
+                  <Button onPress={() => setMode('faculty')}>Find a professor</Button>
                 )
               }
             />
@@ -1130,9 +1110,9 @@ function ConsultationsPage({
                 title={
                   query
                     ? 'No professors match this search'
-                    : 'No faculty linked for consultations'
+                    : 'No professors available'
                 }
-                description="Only professors you may consult appear here."
+                description="Your list only includes professors you can consult."
               />
             )}
           </>
@@ -1192,7 +1172,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
 
   function next() {
     if (step.n === 3 && !purpose.trim()) {
-      setPurposeError('Enter a short topic for your professor.')
+      setPurposeError('Add a short topic for your professor.')
       return
     }
     setPurposeError('')
@@ -1203,7 +1183,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
     event.preventDefault()
     if (step.n !== 4) return
     if (!selectedSlot || !purpose.trim()) {
-      setPurposeError('Choose an open time and enter a short topic.')
+      setPurposeError('Choose an open time and add a short topic.')
       return
     }
     try {
@@ -1240,7 +1220,6 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
           { label: faculty.name },
         ]}
         title={`Book ${faculty.name}`}
-        description="Pick an open time and tell the professor what you want to discuss."
       />
       <div className="accs-stack accs-stagger">
         <div className="bk-stepper">
@@ -1350,8 +1329,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                           </Button>
                         }
                       >
-                        Try another week, or send a permitted message to the
-                        professor.
+                        Try another week, or message the professor.
                       </Empty>
                     )}
                     <div className="bk-days">
@@ -1413,7 +1391,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                         </section>
                       ))}
                     </div>
-                    <p className="accs-meta">Local campus time. Each slot runs 30 minutes unless noted.</p>
+                    <p className="accs-meta">Campus time. Each slot is 30 minutes unless noted.</p>
                   </Panel>
                 )}
                 {step.n === 3 && (
@@ -1457,10 +1435,9 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                     </dl>
                     <Alert
                       tone="neutral"
-                      title="Nothing is booked until your professor confirms"
+                      title="Your professor still has to approve"
                     >
-                      A request starts as Requested. Check its status before
-                      attending.
+                      The request stays Requested until then. Check its status before you go.
                     </Alert>
                     {purposeError && (
                       <Alert tone="danger" title="Check your request">
@@ -1622,7 +1599,7 @@ function RequestPage({
               error={action.error}
               title={
                 action.error instanceof ApiError && action.error.status === 409
-                  ? 'This time could not be changed'
+                  ? "This time can't be changed"
                   : undefined
               }
             />
@@ -1649,9 +1626,7 @@ function RequestPage({
             {/* TBD(D-04): cancellation notice periods and rescheduling rules are not approved. */}
             {next.includes('Cancelled') && (
               <p className="accs-meta">
-                A cancellation needs a reason and stays in the request history.
-                Rescheduling requires a new open time. Cancellation policy is
-                under review.
+                Cancelling needs a reason, and the reason stays in the request history. To reschedule, book a new open time. Cancellation rules are still being decided.
               </p>
             )}
           </Panel>
@@ -1754,7 +1729,7 @@ function RequestPage({
               isInvalid={Boolean(reasonError)}
               errorMessage={reasonError}
             />
-            <p>Both participants can see the recorded update.</p>
+            <p>The student and the professor can both see this reason.</p>
             <ActionError error={action.error} />
           </div>
         </ModalBody>
@@ -1917,7 +1892,6 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
     <>
       <PageHeader
         title="My availability"
-        description="Your own consultation schedule, in local campus time."
         actions={
           <Button
             icon="plus"
@@ -1931,19 +1905,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         }
       />
       <div className="accs-stack accs-stagger">
-        <Kpis label="This week">
-          <Kpi label="Open" value={<CountUp value={count('open')} />} note="Students can request" />
-          <Kpi
-            label="Requested or booked"
-            value={<CountUp value={count('requested', 'booked')} />}
-            note="Need your attention"
-          />
-          <Kpi
-            label="Unavailable"
-            value={<CountUp value={count('unavailable')} />}
-            note="Blocked out"
-          />
-        </Kpis>
+        <p className="accs-meta" aria-live="polite">
+          This week: {count('open')} open, {count('requested', 'booked')}{' '}
+          requested or booked, {count('unavailable')} unavailable.
+        </p>
         <div className="sc-bar">
           <div className="sc-bar__nav">
             <IconButton
@@ -1994,7 +1959,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               />
               {!weekSlots.length && (
                 <Empty title="No availability posted this week">
-                  Add an open or unavailable time to your own schedule.
+                  Add open or unavailable times to fill it in.
                 </Empty>
               )}
             </>
@@ -2071,15 +2036,14 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
             </ul>
           ) : (
             <Empty title="No availability posted this week">
-              Add an open or unavailable time to your own schedule.
+              Add open or unavailable times to fill it in.
             </Empty>
           )}
         </Panel>
         <ActionError error={action.error} />
         {/* TBD(D-04): external calendar sync, recurrence and booking-change policy are not approved. */}
         <p className="accs-meta">
-          Changes here update ACCS availability. External calendar sync and
-          recurring times are not configured yet.
+          Changes apply in ACCS only. Calendar sync and recurring times are not available yet.
         </p>
       </div>
       <Modal title="Add times" isOpen={addOpen} onOpenChange={setAddOpen}>
@@ -2127,16 +2091,15 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <RadioGroup
                 label="Repeat"
                 value="once"
-                description="Recurring times await an approved term rule."
+                description="Recurring times are not available yet."
               >
                 <Radio value="once">Once</Radio>
                 <Radio value="weekly" isDisabled>
                   Weekly until the end of term
                 </Radio>
               </RadioGroup>
-              <Alert tone="neutral" title="Students see changes right away">
-                Requested or booked times need a recorded cancellation before
-                they can change.
+              <Alert tone="neutral" title="Students see changes immediately">
+                To change a requested or booked time, cancel the consultation first.
               </Alert>
               {fieldError && (
                 <Alert tone="danger" title="Check the time">
@@ -2159,7 +2122,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       <Modal
         title={
           booked
-            ? 'This time is booked. Changing it needs a cancellation.'
+            ? 'This time is booked'
             : 'Availability options'
         }
         role={booked ? 'alertdialog' : 'dialog'}
@@ -2174,8 +2137,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <div className="sc-detail">
                 <p>{slotTime(selectedSlot)}</p>
                 <p>
-                  The consultation remains on both calendars until a
-                  cancellation is recorded.
+                  The consultation stays on both calendars until you cancel it.
                 </p>
               </div>
             ) : (
@@ -2210,7 +2172,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 export function SchedulePage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <ViewState kind="loading" title="Loading account context" />
+    return <ViewState kind="loading" title="Loading" />
   if (page.pageId === 'P13')
     return <CalendarPage page={page} session={session.data} />
   if (page.pageId === 'P14')

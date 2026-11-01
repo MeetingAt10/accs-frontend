@@ -2,18 +2,17 @@
 .ds-next-person-card {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
   gap: 4px 14px;
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--accs-line);
-  border-radius: var(--accs-radius-card);
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--accs-line);
   background: var(--accs-surface);
-  transition: border-color 200ms var(--accs-ease), box-shadow 240ms var(--accs-ease), transform 240ms var(--accs-ease);
+  transition: background-color 160ms var(--accs-ease);
 }
-.ds-next-person-card[data-link]:hover { border-color: var(--accs-line-strong); box-shadow: var(--accs-shadow-hover); transform: translateY(-2px); }
-.ds-next-person-card__avatar { width: 44px; height: 44px; font-size: 0.9375rem; grid-row: span 2; }
+.ds-next-person-card[data-link]:hover { background: var(--accs-sunken); }
+.ds-next-person-card__avatar { width: 40px; height: 40px; font-size: 0.875rem; }
 .ds-next-person-card__body { display: grid; gap: 4px; min-width: 0; }
 .ds-next-person-card__name { margin: 0; font-family: var(--accs-font-display); font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .ds-next-person-card__link { color: var(--accs-ink); text-decoration: none; }
@@ -23,9 +22,11 @@
 .ds-next-person-card:has(.ds-next-person-card__link:focus-visible) { outline: 2px solid var(--site-accent); outline-offset: 2px; }
 .ds-next-person-card__roles { display: flex; flex-wrap: wrap; gap: 4px; }
 .ds-next-person-card__line { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.45; overflow-wrap: anywhere; }
-.ds-next-person-card__meta { position: relative; z-index: 1; grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.8125rem; overflow-wrap: anywhere; }
-.ds-next-person-card__go { position: absolute; top: 16px; right: 16px; color: var(--accs-faint); opacity: 0; transform: translateX(-4px); transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease); }
-.ds-next-person-card[data-link]:hover .ds-next-person-card__go { opacity: 1; transform: none; color: var(--site-accent-ink); }
+.ds-next-person-card__meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.8125rem; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .ds-next-person-card { grid-template-columns: auto minmax(0, 1fr); padding: 14px 16px; }
+  .ds-next-person-card__meta { grid-column: 2; }
+}
 
 /* Profile header */
 .ds-next-profile-header {
@@ -33,12 +34,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 20px 24px;
-  padding: 24px;
-  border: 1px solid var(--accs-line);
-  border-radius: var(--accs-radius-card);
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--site-accent-wash) 0%, transparent 60%),
-    var(--accs-surface);
+  padding: 0 0 24px;
+  border-bottom: 1px solid var(--accs-line);
   animation: accs-rise var(--accs-dur-3, 520ms) var(--accs-ease) both;
 }
 .ds-next-profile-header__avatar {
@@ -47,14 +44,13 @@
   flex: none;
   width: 80px;
   height: 80px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--site-accent);
   color: #fff;
   font-family: var(--accs-font-display);
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  box-shadow: 0 10px 24px -10px var(--site-accent);
   animation: accs-scale-in var(--accs-dur-3, 520ms) var(--accs-ease-spring, var(--accs-ease)) 120ms both;
 }
 .ds-next-profile-header__body { display: grid; flex: 1 1 16rem; gap: 8px; min-width: 0; }
@@ -63,14 +59,12 @@
 .ds-next-profile-header__contact { color: var(--accs-muted); font-size: 0.875rem; }
 .ds-next-profile-header__contact > * { display: inline-flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
 .ds-next-profile-header__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.ds-next-profile-header--compact { padding: 16px; gap: 16px; }
+.ds-next-profile-header--compact { padding-bottom: 16px; gap: 16px; }
 .ds-next-profile-header--compact .ds-next-profile-header__avatar { width: 56px; height: 56px; border-radius: 16px; font-size: 1.25rem; }
 
 @media (max-width: 600px) {
-  .ds-next-profile-header { padding: 18px; }
   .ds-next-profile-header__avatar { width: 64px; height: 64px; border-radius: 18px; font-size: 1.375rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-next-profile-header, .ds-next-profile-header__avatar { animation: none; }
-  .ds-next-person-card[data-link]:hover { transform: none; }
 }

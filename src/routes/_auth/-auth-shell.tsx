@@ -128,13 +128,9 @@ export function SubmitButton({ loading, children }: { loading: boolean; children
   )
 }
 
-const facts: { icon: 'chats' | 'calendar-check' | 'lock'; text: string }[] = [
-  { icon: 'chats', text: 'Discuss in your class spaces' },
-  { icon: 'calendar-check', text: 'Book faculty consultations' },
-  { icon: 'lock', text: 'Report a concern confidentially' },
-]
+const facts = ['Join your class spaces', 'Book a faculty consultation', 'Send a confidential report']
 
-const headline = 'One account for your classes, consultations, and concerns at CCS.'
+const headline = 'The CCS office, online.'
 
 export function AuthShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
@@ -165,11 +161,8 @@ export function AuthShell({ children, wide }: { children: ReactNode; wide?: bool
             </motion.h2>
             <motion.ul className="au-brand__facts" variants={stagger(0.1)}>
               {facts.map((fact) => (
-                <motion.li key={fact.text} variants={rise}>
-                  <span className="au-brand__icon">
-                    <Icon name={fact.icon} size={20} />
-                  </span>
-                  {fact.text}
+                <motion.li key={fact} variants={rise}>
+                  {fact}
                 </motion.li>
               ))}
             </motion.ul>
@@ -257,7 +250,7 @@ export function PasswordInput({ label, hint, error, ...props }: InputProps & { l
 }
 
 export const passwordRules = [
-  { label: '10+ characters', test: (p: string) => p.length >= 10 },
+  { label: 'At least 10 characters', test: (p: string) => p.length >= 10 },
   { label: 'Upper and lower case letters', test: (p: string) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
   { label: 'A number', test: (p: string) => /\d/.test(p) },
   { label: 'A symbol', test: (p: string) => /[^A-Za-z0-9]/.test(p) },

@@ -195,7 +195,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
       )}
       {empty ? (
         <Panel>
-          <Empty title="Nothing to show yet">Items for your role and scope will appear here when available.</Empty>
+          <Empty title="Nothing here yet">Reports, events, and announcements for your role show up here once they exist.</Empty>
         </Panel>
       ) : (
         <div className="accs-split">
@@ -382,7 +382,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
             {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
             {role === 'staff' && (
               <Alert tone="neutral" title="Staff access is limited">
-                Staff content beyond CCS-wide material is still being defined.
+                Staff see CCS-wide material only. Other staff content has not been defined yet.
               </Alert>
             )}
           </aside>
@@ -459,7 +459,7 @@ function BasicPage({ page }: { page: PageEnvelope }) {
   if (!entries.length) {
     return (
       <Panel>
-        <Empty title="No items to show">There is nothing here yet.</Empty>
+        <Empty title="Nothing to show">No records have been added to this page.</Empty>
       </Panel>
     )
   }

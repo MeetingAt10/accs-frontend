@@ -24,7 +24,7 @@ export const sites: Site[] = [
   {
     id: 'portal',
     label: 'Home',
-    purpose: 'Your dashboard, notifications, assistant, and account in one place.',
+    purpose: 'Dashboard, notifications, assistant, and your account.',
     icon: 'house',
     lane: 'navy',
     prefixes: ['/home', '/notifications', '/assistant', '/help', '/settings', '/profile', '/standing'],
@@ -54,7 +54,7 @@ export const sites: Site[] = [
   {
     id: 'cases',
     label: 'Cases',
-    purpose: 'Confidential reports and the case files that follow them.',
+    purpose: 'Confidential reports and their case files.',
     icon: 'file',
     lane: 'neutral',
     prefixes: ['/reports', '/cases'],

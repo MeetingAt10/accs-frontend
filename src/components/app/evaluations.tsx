@@ -85,8 +85,8 @@ export interface EvaluationQuestion {
 const formLabels: Record<EvaluationForm, string> = {
   student: "Student to faculty",
   peer: "Faculty peer",
-  "upward-chair": "Upward: Program Chair",
-  "upward-dean": "Upward: Dean",
+  "upward-chair": "Faculty to Program Chair",
+  "upward-dean": "Faculty to Dean",
 };
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -177,10 +177,10 @@ const root = siteCrumb("/evaluations");
 
 function ActionError({ error }: { error: unknown }) {
   return error ? (
-    <Alert tone="danger" title="The change couldn't be saved">
+    <Alert tone="danger" title="Couldn't save">
       {error instanceof Error
         ? error.message
-        : "Try again. Your entered text is kept."}
+        : "Try again. Your text is still here."}
     </Alert>
   ) : null;
 }
@@ -458,17 +458,6 @@ function AssignmentCard({ assignment }: { assignment: Item }) {
           Due <strong>{formatDate(assignment.due)}</strong>
         </span>
       </div>
-      <div className="ev-card__progress">
-        <p>
-          <span>{done ? "Submitted" : "Not started"}</span>
-          <span>{done ? "100%" : "0%"}</span>
-        </p>
-        <LinearProgress
-          value={done ? 1 : 0}
-          max={1}
-          label={`Progress for ${name}`}
-        />
-      </div>
       <div className="ev-card__foot">
         {done ? (
           <Button href={href} variant="secondary">
@@ -518,7 +507,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
   ) : (
     <Panel>
       <Empty title="No evaluations open">
-        You'll get a notification when the next cycle opens.
+        A notification arrives when the next cycle opens.
       </Empty>
     </Panel>
   );
@@ -528,10 +517,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
       <ul className="accs-rows">
         {reviews.map((cycle) => (
           <li key={words(cycle.id)}>
-            <div className="accs-row">
-              <span className="accs-avatar" aria-hidden="true">
-                <Icon name="list-checks" size={16} />
-              </span>
+            <div className="accs-row ev-row">
               <div>
                 <p className="accs-row__title">{words(cycle.title)}</p>
                 <p className="accs-row__sub">
@@ -564,8 +550,9 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
         title="Evaluations"
         description={
           first
-            ? `${words(first.cycleTitle)} · closes ${formatDate(first.due)}`
-            : "Assigned forms and published results"
+            ? `${words(first.cycleTitle)} · ${submitted} of ${assignments.length} submitted` +
+              (soonest ? ` · next due ${formatDate(soonest.due)}` : "")
+            : "Your forms and published results"
         }
         actions={
           <>
@@ -580,34 +567,9 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
           </>
         }
       />
-      <Kpis label="Evaluation summary">
-        <Kpi
-          label="Assigned"
-          value={<AnimatedNumber value={assignments.length} />}
-          note={first ? words(first.cycleTitle) : "No open cycle"}
-        />
-        <Kpi
-          label="Completed"
-          value={<AnimatedNumber value={submitted} />}
-          note={
-            assignments.length
-              ? `${Math.round(percent(submitted, assignments.length))}% of your forms`
-              : "Nothing assigned yet"
-          }
-        />
-        <Kpi
-          label="Due soonest"
-          value={soonest ? formatDate(soonest.due) : "—"}
-          note={
-            soonest
-              ? `${words(object(soonest.faculty).name)} · ${words(soonest.subject)}`
-              : "Nothing pending"
-          }
-        />
-      </Kpis>
       {professor ? (
         <TabbedViews
-          label="Evaluation views"
+          label="Evaluation lists"
           tabs={[
             { id: "forms", label: "To complete", content: forms },
             {
@@ -686,7 +648,7 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
                 : "This evaluation isn't open yet"
             }
           >
-            Submitted receipts stay available to their evaluator.
+            You can still open a form you already submitted.
           </Empty>
         </Panel>
       </div>
@@ -705,8 +667,8 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
       />
       <div className="accs-stack accs-stack--tight">
         <p className="ev-note">
-          Your answers are combined with others. Summaries never show
-          individual answers.
+          Results combine everyone's answers. Nobody sees yours on its
+          own.
         </p>
         {words(current.instructions) && (
           <p className="ev-note">{words(current.instructions)}</p>
@@ -732,8 +694,8 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
       {submitted && (
         <div className="ev-receipt" role="status">
           <Icon name="check" size={16} />
-          Submitted {formatDateTime(current.submittedAt)}. These answers are
-          read only.
+          Submitted {formatDateTime(current.submittedAt)}. You can't edit
+          these answers.
         </div>
       )}
       {showValidation && missing.length > 0 && (
@@ -741,7 +703,7 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
           tone="danger"
           title={`${missing.length} ${missing.length === 1 ? "question needs" : "questions need"} an answer`}
         >
-          Complete each marked question before submitting.
+          Answer each required question, then submit.
         </Alert>
       )}
       <ActionError error={action.error} />
@@ -931,14 +893,14 @@ function FacultyResults({
             <Kpi
               label="Responses"
               value={<AnimatedNumber value={number(result.responses)} />}
-              note="Combined answers only"
+              note="Combined, not individual"
             />
             <Kpi
               label="Completion"
               value={
                 <AnimatedNumber value={number(result.completion)} suffix="%" />
               }
-              note="Within the visible scope"
+              note="Of the forms you can see"
             />
           </Kpis>
           <Panel title="By criterion">
@@ -955,7 +917,10 @@ function FacultyResults({
                     <div className="ev-theme">
                       <strong>
                         {words(theme.title)}
-                        <span className="accs-tag">{number(theme.count)}</span>
+                        <span className="ev-muted">
+                          {number(theme.count)}{" "}
+                          {number(theme.count) === 1 ? "mention" : "mentions"}
+                        </span>
                       </strong>
                       <p>{words(theme.summary)}</p>
                     </div>
@@ -973,13 +938,12 @@ function FacultyResults({
         </Panel>
       )}
       <p className="ev-note">
-        Individual answers aren't shown, and results appear after a cycle is
-        published. Results describe feedback. They aren't findings about
-        conduct.
+        Results show combined feedback after a cycle is published. They
+        aren't findings about conduct.
       </p>
       {/* TBD(D-08): release thresholds and feedback retention need QCU approval. */}
       {canFollowUp && (
-        <Panel title="Follow-up note">
+        <Panel title="Follow-up">
           <div className="ev-followup">
             <TextArea
               label="Follow-up note"
@@ -1003,7 +967,7 @@ function FacultyResults({
                   )
                 }
               >
-                Save
+                Save note
               </Button>
             </div>
           </div>
@@ -1165,9 +1129,6 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
                     <tr key={words(result.id)}>
                       <td>
                         <div className="ev-person">
-                          <span className="accs-avatar" aria-hidden="true">
-                            {initials(name)}
-                          </span>
                           <Link
                             href={
                               "/evaluations/results/" +
@@ -1255,7 +1216,6 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={[root, { label: "Cycles" }]}
         title="Evaluation cycles"
-        description="Draft, review, publish, and close evaluation cycles."
         actions={
           <Button icon="plus" onPress={() => setOpen(true)}>
             New cycle
@@ -1295,7 +1255,7 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
                 <tr>
                   <th scope="col">Cycle</th>
                   <th scope="col">Term</th>
-                  <th scope="col">Opens – closes</th>
+                  <th scope="col">Dates</th>
                   <th scope="col">Status</th>
                   <th scope="col">Responses</th>
                 </tr>
@@ -1319,12 +1279,12 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
                           .map(
                             (form) => formLabels[form as EvaluationForm] ?? form,
                           )
-                          .join(", ") || "No forms configured"}
+                          .join(", ") || "No forms chosen"}
                       </p>
                     </td>
                     <td>{words(cycle.term, "—")}</td>
                     <td className="ev-dates">
-                      {formatDate(cycle.opens)} – {formatDate(cycle.closes)}
+                      {formatDate(cycle.opens)} to {formatDate(cycle.closes)}
                     </td>
                     <td>
                       <StatusChip tone={cycleTone(words(cycle.status))}>
@@ -1362,7 +1322,7 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
               </Button>
             }
           >
-            Create a draft to configure the first evaluation cycle.
+            Start a draft to set up the first cycle.
           </Empty>
         </Panel>
       )}
@@ -1667,7 +1627,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     ...(!title.trim() ? ["Name"] : []),
     ...(!instructions.trim() ? ["Instructions"] : []),
     ...(!opens || !closes || closes < opens
-      ? ["Valid open and close dates"]
+      ? ["Open and close dates (close on or after open)"]
       : []),
     ...(!forms.length ? ["At least one form"] : []),
     ...(!formQuestions.length ||
@@ -1806,9 +1766,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           <SelectOption id="undecided">Not decided</SelectOption>
         </Select>
         <p className="ev-note">
-          Participation rule not decided (D-01). Participation and certificate
-          rules need QCU approval, so no grade, certificate, or penalty control
-          is available.
+          QCU hasn't decided the participation rule (D-01). Until it does,
+          there are no grade, certificate, or penalty settings.
         </p>
         {/* TBD(D-02): evaluation participation never applies a grade or Good Moral consequence. */}
       </Panel>
@@ -1875,7 +1834,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
         </ol>
       ) : (
         <Empty title="No faculty reviews yet">
-          Assigned professors can review the questions while the cycle is in
+          Professors can comment on the questions while the cycle is in
           review.
         </Empty>
       )}
@@ -1968,7 +1927,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
       {incomplete.length > 0 && (
         <Alert
           tone={validation ? "danger" : "neutral"}
-          title="Complete the cycle setup"
+          title="Finish the setup first"
         >
           <ul>
             {incomplete.map((field) => (
@@ -1979,7 +1938,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
       )}
       <ActionError error={action.error} />
       <TabbedViews
-        label="Cycle workspace"
+        label="Cycle sections"
         tabs={[
           { id: "setup", label: "Setup", content: setup },
           {
@@ -2008,8 +1967,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           <div className="ev-fields">
             <p>
               {confirmStatus === "Published"
-                ? "Assigned students and faculty get their forms. Published questions cannot be edited."
-                : "People will no longer be able to submit this cycle. Submitted receipts stay available."}
+                ? "Assigned students and faculty get their forms. You can't edit the questions after this."
+                : "Nobody can submit after this. Submitted receipts stay available."}
             </p>
             {confirmStatus === "Closed" && (
               <>
@@ -2017,11 +1976,11 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
                   isSelected={releaseResults}
                   onChange={setReleaseResults}
                 >
-                  Release the aggregate results when this cycle closes
+                  Publish combined results when the cycle closes
                 </Checkbox>
                 <p className="ev-note">
-                  Only combined results are shown. QCU still needs to approve
-                  release thresholds and retention.
+                  Results are combined only. QCU hasn't approved release
+                  thresholds or retention yet (D-08).
                 </p>
               </>
             )}
@@ -2066,7 +2025,7 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
     const note = formQuestions
       .map(
         (question) =>
-          `${question.criterion}: ${decisions[question.id] === "changes" ? "Needs change" : "Yes"}${comments[question.id]?.trim() ? " — " + comments[question.id].trim() : ""}`,
+          `${question.criterion}: ${decisions[question.id] === "changes" ? "Needs change" : "Yes"}${comments[question.id]?.trim() ? " · " + comments[question.id].trim() : ""}`,
       )
       .join("\n");
     try {
@@ -2108,13 +2067,12 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         description={words(record.title)}
       />
       <p className="ev-note">
-        Your comments go to the Dean and are available before the cycle is
-        published.
+        Your comments go to the Dean before the cycle is published.
       </p>
       {(sent || savedReview) && (
         <div className="ev-receipt" role="status">
           <Icon name="check" size={16} />
-          Review sent. Your review is read only.
+          Review sent. You can't edit it now.
         </div>
       )}
       {savedReview ? (
@@ -2192,7 +2150,7 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
       <ActionError error={action.error} />
       {!readOnly && !savedReview && (
         <div className="ev-submitbar">
-          <p>Send once you have gone through every question.</p>
+          <p>Go through every question, then send.</p>
           <Button loading={action.isPending} onPress={() => void submit()}>
             Send review
           </Button>

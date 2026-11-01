@@ -75,6 +75,7 @@
 }
 .ev-tab__count { font-variant-numeric: tabular-nums; opacity: 0.7; }
 .ev-tabpanel { min-width: 0; }
+.accs-row.ev-row { grid-template-columns: minmax(0, 1fr) auto; }
 .ev-tabpanel:focus-visible { outline-offset: 6px; border-radius: var(--accs-radius-card); }
 
 /* ---------- Assignment cards (P26) ---------- */
@@ -96,15 +97,6 @@
 .ev-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .ev-card__due { color: var(--accs-muted); font-size: 0.8125rem; }
 .ev-card__due strong { color: var(--accs-ink-2); font-weight: 600; }
-.ev-card__progress { display: grid; gap: 6px; }
-.ev-card__progress p {
-  display: flex;
-  justify-content: space-between;
-  margin: 0;
-  color: var(--accs-muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
 .ev-card__foot { display: flex; justify-content: flex-end; }
 
 /* ---------- Focused form column (P27, P32) ---------- */
@@ -113,19 +105,14 @@
 
 .ev-sticky {
   position: sticky;
-  top: calc(var(--ds-size-topbar-h, 0px) + 8px);
+  top: 64px; /* 56px sticky topbar + 8px */
   z-index: 4;
   display: grid;
   gap: 8px;
   padding: 12px 16px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-card);
-  background: color-mix(in srgb, var(--accs-surface) 82%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%), 0 8px 20px -10px rgb(11 18 32 / 14%);
-}
-@media (min-width: 1024px) {
-  .ev-sticky { top: calc(var(--ds-size-topbar-h, 0px) + 3.25rem + 8px); }
+  background: var(--accs-surface);
 }
 .ev-sticky__row {
   display: flex;
@@ -169,8 +156,7 @@
   padding: 12px 16px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-card);
-  background: color-mix(in srgb, var(--accs-surface) 86%, transparent);
-  backdrop-filter: blur(12px);
+  background: var(--accs-surface);
   box-shadow: var(--accs-shadow-hover);
 }
 .ev-submitbar p { margin: 0; color: var(--accs-muted); font-size: 0.875rem; }
@@ -224,7 +210,6 @@
   z-index: -1;
   border-radius: inherit;
   background: var(--site-accent);
-  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--site-accent) 55%, transparent);
 }
 .rs__ends {
   display: flex;
@@ -297,10 +282,7 @@
 .ev-table-sub { margin: 2px 0 0; color: var(--accs-muted); font-size: 0.8125rem; }
 .ev-dates { color: var(--accs-ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.accs-toolbar.ev-toolbar { position: sticky; top: calc(var(--ds-size-topbar-h, 0px) + 8px); z-index: 3; background: color-mix(in srgb, var(--accs-surface) 86%, transparent); backdrop-filter: blur(12px); }
-@media (min-width: 1024px) {
-  .accs-toolbar.ev-toolbar { top: calc(var(--ds-size-topbar-h, 0px) + 3.25rem + 8px); }
-}
+.accs-toolbar.ev-toolbar { position: sticky; top: 64px; z-index: 3; background: var(--accs-surface); }
 
 /* ---------- Question editor ---------- */
 
@@ -320,10 +302,10 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--site-accent-wash);
-  color: var(--site-accent-ink);
+  border: 1px solid var(--accs-line);
+  color: var(--accs-ink-2);
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .ev-qrow__body { display: grid; gap: 16px; min-width: 0; }

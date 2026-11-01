@@ -187,8 +187,8 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
         </div>
       ) : (
         <Panel>
-          <Empty title="No one matches">
-            Try another name, role, office, or program.
+          <Empty title="No matches">
+            Change the search or clear a filter.
           </Empty>
         </Panel>
       )}
@@ -298,7 +298,7 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
           )}
         </aside>
       </div>
-      <PrivacyNotice title="Profile information is limited">
+      <PrivacyNotice title="What profiles leave out">
         Personal phone numbers, social links, private media, and offense details
         are not shown here.
       </PrivacyNotice>
@@ -316,7 +316,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const roles = strings(record.roles);
   return (
     <div className="accs-stack">
-      <PageHeader title="My profile" description="What others see." />
+      <PageHeader title="My profile" description="This is the profile other people see." />
       <ProfileHeader
         name={word(record.name)}
         role={roleTags(roles)}
@@ -356,7 +356,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               value={education}
               onChange={setEducation}
               maxLength={500}
-              description="Education fields are proposed and remain subject to approval."
+              description="This field is proposed and needs approval before it is final."
             />
           </Panel>
         </div>
@@ -375,10 +375,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
             </p>
           </Panel>
           {/* TBD(D-08): profile photo upload requires policy approval. */}
-          <Alert tone="neutral" title="Keep profile details professional">
-            Don't add phone numbers or social links. Profiles show your QCU
-            email only. Profile photo upload remains unavailable pending policy
-            approval.
+          <Alert tone="neutral" title="Keep it professional">
+            Don't add phone numbers or social links. Others see your QCU email
+            only. Photo upload is not available until the policy is approved.
           </Alert>
         </aside>
       </div>
@@ -434,7 +433,7 @@ function FaqRow({ faq, canOpen }: { faq: Item; canOpen: boolean }) {
       <Collapse open={open} id={panelId}>
         <div className="pa-faq__a">
           <p>{word(faq.answer)}</p>
-          {canOpen && <Link href={word(faq.href, "/help")}>Open this page</Link>}
+          {canOpen && <Link href={word(faq.href, "/help")}>Open page</Link>}
         </div>
       </Collapse>
     </li>
@@ -460,7 +459,7 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <PageHeader
         title="Help"
-        description="Answers about reports, consultations, evaluations, and your account."
+        description="Answers on reports, consultations, evaluations, and your account."
         actions={
           <Button href="/assistant" variant="secondary" icon="chats">
             Ask the assistant
@@ -493,9 +492,9 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
               </ul>
               {topic === "Reports and privacy" && (
                 <p className="pa-note">
-                  A report is available to its verified reporter and authorized
-                  handlers within the current routing and conflict rules.
-                  Anonymous reports remain tied to a verified account.
+                  Only the verified reporter and the assigned handlers can open
+                  a report, subject to routing and conflict rules. An anonymous
+                  report is still tied to a verified account.
                 </p>
               )}
             </Panel>
@@ -671,10 +670,7 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
   const roleLabels = strings(record.roles);
   return (
     <div className="accs-stack">
-      <PageHeader
-        title="Settings"
-        description="Your account, appearance, and sign-in security."
-      />
+      <PageHeader title="Settings" />
       <div className="accs-split accs-stagger">
         <div className="accs-stack">
           <Panel title="Account">
@@ -800,7 +796,7 @@ export function PeopleAccountScreen({
       <ViewState
         kind="error"
         title="This information couldn't be loaded"
-        description="Try again."
+        description="Check your connection, then try again."
         actions={
           <Button variant="secondary" onPress={() => void page.refetch()}>
             Try again

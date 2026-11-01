@@ -74,7 +74,7 @@ export function SiteRail({
                 key={site.id}
                 href={href}
                 className="shell-rail__item"
-                title={`${site.label}: ${site.purpose}`}
+                title={`${site.label}. ${site.purpose}`}
                 aria-current={isCurrent ? 'page' : undefined}
               >
                 {isCurrent && (
@@ -197,7 +197,7 @@ export function SiteNav({
   )
 }
 
-/** Light sidebar: site name and purpose, nav groups, then the signed-in person. */
+/** Light sidebar: site name, nav groups, then the signed-in person. */
 export function SiteSidebar({
   site,
   groups,
@@ -229,7 +229,6 @@ export function SiteSidebar({
     <aside className="shell-side" aria-label={`${info.label} sidebar`}>
       <div className="shell-side__head">
         <p className="shell-side__name">{info.label}</p>
-        <p className="shell-side__purpose">{info.purpose}</p>
       </div>
       <nav className="shell-side__nav" aria-label={`${info.label} navigation`}>
         <SiteNav groups={groups} current={current} />

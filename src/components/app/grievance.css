@@ -1,12 +1,12 @@
 /* Cases site: confidential case tracker. Neutral surfaces; the wine accent marks only focus and "current". */
 
-.gv-page { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.gv-page { display: grid; gap: 24px; align-content: start; min-width: 0; }
 .gv-stack { display: grid; gap: 18px; align-content: start; min-width: 0; }
 .gv-wizard { max-width: 680px; }
 .gv-cap { text-transform: capitalize; }
 .gv-hint { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.5; }
 .gv-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.gv-sub { margin: 0 0 6px; font-family: var(--accs-font-display); font-size: 0.9375rem; font-weight: 700; color: var(--accs-ink); }
+.gv-sub { margin: 24px 0 8px; font-family: var(--accs-font-display); font-size: 0.9375rem; font-weight: 700; color: var(--accs-ink); }
 
 /* Quiet privacy line */
 .gv-note {
@@ -19,50 +19,6 @@
   line-height: 1.5;
 }
 .gv-note svg { flex: none; margin-top: 2px; color: var(--accs-faint); }
-
-/* ---------- Pipeline strip ---------- */
-.gv-pipe {
-  overflow-x: auto;
-  border: 1px solid var(--accs-line);
-  border-radius: var(--accs-radius-card);
-  background: var(--accs-surface);
-  scrollbar-width: thin;
-}
-.gv-pipe ol { display: flex; min-width: max-content; width: 100%; margin: 0; padding: 0; list-style: none; }
-.gv-pipe li { position: relative; flex: 1 1 112px; min-width: 112px; }
-.gv-pipe li + li::before {
-  content: '';
-  position: absolute;
-  inset: 14px auto 14px 0;
-  width: 1px;
-  background: var(--accs-line);
-}
-.gv-pipe__seg {
-  position: relative;
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  min-height: 72px;
-  padding: 14px 18px;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-}
-button.gv-pipe__seg { cursor: pointer; transition: background 160ms var(--accs-ease-out); }
-button.gv-pipe__seg:hover { background: var(--accs-sunken); }
-button.gv-pipe__seg:focus-visible { outline-offset: -3px; }
-.gv-pipe__name { position: relative; z-index: 1; color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em; }
-.gv-pipe__count { position: relative; z-index: 1; color: var(--accs-ink); font-family: var(--accs-font-display); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.gv-pipe li[data-empty] .gv-pipe__count { color: var(--accs-faint); }
-.gv-pipe__seg[aria-pressed='true'] .gv-pipe__name { color: var(--site-accent-ink); }
-.gv-pipe__ind {
-  position: absolute;
-  inset: 0;
-  background: var(--site-accent-wash);
-  box-shadow: inset 0 -2px 0 var(--site-accent);
-}
 
 /* ---------- Pills and tabs ---------- */
 .gv-pills { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-sunken); }
@@ -114,10 +70,7 @@ button.gv-pipe__seg:focus-visible { outline-offset: -3px; }
   position: sticky;
   top: 8px;
   z-index: 4;
-  background: rgb(255 255 255 / 82%);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  backdrop-filter: blur(12px) saturate(1.2);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%);
+  background: var(--accs-surface);
 }
 .gv-sortbar { display: none; gap: 8px; flex: 1 1 100%; }
 .gv-sortbar > * { flex: 1; min-width: 0; }

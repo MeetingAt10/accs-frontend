@@ -168,7 +168,7 @@ function RegisterPage() {
             label="Student or employee ID"
             autoComplete="off"
             spellCheck={false}
-            hint="Format: 24-1234"
+            hint="Example: 24-1234"
             {...input('identifier')}
           />
         </Group>
@@ -202,12 +202,12 @@ function RegisterPage() {
             </Reveal>
           </Rise>
           <p className="au-hint">
-            Chairs, deans, guidance, OSAS, and administrators get access from the CCS administrator.
+            The CCS administrator creates accounts for chairs, deans, guidance, OSAS, and administrators.
           </p>
         </Group>
 
         <Group>
-          <legend>Password</legend>
+          <legend>Choose a password</legend>
           <PasswordInput label="Password" autoComplete="new-password" {...input('password')} />
           <PasswordStrength password={values.password} />
           <PasswordInput label="Confirm password" autoComplete="new-password" {...input('confirm')} />

@@ -4,8 +4,6 @@
    the shared motion.css choreography.
    ========================================================================== */
 
-.adm { --adm-glass: color-mix(in srgb, var(--accs-surface) 78%, transparent); }
-
 /* ---------- Slim sub-navigation ---------- */
 .adm-nav {
   display: flex;
@@ -16,9 +14,7 @@
   padding: 4px;
   border: 1px solid var(--accs-line);
   border-radius: 12px;
-  background: var(--adm-glass);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%);
+  background: var(--accs-surface);
 }
 .adm-nav .adm-nav__link {
   position: relative;
@@ -48,7 +44,7 @@
 }
 
 /* ---------- Two column layouts ---------- */
-.adm-cols { display: grid; gap: 16px; align-items: start; }
+.adm-cols { display: grid; gap: 24px; align-items: start; }
 @media (min-width: 960px) {
   .adm-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .adm-cols--wide { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
@@ -62,7 +58,7 @@
 .adm-row {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
@@ -71,15 +67,6 @@
 }
 .adm-rows > li:last-child > .adm-row, .adm-rows > .adm-row:last-child { border-bottom: 0; }
 .adm-row:hover { background: var(--accs-sunken); }
-.adm-row__icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--site-accent-wash);
-  color: var(--site-accent-ink);
-}
 .adm-row__title { margin: 0; font-weight: 600; color: var(--accs-ink); overflow-wrap: anywhere; }
 .adm-row__sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 2px 0 0; color: var(--accs-muted); font-size: 0.8125rem; }
 .adm-row__age { color: var(--accs-muted); font-size: 0.8125rem; white-space: nowrap; }
@@ -127,16 +114,13 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 /* Trend: vertical bars. */
 .adm-trend { display: flex; align-items: flex-end; gap: 10px; height: 168px; padding: 8px 20px 0; }
 .adm-trend__col { flex: 1 1 0; display: grid; grid-template-rows: 1fr auto auto; justify-items: center; gap: 6px; height: 100%; min-width: 0; max-width: 72px; }
-.adm-trend__bar { align-self: end; width: 100%; height: 100%; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, var(--site-accent), color-mix(in srgb, var(--site-accent) 55%, white)); transform-origin: bottom center; }
+.adm-trend__bar { align-self: end; width: 100%; height: 100%; border-radius: 8px 8px 3px 3px; background: var(--site-accent); transform-origin: bottom center; }
 .adm-trend__value { font-size: 0.75rem; font-weight: 700; color: var(--accs-ink); }
 .adm-trend__label { font-size: 0.6875rem; color: var(--accs-muted); white-space: nowrap; }
 .adm-trend-wrap { padding-bottom: 16px; }
 
 /* ---------- Toolbar, filter pills ---------- */
 .adm-toolbar {
-  background: var(--adm-glass);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%), 0 8px 20px -14px rgb(11 18 32 / 18%);
   gap: 10px 20px;
 }
 .adm-toolbar .adm-search { flex: 1 1 18rem; min-width: 0; }
@@ -152,7 +136,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 
 .adm-pill { position: relative; isolation: isolate; min-height: 36px; }
 .accs-pill.adm-pill[aria-pressed='true'] { background: transparent; border-color: transparent; }
-.adm-pill__bg { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accs-ink); box-shadow: 0 4px 10px -4px rgb(11 18 32 / 45%); }
+.adm-pill__bg { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accs-ink); }
 .adm-pill[aria-pressed='true'] { color: #fff; }
 
 /* ---------- Tables ---------- */
@@ -225,8 +209,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   top: 0;
   z-index: 3;
   padding: 8px 4px;
-  background: color-mix(in srgb, var(--accs-sunken) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: var(--accs-sunken);
   vertical-align: bottom;
   text-align: center;
 }
@@ -262,9 +245,8 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   color: var(--accs-muted);
   font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
   text-align: start;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 .adm-matrix tbody tr:not(.adm-matrix__group):hover > * { background: var(--accs-sunken); }
 .adm-matrix td { width: 56px; min-width: 56px; padding: 4px; text-align: center; transition: background-color 160ms var(--accs-ease-out); }
@@ -311,8 +293,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   padding: 12px 16px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 14px;
-  background: rgb(11 18 32 / 92%);
-  backdrop-filter: blur(14px);
+  background: var(--accs-ink);
   color: #fff;
   box-shadow: var(--accs-shadow-pop);
 }
@@ -336,9 +317,8 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 .adm-facts dd { margin: 0; color: var(--accs-ink); font-size: 0.875rem; font-weight: 600; text-align: end; overflow-wrap: anywhere; }
 
 .adm-quote {
-  position: relative;
   margin: 0;
-  padding: 20px 22px 20px 54px;
+  padding: 18px 20px;
   border-radius: 12px;
   background: var(--accs-sunken);
   color: var(--accs-ink);
@@ -346,16 +326,6 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   line-height: 1.65;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-}
-.adm-quote::before {
-  content: '\201C';
-  position: absolute;
-  left: 16px;
-  top: 6px;
-  color: var(--accs-line-strong);
-  font-family: var(--accs-font-display);
-  font-size: 3.5rem;
-  line-height: 1;
 }
 .adm-quote__by { margin: 8px 2px 0; color: var(--accs-muted); font-size: 0.8125rem; }
 .adm-context { display: grid; gap: 14px; }
@@ -383,7 +353,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 .adm-timeline-body strong { color: var(--accs-ink); font-size: 0.875rem; }
 .adm-timeline-body span { color: var(--accs-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
 
-.adm-skeleton { display: grid; gap: 16px; }
+.adm-skeleton { display: grid; gap: 24px; }
 .adm-skeleton .accs-skeleton:nth-child(1) { height: 36px; width: min(320px, 70%); }
 .adm-skeleton .accs-skeleton:nth-child(2) { height: 84px; }
 .adm-skeleton .accs-skeleton:nth-child(3) { height: 280px; }

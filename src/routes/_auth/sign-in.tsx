@@ -121,7 +121,7 @@ function SignInForm({
   return (
     <>
       <Title>Sign in</Title>
-      <Sub>Use your QCU email or student / employee ID.</Sub>
+      <Sub>Use your QCU email or your student or employee ID.</Sub>
       <Form formRef={form} onSubmit={submit}>
         {notice && <Rise><Alert tone="success" title={notice} /></Rise>}
         <TextInput
@@ -157,7 +157,7 @@ function SignInForm({
       <Foot>
         Don't have an account?{' '}
         <Link to="/register" search={{ redirect: redirectTo }}>
-          Create your QCU ACCS account
+          Create an account
         </Link>
       </Foot>
     </>
@@ -190,7 +190,7 @@ function ForgotForm({
   return (
     <>
       <Title>Reset your password</Title>
-      <Sub>Enter your QCU email or ID and we'll send a 6-digit code to its QCU email.</Sub>
+      <Sub>Enter your email or ID. We will send a 6-digit code to the QCU email on that account.</Sub>
       <Form formRef={form} onSubmit={submit}>
         <TextInput
           label="Email or ID"
@@ -253,7 +253,7 @@ function ResetForm({ emailOrId, onDone, onBack }: { emailOrId: string; onDone: (
     <>
       <Title>Enter your code</Title>
       <Sub>
-        If an account matches, a 6-digit code was sent to its QCU email. No email? Contact the CCS office.
+        If an account matches, we sent a 6-digit code to its QCU email. No email? Contact the CCS office.
       </Sub>
       <Form formRef={form} onSubmit={submit}>
         <TextInput

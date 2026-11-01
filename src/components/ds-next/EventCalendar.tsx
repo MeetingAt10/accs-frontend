@@ -277,7 +277,7 @@ function Month({
           />
         ) : (
           <Empty title="Nothing on this day">
-            Pick another date or change the calendar layers.
+            Pick another date or turn on more layers.
           </Empty>
         )}
       </section>
@@ -463,7 +463,7 @@ function Week({
           />
         ) : (
           <Empty title="No events this week">
-            Nothing is substituted from another date or layer.
+            Try another week or turn on more layers.
           </Empty>
         )}
       </div>
@@ -545,7 +545,7 @@ export function EventCalendar({
               />
             ) : (
               <Empty title="No events this month">
-                Change the date or calendar layers to see other permitted events.
+                Try another month or turn on more layers.
               </Empty>
             ))}
         </motion.div>

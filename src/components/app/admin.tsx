@@ -17,7 +17,6 @@ import {
   TextField,
   ViewState,
   toast,
-  type IconName,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
@@ -101,15 +100,15 @@ const SHORT: Record<string, string> = {
 };
 const FULL: Record<string, string> = {
   student: "Student",
-  organization: "CCS Student Organization",
+  organization: "CCS student organization",
   professor: "Professor",
-  staff: "CCS Staff",
-  chair: "Program Chair",
+  staff: "CCS staff",
+  chair: "Program chair",
   dean: "Dean",
   administrator: "Administrator / Moderator",
   guidance: "Guidance",
   osas: "OSAS",
-  president: "President’s Office",
+  president: "President's Office",
 };
 const roleShort = (role: string) => SHORT[role] ?? cap(role);
 const roleFull = (role: string) => FULL[role] ?? cap(role);
@@ -341,12 +340,12 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Permissions" })}
         title="Permission matrix"
-        description="Review what each role can do and propose a change. Proposals are saved for CCS review."
+        description="Propose a change to what a role can do. CCS reviews each proposal."
       />
       <div className="accs-stack accs-stack--tight">
         <Note>
-          Role changes take effect at next sign-in. This matrix does not decide
-          case outcomes or restrictions.
+          Role changes take effect at the next sign-in. This matrix does not
+          decide case outcomes or restrictions.
         </Note>
         <div className="adm-legend" aria-label="Legend">
           <span>
@@ -493,8 +492,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               )}
             </ul>
             <p className="adm-proposed__note">
-              Saved for CCS review. Approved changes apply at each person's
-              next sign-in.
+              CCS reviews each proposal. Approved changes apply at each
+              person's next sign-in.
             </p>
           </motion.aside>
         )}
@@ -583,14 +582,9 @@ function MatrixCell({
 
 /* ---------- Service status ---------- */
 
-const clean = (value: string) =>
-  value
-    .replace(/demo provider/i, "Built-in provider")
-    .replace(/in-memory prototype/i, "In-memory store");
-
 export function SystemStatus({ status }: { status: Item }) {
   const api = word(status.api, "Unknown");
-  const storage = clean(word(status.storage, "Unknown"));
+  const storage = word(status.storage, "Unknown");
   const rows: Array<{
     name: string;
     detail: string;
@@ -599,7 +593,7 @@ export function SystemStatus({ status }: { status: Item }) {
   }> = [
     {
       name: "API",
-      detail: "Handles every request from the app",
+      detail: "Serves every request the app makes",
       value: api,
       tone: /operational|healthy|ok/i.test(api)
         ? "ok"
@@ -612,7 +606,7 @@ export function SystemStatus({ status }: { status: Item }) {
     {
       name: "Assistant",
       detail: "Answers questions in the assistant",
-      value: clean(word(status.assistant, "Unknown")),
+      value: word(status.assistant, "Unknown"),
       tone: "neutral",
     },
     {
@@ -643,13 +637,13 @@ export function SystemStatus({ status }: { status: Item }) {
 
 /* ---------- P45 Overview ---------- */
 
-const NAV: Array<{ href: string; label: string; icon: IconName }> = [
-  { href: "/admin/users", label: "Users", icon: "users" },
-  { href: "/admin/roles", label: "Permissions", icon: "lock" },
-  { href: "/admin/moderation", label: "Moderation", icon: "flag" },
-  { href: "/restrictions", label: "Restrictions", icon: "prohibit" },
-  { href: "/admin/audit", label: "Audit trail", icon: "list-checks" },
-  { href: "/admin/monitoring", label: "Monitoring", icon: "desktop" },
+const NAV: Array<{ href: string; label: string }> = [
+  { href: "/admin/users", label: "Users" },
+  { href: "/admin/roles", label: "Permissions" },
+  { href: "/admin/moderation", label: "Moderation" },
+  { href: "/restrictions", label: "Restrictions" },
+  { href: "/admin/audit", label: "Audit trail" },
+  { href: "/admin/monitoring", label: "Monitoring" },
 ];
 
 function AuditTable({ rows }: { rows: Item[] }) {
@@ -703,12 +697,10 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
     <div className="accs-stack accs-stagger adm">
       <PageHeader
         title="Administration"
-        description="Accounts, moderation, the audit trail, and service health in one place."
       />
       <nav className="adm-nav" aria-label="Administration pages">
         {NAV.map((entry) => (
           <Link key={entry.href} className="adm-nav__link" href={entry.href}>
-            <Icon name={entry.icon} size={16} />
             {entry.label}
             {entry.href === "/admin/moderation" &&
               typeof queue === "number" &&
@@ -726,13 +718,13 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
         <Kpi
           label="Active restrictions"
           value={kpiValue(stat("Active restrictions"))}
-          note="Feature-specific"
+          note="Limits on single features"
           href="/restrictions"
         />
         <Kpi
           label="Moderation queue"
           value={kpiValue(queue)}
-          note="Waiting for human review"
+          note="Waiting for a decision"
           href="/admin/moderation"
         />
         <Kpi
@@ -745,7 +737,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
       <div className="adm-cols">
         <Panel
           flush
-          title="Needs attention"
+          title="Waiting for review"
           action={
             <Link variant="standalone" href="/admin/moderation">
               Open queue
@@ -757,9 +749,6 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
               {pending.map((entry) => (
                 <li key={word(entry.id)}>
                   <div className="adm-row">
-                    <span className="adm-row__icon">
-                      <Icon name="flag" size={16} />
-                    </span>
                     <div>
                       <p className="adm-row__title">
                         <Link
@@ -792,7 +781,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
             </ul>
           ) : (
             <Empty title="Nothing needs review">
-              Flagged posts, comments, and messages appear here.
+              Reported posts, comments, and messages show up here.
             </Empty>
           )}
         </Panel>
@@ -801,7 +790,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
           title="Recent audit events"
           action={
             <Link variant="standalone" href="/admin/audit">
-              Full trail
+              Open audit trail
             </Link>
           }
         >
@@ -809,7 +798,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
             <AuditTable rows={audit} />
           ) : (
             <Empty title="No audit events yet">
-              Role, permission, and moderation actions are recorded here.
+              Role, permission, and moderation actions show up here.
             </Empty>
           )}
         </Panel>
@@ -862,7 +851,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Users" })}
         title="Users and roles"
-        description="Everyone with an ACCS account. Role changes take effect at the next sign-in and are recorded in the audit trail."
+        description="Role changes take effect at the next sign-in and go in the audit trail."
         actions={
           <Button
             variant="secondary"
@@ -988,7 +977,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
               ) : undefined
             }
           >
-            Try a different name, QCU ID, or email.
+            Check the spelling or search by QCU ID or email.
           </Empty>
         </div>
       )}
@@ -1023,7 +1012,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
               );
             }}
           >
-            Continue
+            Open account
           </Button>
         </ModalActions>
       </Modal>
@@ -1082,8 +1071,8 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
         <Panel title="Roles and assignment">
           <div className="adm-form">
             <Note>
-              Role changes apply at next sign-in. The current session keeps its
-              loaded roles, and this action is recorded.
+              Role changes apply at the next sign-in. The current session keeps
+              its roles. The audit trail records this change.
             </Note>
             <CheckboxGroup
               label="Assigned roles"
@@ -1116,7 +1105,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               maxLength={1000}
             />
             {action.error && (
-              <Alert tone="danger" title="Role assignment couldn't be saved">
+              <Alert tone="danger" title="The role change couldn't be saved">
                 {action.error.message}
               </Alert>
             )}
@@ -1173,7 +1162,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Manage restrictions
             </Button>
           </Panel>
-          <Panel title="Sessions and activity">
+          <Panel title="Recent activity">
             {audit.length ? (
               <ol className="accs-timeline">
                 {audit.map((entry, index) => (
@@ -1194,7 +1183,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               </ol>
             ) : (
               <Empty title="No recorded activity">
-                Role changes and account events for this person appear here.
+                Role changes and account events for this person show up here.
                 Sign-in history isn't recorded.
               </Empty>
             )}
@@ -1223,7 +1212,7 @@ function ModerationQueue({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Moderation" })}
         title="Moderation"
-        description="Posts, comments, and messages reported for human review. A flag is not proof of a violation."
+        description="A flag is not proof of a violation. Read the context before you decide."
       />
       <div className="accs-toolbar adm-toolbar">
         <Pills
@@ -1397,9 +1386,8 @@ function ModerationReview({
                 </div>
               )}
               <Note>
-                Review the context before deciding. A flag does not establish a
-                rule violation, and restrictions are not applied from this
-                screen.
+                A flag does not establish a rule violation. This screen does not
+                apply restrictions.
               </Note>
             </div>
           </Panel>
@@ -1412,7 +1400,7 @@ function ModerationReview({
                   onChange={setDecision}
                 >
                   <Radio value="keep" card>
-                    Keep (no action)
+                    Keep, no action
                   </Radio>
                   <Radio value="remove" card>
                     Remove content
@@ -1421,8 +1409,9 @@ function ModerationReview({
                     Remove and warn the author
                   </Radio>
                   <Radio value="refer" card isDisabled={!userReport}>
-                    Refer as a possible grievance{" "}
-                    {userReport ? "" : "(user reports only)"}
+                    {userReport
+                      ? "Refer as a possible grievance"
+                      : "Refer as a possible grievance (user reports only)"}
                   </Radio>
                 </RadioGroup>
                 <TextArea
@@ -1433,7 +1422,7 @@ function ModerationReview({
                   maxLength={1000}
                 />
                 <Checkbox isSelected={notifyAuthor} onChange={setNotifyAuthor}>
-                  Notify the author, where permitted
+                  Notify the author if policy allows
                 </Checkbox>
                 {action.error && (
                   <Alert tone="danger" title="The decision couldn't be recorded">
@@ -1525,8 +1514,8 @@ function ModerationReview({
 
 const STAT_NOTES: Array<[RegExp, string]> = [
   [/session/i, "Since the app started"],
-  [/fail/i, "Responses that errored"],
-  [/median|response/i, "Measured in this process"],
+  [/fail/i, "Responses that failed"],
+  [/median|response/i, "Since the app started"],
 ];
 
 export function SystemMonitoring({ page }: { page: PageEnvelope }) {
@@ -1542,7 +1531,7 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Monitoring" })}
         title="Monitoring"
-        description="App process metrics: service status and assistant activity since the app last started. Conversation content is never shown."
+        description="Service status and assistant activity since the app last started. Conversation text is never shown."
       />
       <Kpis label="Process metrics">
         {stats.map((entry) => (
@@ -1587,7 +1576,7 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
             </div>
           ) : (
             <Empty title="No activity yet">
-              Assistant sessions appear here once someone uses the assistant.
+              Sessions show up here after someone uses the assistant.
             </Empty>
           )}
         </Panel>
@@ -1605,7 +1594,7 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
             />
           ) : (
             <Empty title="No timings recorded">
-              Response times for the last 10 assistant answers show here.
+              The last 10 assistant answers show up here.
             </Empty>
           )}
         </Panel>
@@ -1615,9 +1604,6 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
               {incidents.map((incident) => (
                 <li key={word(incident.id)}>
                   <div className="adm-row">
-                    <span className="adm-row__icon">
-                      <Icon name="warning" size={16} />
-                    </span>
                     <div>
                       <p className="adm-row__title">
                         {word(incident.service, "Service")}
@@ -1631,7 +1617,7 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
             </ul>
           ) : (
             <Empty title="No incidents recorded">
-              Incidents since the app started would be listed here.
+              Any incident since the app started shows up here.
             </Empty>
           )}
         </Panel>
@@ -1701,7 +1687,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Audit trail" })}
         title="Audit trail"
-        description="Role, permission, restriction, case, moderation, identity, and record-access events. The log shows references, never report narratives or message text."
+        description="Each entry shows a reference, never report text or message text."
       />
       <div className="accs-toolbar adm-toolbar">
         <Search
@@ -1852,7 +1838,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
           >
             {filtering
               ? "No events match these filters."
-              : "Events appear here as people use the system."}
+              : "Events show up here as people use ACCS."}
           </Empty>
         </div>
       )}
@@ -1905,7 +1891,7 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     return (
       <ViewState
         kind="restricted"
-        title="This page isn't available to your role."
+        title="Your role can't open this page"
       />
     );
   if (page.isError)
@@ -1919,8 +1905,8 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     ) : (
       <ViewState
         kind="error"
-        title="This information couldn't be loaded"
-        description="Try again."
+        title="This page couldn't load"
+        description="Check your connection, then try again."
         actions={
           <Button variant="secondary" onPress={() => void page.refetch()}>
             Try again

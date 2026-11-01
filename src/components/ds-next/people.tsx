@@ -15,7 +15,7 @@ export interface PersonCardProps {
   actions?: ReactNode
 }
 
-/** Compact person card: initials avatar, name (the whole card links when `href` is set), role tags, office. */
+/** Directory row: initials avatar, name (the whole card links when `href` is set), role tags, office. */
 export function PersonCard({
   name,
   role,
@@ -49,11 +49,6 @@ export function PersonCard({
           {meta}
           {actions}
         </div>
-      )}
-      {href && (
-        <span className="ds-next-person-card__go" aria-hidden>
-          <Icon name="arrow-right" size={16} />
-        </span>
       )}
     </article>
   )

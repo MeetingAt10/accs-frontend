@@ -442,7 +442,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
     {
       label: "Cases",
       entries: [
-        { label: "Case Files", href: "/cases", pageId: "P21", icon: "tray" },
+        { label: "Case files", href: "/cases", pageId: "P21", icon: "tray" },
       ],
     },
     {
@@ -708,7 +708,7 @@ function Topbar({
       >
         <Stack gap={16}>
           <AssistantPanel />
-          <Link href="/assistant">Open the full assistant page</Link>
+          <Link href="/assistant">Open the assistant page</Link>
         </Stack>
       </Drawer>
     </>
@@ -806,8 +806,8 @@ export function AppChrome({
                     const restriction = entry as Record<string, unknown>;
                     const features = Array.isArray(restriction.features)
                       ? restriction.features.map(String).join(", ")
-                      : "Selected feature";
-                    return `${features}, until ${String(restriction.until ?? "review")}`;
+                      : "Some features";
+                    return `${features} paused until ${String(restriction.until ?? "review")}`;
                   })
                   .join("; ")
               : "Some account features are paused."}

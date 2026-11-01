@@ -182,9 +182,8 @@
   border-right: 1px solid var(--accs-line);
   background: var(--accs-surface);
 }
-.shell-side__head { display: grid; gap: 4px; padding: 18px 16px 14px; }
+.shell-side__head { padding: 18px 16px 10px; }
 .shell-side__name { margin: 0; font-family: var(--accs-font-display); font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
-.shell-side__purpose { margin: 0; color: var(--accs-muted); font-size: 0.75rem; line-height: 1.45; }
 .shell-side__nav { flex: 1; display: grid; align-content: start; gap: 18px; padding: 6px 8px 16px; overflow-y: auto; }
 .shell-group { display: grid; gap: 2px; }
 .shell-group__label { margin: 0 0 4px; padding: 0 10px; color: var(--accs-faint); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.02em; }
@@ -305,10 +304,7 @@
   place-items: center;
   width: 56px;
   height: 56px;
-  border-radius: 16px;
-  background: var(--accs-surface);
-  box-shadow: inset 0 0 0 1px var(--accs-line), 0 10px 24px -12px rgb(11 18 32 / 30%);
-  color: var(--accs-ink-2);
+  color: var(--accs-muted);
 }
 .shell-denied__title { margin: 8px 0 0; font-family: var(--accs-font-display); font-size: 1.375rem; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; }
 .shell-denied__text { max-width: 30rem; margin: 0 0 8px; color: var(--accs-muted); line-height: 1.55; text-wrap: pretty; }

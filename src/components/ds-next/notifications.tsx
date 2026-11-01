@@ -106,7 +106,7 @@ export function NotificationItem({
           </p>
         )}
         <span className="ds-next-notification-item__meta">
-          <span className="accs-tag">{kind}</span>
+          <span className="ds-next-notification-item__kind">{kind}</span>
           <time dateTime={at} title={formatDateTime(at, "")}>
             {relativeTime(at)}
           </time>

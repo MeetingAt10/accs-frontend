@@ -66,8 +66,8 @@ export function ConversationList({
   if (!conversations.length) {
     return (
       <div className="accs-empty">
-        <strong>No messages yet</strong>
-        <span>Start a conversation with someone in your permitted scope.</span>
+        <strong>No conversations yet</strong>
+        <span>Start a conversation with someone you are allowed to message.</span>
       </div>
     );
   }

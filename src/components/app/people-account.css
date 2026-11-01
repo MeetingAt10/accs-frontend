@@ -6,7 +6,7 @@
 .pa-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .pa-standing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--accs-muted); font-size: 0.875rem; }
 
-/* Translucent sticky toolbar */
+/* Sticky filter bar */
 .pa-toolbar {
   position: sticky;
   top: 8px;
@@ -16,18 +16,17 @@
   padding: 12px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-card);
-  background: color-mix(in srgb, var(--accs-surface) 82%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%), 0 8px 24px -12px rgb(11 18 32 / 12%);
+  background: var(--accs-surface);
   animation: accs-rise var(--accs-dur-3) var(--accs-ease-out) 80ms both;
 }
 .pa-toolbar__row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; }
 .pa-toolbar__search { flex: 1 1 16rem; min-width: 0; }
 .pa-toolbar__row > :not(.pa-toolbar__search) { flex: 0 1 11rem; min-width: 9rem; }
 
-/* Directory grid. Motion handles the entrance, so no CSS cascade here. */
-.pa-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+/* Directory list. Motion handles the entrance, so no CSS cascade here. */
+.pa-grid { display: grid; overflow: hidden; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); background: var(--accs-surface); }
 .pa-grid > * { min-width: 0; }
+.pa-grid > :last-child .ds-next-person-card { border-bottom: 0; }
 
 /* Label/value rows */
 .pa-facts { display: grid; margin: 0; }
@@ -48,9 +47,7 @@
   padding: 10px 14px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-card);
-  background: color-mix(in srgb, var(--accs-surface) 82%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--accs-shadow-hover);
+  background: var(--accs-surface);
 }
 
 /* Help */

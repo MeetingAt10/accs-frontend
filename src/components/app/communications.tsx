@@ -4,7 +4,6 @@ import {
   Button,
   ComboBox,
   Divider,
-  Icon,
   Drawer,
   EmptyState,
   Grid,
@@ -337,8 +336,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           )}
           {!isThread ? (
             <EmptyState
-              title="Pick a conversation"
-              description="Open a conversation from the list, or start a new message."
+              title="No conversation open"
+              description="Choose one from the list or start a new message."
             />
           ) : (
             <Stack gap={24}>
@@ -368,9 +367,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               {officeConversation && (
                 <Alert
                   tone="neutral"
-                  title="Keep case details in the case record"
+                  title="Keep case details out of messages"
                 >
-                  Keep case details in the case record.
+                  Put them in the case record.
                 </Alert>
               )}
               {messages.length > earlier && (
@@ -435,7 +434,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               ) : (
                 <EmptyState
                   title="No messages yet"
-                  description="Send the first message in this conversation."
+                  description="Write the first one below."
                 />
               )}
               <ActionError error={action.error} />
@@ -457,7 +456,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               label="To"
               selectedKey={recipientId || null}
               onSelectionChange={(key) => setRecipientId(String(key ?? ""))}
-              emptyMessage="No one you can message matches"
+              emptyMessage="No matching recipients"
               isRequired
             >
               {recipients.map((recipient) => (
@@ -535,8 +534,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       >
         <ModalBody>
           <Stack gap={16}>
-            <Alert tone="neutral" title="A report starts a human review">
-              A report starts a human review. It isn't a finding.
+            <Alert tone="neutral" title="A person reviews every report">
+              A report is not a finding.
             </Alert>
             <TextArea
               label="Reason"
@@ -697,7 +696,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
       <Heading
         title="Notifications"
         description={
-          unreadCount ? unreadCount + " unread" : "You're all caught up"
+          unreadCount ? unreadCount + " unread" : "No unread notifications"
         }
         actions={
           <>
@@ -749,8 +748,10 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         {visible.length ? (
           <NotificationList>{rows}</NotificationList>
         ) : (
-          <Empty title="You're all caught up">
-            Updates for your account appear here when they are available.
+          <Empty title="No notifications">
+            {filter === "all"
+              ? "Updates about your reports, consultations, and messages show up here."
+              : "Nothing matches this filter."}
           </Empty>
         )}
       </Panel>
@@ -835,11 +836,6 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: reduce ? 0 : 0.34, ease }}
                   >
-                    {!message.own && (
-                      <span className="cm-msg__avatar" aria-hidden>
-                        <Icon name="chats" size={16} />
-                      </span>
-                    )}
                     <div className="cm-msg__bubble">
                       <span className="cm-msg__who">
                         {message.own ? "You" : "ACCS assistant"}
@@ -865,11 +861,8 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
             </ol>
           ) : (
             <div className="cm-welcome">
-              <span className="cm-welcome__mark" aria-hidden>
-                <Icon name="chats" size={24} />
-              </span>
               <h2>Ask about ACCS</h2>
-              <p>Choose a suggested prompt or write a question below.</p>
+              <p>Pick a suggestion or type your own question.</p>
             </div>
           )}
           {action.isPending && (
@@ -879,7 +872,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                 <i />
                 <i />
               </span>
-              Preparing a reply from permitted information
+              Writing a reply
             </div>
           )}
           {action.isError && (
@@ -917,9 +910,9 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
           {/* TBD(D-08): assistant provider data handling and log retention require approval. */}
           <div className="cm-chat__note">
             <small>
-              The assistant explains and helps you write. It doesn't decide
-              reports, restrictions, or outcomes, and it can't see records you
-              can't.
+              The assistant explains things and helps you write. It does not
+              decide reports, restrictions, or outcomes, and it cannot see
+              records you cannot.
             </small>
             <Button
               variant="tertiary"
@@ -984,7 +977,7 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <Heading
         title="Notification priorities"
-        description="Choose how loudly each kind of update reaches you."
+        description="Set each kind of update to urgent, normal, or off."
         crumbs={[
           { label: "Settings", href: "/settings" },
           { label: "Notifications" },
@@ -1018,8 +1011,8 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
         ))}
         {/* TBD(D-06): no category is marked mandatory until the required-category policy is approved. */}
         <p className="pt-scope">
-          Delivery channels such as email are still being decided. Priority
-          choices do not change your access to a report or case.
+          Email and other delivery channels are not set up yet. Priority
+          choices never change your access to a report or case.
         </p>
       </div>
       <ActionError error={action.error} />
@@ -1054,7 +1047,7 @@ export function CommunicationsPage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <Heading
         title="Assistant"
-        description="Ask how ACCS works, where to find things, and what a stage means."
+        description="Ask how ACCS works or where to find something."
       />
       <Panel flush className="cm-chat-panel accs-reveal">
         <AssistantPanel suggestions={roles(page.data.suggestions)} />

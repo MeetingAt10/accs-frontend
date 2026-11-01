@@ -1,7 +1,7 @@
 .ds-next-notification-list { margin: 0; padding: 0; list-style: none; }
 
 .ds-next-notification-group {
-  padding: 10px 20px 6px;
+  padding: 16px 20px 6px;
   color: var(--accs-muted);
   font-size: 0.75rem;
   font-weight: 700;
@@ -28,18 +28,17 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--site-accent-wash);
-  color: var(--site-accent-ink);
+  width: 24px;
+  height: 24px;
+  color: var(--accs-muted);
 }
+.ds-next-notification-item[data-unread] .ds-next-notification-item__icon { color: var(--site-accent-ink); }
 .ds-next-notification-item__dot {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 11px;
-  height: 11px;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--site-accent);
   box-shadow: 0 0 0 2px var(--accs-surface);
@@ -70,8 +69,8 @@
   font-size: 0.875rem;
   line-height: 1.5;
 }
-.ds-next-notification-item__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--accs-muted); font-size: 0.75rem; }
-.ds-next-notification-item__meta .accs-tag { text-transform: capitalize; }
+.ds-next-notification-item__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--accs-muted); font-size: 0.75rem; }
+.ds-next-notification-item__kind { text-transform: capitalize; }
 .ds-next-notification-item__read {
   min-height: 40px;
   padding: 0 12px;

@@ -231,7 +231,7 @@ function ActionError({ error }: { error: unknown }) {
     <Alert tone="danger" title="The change couldn't be saved">
       {error instanceof Error
         ? error.message
-        : 'Try again. Your entered text is kept.'}
+        : 'Try again. Your text is still in the form.'}
     </Alert>
   )
 }
@@ -547,7 +547,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     <div className="fx-page accs-stack accs-stagger">
       <PageHeader
         title="Feed"
-        description="Discussions and announcements in your permitted spaces."
+        description="Posts and announcements from the audiences you belong to."
         actions={
           canParticipate && (
             <Button
@@ -681,7 +681,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                   ) : undefined
                 }
               >
-                Only content in the selected audience is shown.
+                Posts appear here when someone in this audience publishes one.
               </Empty>
             </Panel>
           )}
@@ -817,8 +817,7 @@ export function PostComposer({
       <PageHeader
         crumbs={[{ label: 'Feed', href: '/feed' }, { label: 'New post' }]}
         title={kind === 'announcement' ? 'New announcement' : 'Start a discussion'}
-        description="Share a question, update, or idea with the people in the audience you choose."
-      />
+              />
       {invalidRequestedAudience && (
         <Alert tone="danger" title="You can't post there">
           Choose one of the audiences listed below.
@@ -906,7 +905,7 @@ export function PostComposer({
                 Your post
               </h2>
               <p className="fx-group__hint">
-                Keep personal details out. Posts are checked for harmful words.
+                Leave out personal details. The system screens posts for harmful words.
               </p>
             </div>
             <div className="fx-group__body">
@@ -1005,7 +1004,7 @@ export function PostComposer({
           {/* TBD(D-08): attachment handling and retention are not approved. */}
           <p className="fx-note">
             <Icon name="paperclip" size={16} />
-            Attachments are not enabled yet. Keep this post to text for now.
+            You can't attach files yet. Write your post as text.
           </p>
           {session.user.roles.some((role) =>
             ['guidance', 'osas'].includes(role),
@@ -1014,7 +1013,7 @@ export function PostComposer({
               tone="neutral"
               title="Keep case information in the case record"
             >
-              Don't include case details here.
+              Do not put case details in a post.
             </Alert>
           )}
           <ActionError error={action.error} />
@@ -1039,7 +1038,7 @@ export function PostComposer({
           if (!open && blocker.status === 'blocked') blocker.reset()
         }}
       >
-        <ModalBody>Your entered text will be discarded.</ModalBody>
+        <ModalBody>The text you wrote will be lost.</ModalBody>
         <ModalActions>
           <Button
             variant="secondary"
@@ -1170,7 +1169,7 @@ function PostDetailPage({
     return (
       <EmptyState
         title="This post was removed"
-        description="The content is no longer available in the community."
+        description="Its content can no longer be viewed."
       />
     )
 
@@ -1194,7 +1193,7 @@ function PostDetailPage({
       await navigator.clipboard.writeText(window.location.href)
       toast('Link copied.', { tone: 'success' })
     } catch {
-      toast('Copy the address from your browser to share this link.', {
+      toast('Copy the link from your browser address bar.', {
         tone: 'neutral',
       })
     }
@@ -1261,7 +1260,7 @@ function PostDetailPage({
       !editBody.trim() ||
       (post!.kind === 'discussion' && !editLabel)
     ) {
-      setEditError('Enter a title, text, and label before saving.')
+      setEditError('Add a title and text, and choose a label, then save again.')
       return
     }
     try {
@@ -1354,7 +1353,7 @@ function PostDetailPage({
         {showConversionPrompt && (
           <Alert
             tone="info"
-            title="Many people agree with this. Turn it into a report?"
+            title="Many people agree with this post. Do you want to file a report?"
             actions={
               <Row>
                 <Button href={`/reports/new?from=${encodeURIComponent(post.id)}`}>
@@ -1369,7 +1368,7 @@ function PostDetailPage({
               </Row>
             }
           >
-            Only you can decide. Nothing is filed unless you choose to.
+            Nothing is filed unless you choose to file it.
           </Alert>
         )}
         <ActionError error={action.error} />
@@ -1430,9 +1429,7 @@ function PostDetailPage({
               )}
             </>
           ) : (
-            <Empty title="No comments yet">
-              A comment can add context or ask a question.
-            </Empty>
+            <Empty title="No comments yet" />
           )}
           {page.data.canComment === true ? (
             <div className="fx-reply">
@@ -1502,7 +1499,7 @@ function PostDetailPage({
             </div>
           ) : session.user.restrictions.includes('post.comment') ? (
             <Alert tone="neutral" title="Commenting is paused">
-              You can continue reading.{' '}
+              You can still read posts.{' '}
               <Link href="/standing">View account standing</Link>.
             </Alert>
           ) : null}
@@ -1522,7 +1519,7 @@ function PostDetailPage({
       >
         <ModalBody>
           <div className="app-page">
-            <p>Moderators review reports. A report is not a finding.</p>
+            <p>Moderators review every report. A report does not decide the outcome.</p>
             <RadioGroup
               label="Reason"
               value={reportReason}
@@ -1643,7 +1640,7 @@ function PostDetailPage({
         onOpenChange={setDeleteOpen}
       >
         <ModalBody>
-          <p>The post will no longer be available in the community.</p>
+          <p>No one will be able to view this post after you delete it.</p>
           <ActionError error={action.error} />
         </ModalBody>
         <ModalActions>
@@ -1805,7 +1802,7 @@ function SpacesPage({
               ? 'Program sections'
               : 'My classes'
         }
-        description="Current term · approved enrollment and teaching assignments"
+        description="Current term, from enrollment and teaching assignments."
       />
       {oversight && (
         <div className="fx-toolbar">
@@ -1904,50 +1901,48 @@ function SpacesPage({
             )}
           </>
         ) : (
-          <div className="accs-grid fx-cards">
-            {spaces.map((space) => (
-              <Panel as="article" interactive className="fx-card" key={space.id}>
-                <div className="fx-card__tags">
-                  <span className="accs-tag fx-tag--label">{space.program}</span>
-                  <span className="accs-tag">{space.title}</span>
-                </div>
-                <h2 className="fx-card__title">
-                  <Link
-                    variant="quiet"
-                    className="fx-card__link"
-                    href={`/spaces/${encodeURIComponent(space.id)}`}
-                  >
-                    {space.subject}
-                  </Link>
-                </h2>
-                <p className="fx-card__sub">
-                  {adviserNames(space, 'Faculty assignment pending')}
-                </p>
-                <div className="fx-card__foot">
-                  <span className="fx-card__stat">
-                    <Icon name="users" size={16} />
-                    <span className="accs-num">{studentTotal(space)}</span> students
-                  </span>
-                  {space.threadId && (
-                    <Link
-                      variant="quiet"
-                      className="fx-card__aux"
-                      href={`/messages/${encodeURIComponent(space.threadId)}`}
-                    >
-                      <Icon name="chat" size={16} />
-                      Group chat
-                    </Link>
-                  )}
-                </div>
-              </Panel>
-            ))}
-          </div>
+          <Panel flush>
+            <ul className="accs-rows" aria-label="My classes">
+              {spaces.map((space) => (
+                <li key={space.id}>
+                  <div className="accs-row fx-row">
+                    <div>
+                      <p className="accs-row__title">
+                        <Link
+                          variant="quiet"
+                          className="fx-table-link"
+                          href={`/spaces/${encodeURIComponent(space.id)}`}
+                        >
+                          {space.subject}
+                        </Link>
+                      </p>
+                      <p className="accs-row__sub">
+                        {space.program} · {space.title} ·{' '}
+                        {adviserNames(space, 'No adviser assigned')} ·{' '}
+                        <span className="accs-num">{studentTotal(space)}</span>{' '}
+                        students
+                      </p>
+                    </div>
+                    {space.threadId && (
+                      <Link
+                        variant="quiet"
+                        className="fx-table-link"
+                        href={`/messages/${encodeURIComponent(space.threadId)}`}
+                      >
+                        Group chat
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
         )
       ) : (
         <Panel>
-          <Empty title="No classes linked to your account yet">
-            Classes come from enrollment records. Contact the CCS office if this
-            is wrong.
+          <Empty title="No classes linked to your account">
+            Classes come from enrollment records. If one is missing, contact the
+            CCS office.
           </Empty>
         </Panel>
       )}
@@ -1993,7 +1988,7 @@ function SpacePage({
           { label: space.title },
         ]}
         title={`${space.title} · ${space.subject}`}
-        description={`${adviserNames(space, 'Faculty assignment pending')} · ${studentTotal(space)} students`}
+        description={`${adviserNames(space, 'No adviser assigned')} · ${studentTotal(space)} students`}
         actions={
           <>
             {canShowPost && (
@@ -2066,7 +2061,7 @@ function SpacePage({
             {!academic && (
               <p className="fx-note">
                 <Icon name="info" size={16} />
-                Member list visibility is under review. This view shows names
+                The policy on member lists is still under review. You see names
                 and roles only.
               </p>
             )}
@@ -2091,7 +2086,7 @@ function SpacePage({
                 </div>
                 <div>
                   <dt>Adviser</dt>
-                  <dd>{adviserNames(space, 'Faculty assignment pending')}</dd>
+                  <dd>{adviserNames(space, 'No adviser assigned')}</dd>
                 </div>
               </dl>
             </Panel>
@@ -2128,44 +2123,33 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
         </div>
       </div>
       {organizations.length ? (
-        <div className="accs-grid fx-cards">
-          {organizations.map((organization) => (
-            <Panel
-              as="article"
-              interactive
-              className="fx-card"
-              key={organization.id}
-            >
-              <div className="fx-card__top">
-                <span className="fx-mark" aria-hidden>
-                  {initials(organization.name)}
-                </span>
-                {organization.member && (
-                  <StatusChip tone="accent">Member</StatusChip>
-                )}
-              </div>
-              <h2 className="fx-card__title">
-                <Link
-                  variant="quiet"
-                  className="fx-card__link"
-                  href={`/organizations/${encodeURIComponent(organization.id)}`}
-                >
-                  {organization.name}
-                </Link>
-              </h2>
-              <p className="fx-card__sub fx-card__sub--clamp">
-                {organization.description}
-              </p>
-              <div className="fx-card__foot">
-                <span className="fx-card__stat">
-                  <Icon name="users" size={16} />
-                  <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
-                  members
-                </span>
-              </div>
-            </Panel>
-          ))}
-        </div>
+        <Panel flush>
+          <ul className="accs-rows" aria-label="Organizations">
+            {organizations.map((organization) => (
+              <li key={organization.id}>
+                <div className="accs-row fx-row">
+                  <div>
+                    <p className="accs-row__title">
+                      <Link
+                        variant="quiet"
+                        className="fx-table-link"
+                        href={`/organizations/${encodeURIComponent(organization.id)}`}
+                      >
+                        {organization.name}
+                      </Link>
+                    </p>
+                    <p className="accs-row__sub">{organization.description}</p>
+                  </div>
+                  <span className="fx-count-label">
+                    <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
+                    members
+                    {organization.member ? ' · Member' : ''}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
       ) : (
         <Panel>
           <Empty
@@ -2232,13 +2216,10 @@ function OrganizationPage({
           </>
         }
       />
-      <div className="fx-badges">
-        <StatusChip tone="ok">Verified organization</StatusChip>
-        {organization.member && <StatusChip tone="accent">Member</StatusChip>}
-        <span className="fx-count-label">
-          <span className="accs-num">{organization.memberCount ?? 0}</span> members
-        </span>
-      </div>
+      <p className="fx-count-label">
+        <span className="accs-num">{organization.memberCount ?? 0}</span> members
+        {organization.member ? ' · You’re a member' : ''}
+      </p>
       <Tabs defaultSelectedKey="feed">
         <TabList aria-label="Organization views">
           <Tab id="feed">Feed</Tab>
@@ -2254,8 +2235,8 @@ function OrganizationPage({
               <Panel>
                 <Empty title="No organization posts yet">
                   {organization.member
-                    ? 'Posts for this organization will appear here.'
-                    : 'Public posts for this organization will appear here.'}
+                    ? 'Posts from this organization show here once it publishes one.'
+                    : 'Public posts from this organization show here once it publishes one.'}
                 </Empty>
               </Panel>
             )}
@@ -2329,7 +2310,7 @@ function OrganizationPage({
                 <div>
                   <dt>Verified representative</dt>
                   <dd>
-                    {organization.representative?.name ?? 'Awaiting assignment'}
+                    {organization.representative?.name ?? 'Not assigned yet'}
                   </dd>
                 </div>
                 <div>
@@ -2341,8 +2322,8 @@ function OrganizationPage({
               {representative && (
                 <p className="fx-note">
                   <Icon name="info" size={16} />
-                  Member management is awaiting approval. Membership comes from
-                  the verified organization roster.
+                  You can't manage members yet. Membership comes from the
+                  verified organization roster.
                 </p>
               )}
             </Panel>

@@ -57,7 +57,7 @@ const word = (value: unknown, fallback = "") =>
   typeof value === "string" || typeof value === "number"
     ? String(value)
     : fallback;
-const firstRole = (value: unknown, fallback = "Authorized office") =>
+const firstRole = (value: unknown, fallback = "Office not recorded") =>
   Array.isArray(value) ? word(value[0], fallback) : fallback;
 const features = (restriction: Item) =>
   Array.isArray(restriction.features) ? restriction.features.map(String) : [];
@@ -314,7 +314,7 @@ function PersonCell({
 function Skeleton() {
   return (
     <div className="rc-skel" role="status" aria-busy="true">
-      <span className="rc-sr">Loading information</span>
+      <span className="rc-sr">Loading</span>
       <div className="accs-skeleton rc-skel__title" />
       <div className="accs-skeleton rc-skel__line" style={{ width: "40%" }} />
       <div className="accs-skeleton rc-skel__block" />
@@ -364,14 +364,14 @@ export function OffenseHistory({ offenses }: { offenses: Item[] }) {
                     {word(offense.decisionReference, "—")}
                   </span>
                 </span>
-                <span>{word(offense.actorRole, "Authorized office")}</span>
+                <span>{word(offense.actorRole, "Office not recorded")}</span>
               </p>
             </motion.li>
           ))}
         </ol>
       ) : (
         <Empty title="No offense records">
-          Nothing is recorded for this student.
+          This student has none.
         </Empty>
       )}
     </Panel>
@@ -398,10 +398,10 @@ export function RestrictionPanel({
               <div className="accs-row rc-row">
                 <div>
                   <p className="accs-row__title">
-                    {features(restriction).join(", ") || "Feature restriction"}
+                    {features(restriction).join(", ") || "Restricted features"}
                   </p>
                   <p className="accs-row__sub">
-                    {word(restriction.basis, "Basis recorded")}
+                    {word(restriction.basis, "No basis given")}
                     {Boolean(restriction.decisionReference) && (
                       <>
                         {" · "}
@@ -414,7 +414,7 @@ export function RestrictionPanel({
                   <p className="accs-row__sub">
                     {firstRole(
                       object(restriction.authorizer).roles,
-                      word(restriction.actorRole, "Authorized office"),
+                      word(restriction.actorRole, "Office not recorded"),
                     )}
                   </p>
                 </div>
@@ -433,7 +433,7 @@ export function RestrictionPanel({
         </ul>
       ) : (
         <Empty title="No restrictions">
-          No restriction records are available for this student.
+          This student has no restrictions on record.
         </Empty>
       )}
     </Panel>
@@ -470,11 +470,9 @@ export function AuditLog({
               {entries.map((entry, index) => (
                 <tr key={word(entry.id, String(index))}>
                   <td className="accs-mono">{formatDateTime(entry.at)}</td>
-                  <td>{word(object(entry.actor).name, "Authorized user")}</td>
+                  <td>{word(object(entry.actor).name, "Unknown user")}</td>
                   <td>{word(entry.action, "—")}</td>
-                  <td>
-                    <span className="accs-tag">{word(entry.module, "—")}</span>
-                  </td>
+                  <td>{word(entry.module, "—")}</td>
                   <td className="accs-mono">{word(entry.reference, "—")}</td>
                   <td>{word(entry.purpose, "—")}</td>
                 </tr>
@@ -483,7 +481,7 @@ export function AuditLog({
           </table>
         </div>
       ) : (
-        <Empty title="No audit entries" />
+        <Empty title="No entries yet" />
       )}
     </Panel>
   );
@@ -521,39 +519,37 @@ function Similarity({ value }: { value: unknown }) {
   );
 }
 
-function ClusterCard({ cluster }: { cluster: Item }) {
+function ClusterRow({ cluster }: { cluster: Item }) {
   const count = Number(
     word(cluster.reportCount, String(items(cluster.reportIds).length)),
   );
   return (
-    <Panel as="article" interactive className="rc-cluster">
-      <div className="rc-cluster__top">
-        <span className="accs-tag">{word(cluster.program, "—")}</span>
-        <StatusChip tone={toneFor(word(cluster.status, "To review"))}>
-          {word(cluster.status, "To review")}
-        </StatusChip>
+    <li className="rc-cluster">
+      <div className="accs-row rc-row rc-row--cluster">
+        <div>
+          <p className="accs-row__title">
+            <Link
+              variant="quiet"
+              className="rc-cluster__link"
+              href={"/cases/clusters/" + encodeURIComponent(word(cluster.id))}
+            >
+              {word(cluster.title, "Similar reports for review")}
+            </Link>
+          </p>
+          <p className="accs-row__sub">
+            {word(cluster.program, "—")} · {count}{" "}
+            {count === 1 ? "report" : "reports"}
+          </p>
+          <p className="rc-muted">{word(cluster.supporting)}</p>
+        </div>
+        <div className="rc-row__aside rc-cluster__aside">
+          <StatusChip tone={toneFor(word(cluster.status, "To review"))}>
+            {word(cluster.status, "To review")}
+          </StatusChip>
+          <Similarity value={cluster.similarity} />
+        </div>
       </div>
-      <h2 className="rc-cluster__title">
-        <Link
-          variant="quiet"
-          className="rc-cluster__link"
-          href={"/cases/clusters/" + encodeURIComponent(word(cluster.id))}
-        >
-          {word(cluster.title, "Similar reports for review")}
-        </Link>
-      </h2>
-      <p className="rc-muted">{word(cluster.supporting)}</p>
-      <Similarity value={cluster.similarity} />
-      <div className="rc-cluster__foot">
-        <span>
-          <span className="accs-mono">{count}</span>{" "}
-          {count === 1 ? "report" : "reports"}
-        </span>
-        <span aria-hidden>
-          <Icon name="arrow-right" size={16} />
-        </span>
-      </div>
-    </Panel>
+    </li>
   );
 }
 
@@ -565,24 +561,26 @@ function ClusterList({ page }: { page: PageEnvelope }) {
         <PageHeader
           crumbs={[siteCrumb("/cases"), { label: "Similar reports" }]}
           title="Similar reports"
-          description="Review system-generated suggestions within your program."
+          description="Suggested matches from your program's reports."
         />
       }
     >
       <Note>
-        Suggestions need human review. No report is grouped into a case
-        automatically. <span className="tbd-comment">TBD(D-07)</span>
+        A person reviews every suggestion. The system never groups reports
+        into a case by itself. <span className="tbd-comment">TBD(D-07)</span>
       </Note>
       {clusters.length ? (
-        <div className="accs-grid rc-clusters">
-          {clusters.map((cluster) => (
-            <ClusterCard key={word(cluster.id)} cluster={cluster} />
-          ))}
-        </div>
+        <Panel flush>
+          <ul className="accs-rows">
+            {clusters.map((cluster) => (
+              <ClusterRow key={word(cluster.id)} cluster={cluster} />
+            ))}
+          </ul>
+        </Panel>
       ) : (
         <Panel>
           <Empty title="No groups to review">
-            Similar-report suggestions will appear here when available.
+            The system has not flagged any similar reports in your program.
           </Empty>
         </Panel>
       )}
@@ -600,7 +598,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
       <ViewState
         kind="restricted"
         title="This group isn't available"
-        description="It may not exist, or it may be outside your program scope."
+        description="It may not exist, or it may be outside your program."
       />
     );
   const decide = (decision: "confirmed" | "dismissed") =>
@@ -682,7 +680,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
                         <p className="rc-body">
                           {word(
                             report.summary,
-                            "Report details are available in the authorized case view.",
+                            "Open the case to read this report.",
                           )}
                         </p>
                       </div>
@@ -706,8 +704,8 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
         <Panel title="Your review">
           <Similarity value={record.similarity} />
           <p className="rc-muted">
-            A similarity summary does not establish that reports describe the
-            same event. Review each report and its context.
+            A high score does not mean the reports describe the same event.
+            Read each report in context.
           </p>
           {status === "To review" ? (
             <div className="rc-reasons">
@@ -716,10 +714,10 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
                 value={reason}
                 onChange={setReason}
                 maxLength={1000}
-                description="Record why you confirmed or dismissed this suggestion."
+                description="Say why you are confirming or dismissing this group."
               />
               {action.error && (
-                <Alert tone="danger" title="The review couldn't be saved">
+                <Alert tone="danger" title="The review wasn't saved">
                   {action.error.message}
                 </Alert>
               )}
@@ -742,7 +740,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
               </div>
             </div>
           ) : (
-            <p className="rc-muted">This group was reviewed: {status}.</p>
+            <p className="rc-muted">This group has been reviewed and is {status}.</p>
           )}
         </Panel>
       </div>
@@ -781,7 +779,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
         <PageHeader
           crumbs={[siteCrumb("/analytics"), { label: "Case analytics" }]}
           title="Case analytics"
-          description="Counts and trends for your permitted case scope."
+          description="Case counts for the programs you can see."
           actions={
             filtered ? (
               <Button
@@ -907,7 +905,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
             }))}
           />
           <p className="rc-policy">
-            Counts below the approved threshold are suppressed.
+            Categories with too few cases show as suppressed.
           </p>
         </Panel>
         <Panel title="Opened and resolved reports" className="rc-span">
@@ -955,7 +953,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                       </Link>
                     </td>
                     <td>
-                      <span className="accs-tag">{cap(word(entry.stage, "—"))}</span>
+                      {cap(word(entry.stage, "—"))}
                     </td>
                     <td>
                       <StatusChip tone={toneFor(word(entry.status))}>
@@ -970,13 +968,12 @@ function Analytics({ page }: { page: PageEnvelope }) {
           </div>
         ) : (
           <Empty title="No cases match these filters">
-            Try a different reference, stage, or period.
+            Change or clear a filter.
           </Empty>
         )}
       </Panel>
       <Note>
-        Analytics contain aggregate counts only. Small categories are
-        suppressed, and this page does not show report narratives.
+        This page shows counts only. It never shows what a report says.
       </Note>
     </Screen>
   );
@@ -1034,8 +1031,8 @@ function RecordList({ page }: { page: PageEnvelope }) {
       }
     >
       <Note>
-        Opening a record asks for a purpose and is logged with your name and the
-        time. This list does not create an access entry.
+        Opening a record asks for a reason and logs it with your name and the
+        time. Browsing this list is not logged.
       </Note>
       <div className="accs-toolbar rc-toolbar" role="search">
         <div className="accs-grow">
@@ -1135,7 +1132,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
                         </span>
                       </td>
                       <td>
-                        <StandingBadge standing={student.standing} />
+                        {isPaused(student.standing) ? (
+                          <StandingBadge standing={student.standing} />
+                        ) : (
+                          <span className="rc-muted">Good standing</span>
+                        )}
                       </td>
                       <td className="accs-num">
                         {count ? (
@@ -1156,7 +1157,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
       ) : (
         <Panel>
           <Empty
-            title={filtered ? "No students match" : "No students in your scope yet"}
+            title={filtered ? "No students match" : "No students to show"}
             action={
               filtered ? (
                 <Button variant="secondary" onPress={reset}>
@@ -1165,7 +1166,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
               ) : undefined
             }
           >
-            {filtered ? "Try a different search or filter." : undefined}
+            {filtered ? "Change the search or clear a filter." : undefined}
           </Empty>
         </Panel>
       )}
@@ -1176,10 +1177,10 @@ function RecordList({ page }: { page: PageEnvelope }) {
 /* ---------- Student record (P34) ---------- */
 
 const purposes = [
-  ["Case handling", "Reviewing a report or decision linked to this student."],
+  ["Case handling", "Reviewing a report or decision about this student."],
   ["Good Moral review", "Checking prerequisites for a certificate request."],
   ["Restriction review", "Applying, lifting, or checking a restriction."],
-  ["Program oversight", "Routine program or college oversight."],
+  ["Program oversight", "Routine program or college review."],
 ] as const;
 
 function PurposeStep({
@@ -1201,13 +1202,13 @@ function PurposeStep({
             { label: "Open record" },
           ]}
           title="Open this student record"
-          description="Opening a record is logged with your name and the time."
+          description="The reason you pick is logged with your name and the time."
         />
       }
     >
       <Panel title="Purpose of access">
         <fieldset className="rc-choices">
-          <legend>Why do you need this record?</legend>
+          <legend className="rc-sr">Why do you need this record?</legend>
           {purposes.map(([title, sub]) => (
             <label className="rc-choice" key={title}>
               <input
@@ -1285,7 +1286,7 @@ function GoodMoralReview({
           maxLength={2000}
         />
         {action.error && (
-          <Alert tone="danger" title="The review couldn't be saved">
+          <Alert tone="danger" title="The review wasn't saved">
             {action.error.message}
           </Alert>
         )}
@@ -1395,7 +1396,7 @@ function StudentRecord({
       <ViewState
         kind="restricted"
         title="This record isn't available to you"
-        description="It may not exist, or it may belong to someone else."
+        description="It may not exist, or it may be outside your scope."
       />
     );
   const name = word(record.name, "Student");
@@ -1421,6 +1422,7 @@ function StudentRecord({
               <span className="accs-mono">{word(record.studentId, "—")}</span>
               <span className="accs-tag">{word(record.program, "—")}</span>
               <span>Section {word(record.section, "—")}</span>
+              <span>Year {word(record.year, "—")}</span>
             </span>
           }
           actions={
@@ -1434,22 +1436,9 @@ function StudentRecord({
         />
       }
     >
-      <Kpis label="Record summary">
-        <Kpi
-          label="Offense records"
-          value={<CountUp value={offenses.length} />}
-        />
-        <Kpi
-          label="Active restrictions"
-          value={<CountUp value={activeRestrictions.length} />}
-        />
-        <Kpi label="Year level" value={word(record.year, "—")} />
-        <Kpi
-          label="Record opened"
-          value={formatDateTime(record.openedAt)}
-          note="Logged with your name"
-        />
-      </Kpis>
+      <p className="rc-count">
+        Opened {formatDateTime(record.openedAt)}. Logged with your name.
+      </p>
       <div className="accs-stack accs-stack--tight">
         <TabBar
           label="Student record sections"
@@ -1460,27 +1449,21 @@ function StudentRecord({
         />
         <TabBody panelId={panelId} value={selectedTab}>
           {selectedTab === "overview" && (
-            <div className="rc-cols">
-              <Panel title="Student details">
+            <div className="rc-cols rc-cols--wide">
+              <RestrictionPanel
+                title="Active restrictions"
+                restrictions={activeRestrictions}
+              />
+              <Panel title="Student">
                 <Facts
                   rows={[
                     ["Program", word(record.program, "—")],
                     ["Section", word(record.section, "—")],
                     ["Year", word(record.year, "—")],
                     ["Standing", <StandingBadge standing={record.standing} />],
-                    [
-                      "Active restrictions",
-                      activeRestrictions
-                        .map((restriction) => features(restriction).join(", "))
-                        .join("; ") || "None",
-                    ],
                   ]}
                 />
               </Panel>
-              <RestrictionPanel
-                title="Active restrictions"
-                restrictions={activeRestrictions}
-              />
             </div>
           )}
           {selectedTab === "offenses" && <OffenseHistory offenses={offenses} />}
@@ -1577,15 +1560,10 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
         />
       }
     >
-      <Kpis label="Restriction counts">
-        <Kpi label="Active" value={<CountUp value={active.length} />} />
-        <Kpi label="Ended" value={<CountUp value={ended.length} />} />
-        <Kpi label="Change requests" value={<CountUp value={referrals.length} />} />
-      </Kpis>
       <Note>
-        Restrictions pause selected features only. Announcements, academic
-        information, the assistant, and permitted professor messages stay
-        available.
+        A restriction pauses only the features it lists. Announcements,
+        academic information, the assistant, and permitted professor messages
+        stay available.
       </Note>
       <div className="accs-stack accs-stack--tight">
         <TabBar
@@ -1624,9 +1602,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                             />
                           </td>
                           <td>
-                            <span className="accs-tag">
-                              {word(request.change, "—")}
-                            </span>
+                            {word(request.change, "—")}
                           </td>
                           <td className="rc-wrap">{word(request.reason, "—")}</td>
                           <td>
@@ -1649,8 +1625,8 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                 </div>
                 {admin && (
                   <p className="rc-policy">
-                    Applying a requested end-date change or declining a request
-                    is not defined by the current policy.{" "}
+                    Current policy does not say how to apply an end-date change or
+                    decline a request.{" "}
                     <span className="tbd-comment">TBD(D-05)</span>
                   </p>
                 )}
@@ -1658,7 +1634,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             ) : (
               <Panel>
                 <Empty title="No change requests">
-                  Requests from Guidance and OSAS appear here.
+                  Guidance and OSAS requests to change a restriction show up here.
                 </Empty>
               </Panel>
             )
@@ -1671,7 +1647,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
         </TabBody>
       </div>
       {action.error && (
-        <Alert tone="danger" title="The change couldn't be saved">
+        <Alert tone="danger" title="The change wasn't saved">
           {action.error.message}
         </Alert>
       )}
@@ -1722,8 +1698,8 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             onChange={setUntil}
           />
           <p className="rc-policy">
-            Only the selected features are paused. Start date is today.{" "}
-            {basis ? "" : "Basis options remain under review. "}
+            Only the selected features are paused. The restriction starts today.{" "}
+            {basis ? "" : "Basis options are still under review. "}
             <span className="tbd-comment">TBD(D-05)</span>
           </p>
         </ModalBody>
@@ -1814,7 +1790,7 @@ function RestrictionRows({
     return (
       <Panel>
         <Empty title="No restrictions in this view">
-          Restrictions that match this view will be listed here.
+          Nothing to show under this tab.
         </Empty>
       </Panel>
     );
@@ -1847,15 +1823,7 @@ function RestrictionRows({
                       sub={firstRole(object(restriction.authorizer).roles)}
                     />
                   </td>
-                  <td>
-                    <span className="rc-tags">
-                      {features(restriction).map((feature) => (
-                        <span className="accs-tag" key={feature}>
-                          {feature}
-                        </span>
-                      ))}
-                    </span>
-                  </td>
+                  <td>{features(restriction).join(", ") || "—"}</td>
                   <td className="rc-wrap">
                     {word(restriction.basis, "—")}
                     <p className="rc-person__sub accs-mono">
@@ -1955,7 +1923,7 @@ function RestrictionRequestForm({
       )}
       <TextArea label="Reason" isRequired value={reason} onChange={setReason} />
       {action.error && (
-        <Alert tone="danger" title="The request couldn't be saved">
+        <Alert tone="danger" title="The request wasn't saved">
           {action.error.message}
         </Alert>
       )}
@@ -2052,9 +2020,9 @@ function RecordRestrictionActions({
         })}
       </ul>
       {osas && (
-        <p className="rc-policy" style={{ padding: "12px 20px" }}>
-          OSAS authority is still being defined. A request records a referral
-          and does not apply or lift a restriction.{" "}
+        <p className="rc-policy rc-policy--pad">
+          OSAS authority is still being defined. A request records a referral.
+          It does not apply or lift a restriction.{" "}
           <span className="tbd-comment">TBD(OSAS-03)</span>
         </p>
       )}
@@ -2124,8 +2092,8 @@ function StandingPage({ page }: { page: PageEnvelope }) {
         </>
       )}
       <Note>
-        Classmates see a neutral standing badge. Offense details are not shown on
-        your profile.
+        Classmates see only a neutral badge. Your profile never shows offense
+        details.
       </Note>
       <p>
         <Link variant="standalone" href="/directory?q=Guidance">
@@ -2160,13 +2128,13 @@ export function OversightScreen({ pageId }: { pageId: string }) {
       <ViewState
         kind="restricted"
         title="This record isn't available to you"
-        description="It may not exist, or it may belong to someone else."
+        description="It may not exist, or it may be outside your scope."
       />
     ) : (
       <ViewState
         kind="error"
-        title="This information couldn't be loaded"
-        description="Try again."
+        title="This page didn't load"
+        description="Check your connection, then try again."
         actions={
           <Button variant="secondary" onPress={() => void page.refetch()}>
             Try again

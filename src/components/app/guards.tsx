@@ -9,7 +9,7 @@ import { canOpenSite, currentSite, landingFor, roleLabel, siteById, siteForPath,
 
 import './sites.css'
 
-/** Calm "no access" screen: lock, one explanation, one way back. */
+/** "No access" screen: a title, one explanation, one way back. */
 function DeniedView({ title, children, page }: { title: string; children: ReactNode; page?: boolean }) {
   const session = useQuery(sessionQuery()).data
   return (
@@ -22,7 +22,7 @@ function DeniedView({ title, children, page }: { title: string; children: ReactN
       </h1>
       <p className="shell-denied__text">{children}</p>
       <Button variant="primary" href={session ? siteHref(landingFor(session)) : '/sign-in'}>
-        Go to your home
+        Back to Home
       </Button>
     </section>
   )
@@ -46,7 +46,7 @@ export function AccessDenied({ page = false }: { page?: boolean }) {
 export function RestrictedView({ record = false }: { record?: boolean }) {
   return (
     <DeniedView title={record ? "This record isn't available to you" : "This page isn't available to you"}>
-      It may not exist, or your role and scope may not include it. A link or notification does not grant access.
+      This record may not exist, or it may be outside your role and scope. Having the link does not give you access.
     </DeniedView>
   )
 }
@@ -56,7 +56,7 @@ const recordPages = ['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P2
 export function RequirePermission({ pageId, children }: { pageId: string; children: ReactNode }) {
   const session = useQuery(sessionQuery())
   if (session.isPending) {
-    return <ViewState kind="loading" title="Checking access" />
+    return <ViewState kind="loading" title="Checking your access" />
   }
   const permission = routePermission[pageId]
   const requiredPermissions = permission
@@ -95,8 +95,8 @@ export function RetryView({ onRetry }: { onRetry: () => void }) {
   return (
     <ViewState
       kind="error"
-      title="This information couldn't be loaded"
-      description="Try again. Your access is checked again when the page reloads."
+      title="Couldn't load this page"
+      description="Try again. We check your access each time the page loads."
       actions={<Button variant="secondary" onPress={onRetry}>Try again</Button>}
     />
   )

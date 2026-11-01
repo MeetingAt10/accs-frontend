@@ -238,7 +238,7 @@ export function BarChart({
           />
         </>
       ) : (
-        <p className="ch__empty">No chart data for this selection.</p>
+        <p className="ch__empty">No data for these filters.</p>
       )}
     </figure>
   );
@@ -481,7 +481,7 @@ export function TrendChart({
           <ChartTable data={data} series={series} />
         </>
       ) : (
-        <p className="ch__empty">No chart data for this selection.</p>
+        <p className="ch__empty">No data for these filters.</p>
       )}
     </figure>
   );

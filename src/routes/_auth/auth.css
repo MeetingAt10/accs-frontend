@@ -1,4 +1,6 @@
 /* Sign-in and registration: split screen on desktop, navy strip above the form on mobile. */
+/* The design system reserves a scrollbar gutter on html; on these pages it shows as a strip of page background. */
+html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
 .au {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -41,7 +43,7 @@
 .au-col[data-wide] { max-width: 520px; }
 
 .au-title {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-family: var(--accs-font-display);
   font-size: 1.75rem;
   font-weight: 600;
@@ -57,7 +59,7 @@
 .au-form { display: grid; gap: 16px; }
 .au-set { display: grid; gap: 16px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .au-set + .au-set { padding-top: 20px; border-top: 1px solid var(--accs-line); }
-.au-set > legend { float: left; width: 100%; margin: 0 0 16px; padding: 0; font-size: 0.8125rem; font-weight: 600; color: var(--accs-ink-2); }
+.au-set > legend { float: left; width: 100%; margin: 0; padding: 0; font-size: 0.8125rem; font-weight: 600; color: var(--accs-ink-2); }
 .au-set > legend + * { clear: left; }
 .au-set > :empty { display: none; }
 
@@ -187,8 +189,8 @@
 
 @media (min-width: 960px) {
   .au { grid-template-columns: 44% 1fr; grid-template-rows: 1fr; }
-  .au-brand { position: sticky; top: 0; height: 100dvh; }
-  .au-brand__inner { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; height: 100%; padding: 56px 64px; box-sizing: border-box; }
+  /* The panel stretches with the page; its content stays centered in the viewport while a tall form scrolls. */
+  .au-brand__inner { position: sticky; top: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; height: 100dvh; padding: 56px 64px; box-sizing: border-box; }
   .au-brand__crest { width: 168px; height: 168px; margin-bottom: 20px; }
   .au-brand__name { display: none; }
   .au-brand__line { font-size: 0.875rem; letter-spacing: 0.02em; }
@@ -203,9 +205,8 @@
     letter-spacing: -0.015em;
     text-wrap: balance;
   }
-  .au-brand__facts { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
-  .au-brand__facts li { display: flex; align-items: center; gap: 14px; font-size: 1rem; color: rgb(255 255 255 / 88%); }
-  .au-brand__icon { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgb(255 255 255 / 16%); border-radius: 12px; background: rgb(255 255 255 / 8%); backdrop-filter: blur(6px); }
+  .au-brand__facts { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .au-brand__facts li { padding-inline-start: 14px; border-inline-start: 2px solid var(--accs-gold); font-size: 1rem; color: rgb(255 255 255 / 88%); }
   .au-main { align-items: center; padding: 48px 32px; }
 }
 
