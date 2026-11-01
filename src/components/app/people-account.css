@@ -1,0 +1,103 @@
+/* People, profile, help, and settings pages. Tokens and primitives come from styles.css. */
+
+.pa-role { text-transform: capitalize; }
+.pa-muted { margin: 0; color: var(--accs-muted); font-size: 0.875rem; line-height: 1.5; }
+.pa-prose { margin: 0; color: var(--accs-ink-2); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pa-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.pa-standing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--accs-muted); font-size: 0.875rem; }
+
+/* Translucent sticky toolbar */
+.pa-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 3;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-card);
+  background: color-mix(in srgb, var(--accs-surface) 82%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgb(11 18 32 / 4%), 0 8px 24px -12px rgb(11 18 32 / 12%);
+  animation: accs-rise var(--accs-dur-3) var(--accs-ease-out) 80ms both;
+}
+.pa-toolbar__row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; }
+.pa-toolbar__search { flex: 1 1 16rem; min-width: 0; }
+.pa-toolbar__row > :not(.pa-toolbar__search) { flex: 0 1 11rem; min-width: 9rem; }
+
+/* Directory grid. Motion handles the entrance, so no CSS cascade here. */
+.pa-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.pa-grid > * { min-width: 0; }
+
+/* Label/value rows */
+.pa-facts { display: grid; margin: 0; }
+.pa-facts > div { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr); gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid var(--accs-line); }
+.pa-facts > div:first-child { padding-top: 0; }
+.pa-facts > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.pa-facts dt { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 500; }
+.pa-facts dd { margin: 0; color: var(--accs-ink); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .pa-facts > div { grid-template-columns: 1fr; } }
+
+/* Sticky save bar */
+.pa-savebar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-card);
+  background: color-mix(in srgb, var(--accs-surface) 82%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--accs-shadow-hover);
+}
+
+/* Help */
+.pa-faqs { margin: 0; padding: 0; list-style: none; }
+.pa-faq { border-bottom: 1px solid var(--accs-line); }
+.pa-faqs > .pa-faq:last-child { border-bottom: 0; }
+.pa-faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 20px;
+  border: 0;
+  background: none;
+  color: var(--accs-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 160ms var(--accs-ease-out);
+}
+.pa-faq__q:hover { background: var(--accs-sunken); }
+.pa-faq__caret { flex: none; color: var(--accs-faint); transition: transform 280ms var(--accs-ease-out), color 160ms var(--accs-ease-out); }
+.pa-faq[data-open] .pa-faq__caret { transform: rotate(180deg); color: var(--site-accent-ink); }
+.pa-faq__a { display: grid; gap: 10px; padding: 0 20px 18px; max-width: 46rem; }
+.pa-faq__a p { margin: 0; color: var(--accs-ink-2); line-height: 1.6; }
+.pa-note { margin: 0; padding: 14px 20px; border-top: 1px solid var(--accs-line); background: var(--accs-sunken); color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.55; }
+
+/* Settings */
+.pa-setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding-bottom: 16px; border-bottom: 1px solid var(--accs-line); }
+.pa-setting:last-of-type { padding-bottom: 0; border-bottom: 0; }
+.pa-setting__label { margin: 0 0 2px; font-weight: 600; }
+.pa-session { display: grid; justify-items: start; gap: 10px; }
+.pa-links { display: grid; gap: 10px; }
+
+/* Change password */
+.pa-pw { display: grid; gap: 14px; max-width: 28rem; }
+.pa-meter { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: -6px; }
+.pa-meter span { height: 4px; border-radius: 999px; background: var(--accs-line); transition: background-color 280ms var(--accs-ease-out); }
+.pa-meter[data-score='1'] span[data-on] { background: var(--accs-danger); }
+.pa-meter[data-score='2'] span[data-on] { background: var(--accs-warn); }
+.pa-meter[data-score='3'] span[data-on] { background: var(--accs-info); }
+.pa-meter[data-score='4'] span[data-on] { background: var(--accs-ok); }
+.pa-msg { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; border-radius: var(--accs-radius-control); background: var(--accs-danger-bg); color: var(--accs-danger); font-size: 0.875rem; line-height: 1.45; }
+.pa-msg[data-ok] { background: var(--accs-ok-bg); color: var(--accs-ok); }
+.pa-msg svg { flex: none; margin-top: 2px; }
+
+@media (prefers-reduced-motion: reduce) { .pa-toolbar { animation: none; } }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import inventory from './doc003-modules.json'
 import { pageIdForPath } from './page-catalog'
-import { siteForPath, sites } from './sites'
+import { canOpenPath, canOpenSite, landingFor, siteForPath, sites, type SiteId } from './sites'
 
 // One concrete URL per page (P03-P52; P01 `/` and P02 `/sign-in` are served on every host).
 const samplePaths: Record<string, string> = {
@@ -42,6 +42,48 @@ describe('module sites follow DOC003', () => {
 
   it('gives every site a landing route that belongs to it', () => {
     for (const site of sites) for (const href of site.landings) expect(siteForPath(href)).toBe(site.id)
+  })
+})
+
+// Page ids each role is allowed, derived by hand from backend/src/access.ts (pagePermissions + permissionRoles + canPage).
+const pageRange = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => 'P' + String(from + i).padStart(2, '0'))
+const allowedByRole = {
+  student: [...pageRange(1, 16), 'P18', 'P19', 'P20', 'P26', 'P27', 'P36', ...pageRange(37, 44)],
+  professor: [...pageRange(1, 14), 'P16', 'P17', 'P21', 'P22', 'P26', 'P27', 'P28', 'P29', 'P32', ...pageRange(37, 44)],
+  administrator: ['P01', 'P02', 'P03', 'P04', 'P06', 'P09', 'P10', 'P35', ...pageRange(37, 52)],
+}
+const sessionFor = (role: keyof typeof allowedByRole) => ({
+  user: { id: 'U-1', name: 'Test User', email: 't@example.test', roles: [role], restrictions: [] },
+  permissions: [],
+  allowedPages: allowedByRole[role],
+})
+const openSites = (role: keyof typeof allowedByRole) => sites.map((s) => s.id).filter((id) => canOpenSite(sessionFor(role), id))
+
+describe('site access by role', () => {
+  it('lets a student open portal, forums, schedule, cases, and evaluations only', () => {
+    expect(openSites('student')).toEqual(['portal', 'forums', 'schedule', 'cases', 'evaluations'] satisfies SiteId[])
+  })
+
+  it('lets an administrator open admin and records, not schedule, cases, or evaluations', () => {
+    expect(openSites('administrator')).toEqual(['portal', 'forums', 'records', 'admin'] satisfies SiteId[])
+  })
+
+  it('keeps a professor out of admin and records', () => {
+    expect(openSites('professor')).toEqual(['portal', 'forums', 'schedule', 'cases', 'evaluations'] satisfies SiteId[])
+  })
+
+  it('denies paths on sites the role cannot open', () => {
+    const student = sessionFor('student')
+    expect(canOpenPath(student, '/admin/users')).toBe(false)
+    expect(canOpenPath(student, '/records')).toBe(false)
+    expect(canOpenPath(student, '/feed')).toBe(true)
+    expect(canOpenPath(student, '/no-such-page')).toBe(false)
+    expect(canOpenPath(sessionFor('administrator'), '/admin/users')).toBe(true)
+  })
+
+  it('falls back to Home when a landing is not openable', () => {
+    expect(landingFor(sessionFor('student'), 'admin')).toBe('/home')
+    expect(landingFor(sessionFor('administrator'), 'portal')).toBe('/admin')
   })
 })
 

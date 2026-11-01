@@ -10,14 +10,6 @@ export type Role =
   | 'osas'
   | 'president'
 
-export interface DemoAccount {
-  id: string
-  name: string
-  email: string
-  roles: Role[]
-  description: string
-}
-
 export interface SessionUser {
   id: string
   name: string
@@ -52,10 +44,21 @@ export interface ActionResult {
   record?: unknown
 }
 
+export interface FieldError {
+  path: string
+  message: string
+}
+
 export class ApiError extends Error {
+  readonly code?: string
+  readonly fields?: FieldError[]
+
   constructor(message: string, readonly status: number, readonly details?: unknown) {
     super(message)
     this.name = 'ApiError'
+    const body = details as { code?: unknown; fields?: unknown } | undefined
+    if (typeof body?.code === 'string') this.code = body.code
+    if (Array.isArray(body?.fields)) this.fields = body.fields as FieldError[]
   }
 }
 
@@ -82,13 +85,36 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-export const getDemoAccounts = () =>
-  request<{ accounts: DemoAccount[]; sampleData: true }>('/demo-accounts')
-
 export const getSession = () => request<Session>('/session')
 
-export const signIn = (accountId: string) =>
-  request<Session>('/auth/sign-in', { method: 'POST', body: JSON.stringify({ accountId }) })
+const post = <T>(path: string, body: unknown) =>
+  request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+
+export const signIn = (input: { emailOrId: string; password: string; remember?: boolean }) =>
+  post<Session>('/auth/sign-in', input)
+
+export interface RegisterInput {
+  fullName: string
+  email: string
+  identifier: string
+  role: 'student' | 'professor' | 'staff'
+  program?: 'BSIT' | 'BSCS' | 'BSIS'
+  yearLevel?: number
+  section?: string
+  password: string
+}
+
+export const register = (input: RegisterInput) => post<Session>('/auth/register', input)
+
+type Done = { ok: true; message: string }
+
+export const forgotPassword = (input: { emailOrId: string }) => post<Done>('/auth/forgot-password', input)
+
+export const resetPassword = (input: { emailOrId: string; code: string; password: string }) =>
+  post<Done>('/auth/reset-password', input)
+
+export const changePassword = (input: { currentPassword: string; password: string }) =>
+  post<Done>('/auth/change-password', input)
 
 export const signOut = () =>
   request<{ ok: true; message: string }>('/auth/sign-out', { method: 'POST', body: '{}' })

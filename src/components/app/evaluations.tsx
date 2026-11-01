@@ -1,51 +1,46 @@
 import {
-  Accordion,
   Alert,
-  Avatar,
-  Badge,
-  Breadcrumbs,
   Button,
-  Cell,
   Checkbox,
   CheckboxGroup,
-  Column,
   DatePicker,
   Disclosure,
-  EmptyState,
-  Grid,
+  Icon,
   Link,
   MenuButton,
   MenuItem,
-  Meter,
   Modal,
   ModalActions,
   ModalBody,
-  PrivacyNotice,
-  Progress,
   Radio,
   RadioGroup,
-  Row,
-  SectionHeader,
+  Search,
   Select,
   SelectOption,
-  Stack,
   Switch,
-  Tab,
-  TabList,
-  TabPanel,
-  Table,
-  TableBody,
-  TableHeader,
-  TableRow,
-  Tabs,
   TextArea,
   TextField,
-  ViewState,
   toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "motion/react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import {
   RequirePermission,
@@ -53,19 +48,24 @@ import {
   RetryView,
 } from "@/components/app/guards";
 import {
-  BarChart,
-  FilterBar,
-  ProfileHeader,
-  RatingScale,
-  Stat,
-  type ChartDatum,
-} from "@/components/ds-next";
+  Empty,
+  Kpi,
+  Kpis,
+  PageHeader,
+  Panel,
+  StatusChip,
+  siteCrumb,
+  toneFor,
+  type Tone,
+} from "@/components/app/page-shell";
+import { RatingScale } from "@/components/ds-next";
 import {
   ApiError,
   performPageAction,
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
+import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { pageQuery, sessionQuery } from "@/lib/queries";
 
 import "./evaluations.css";
@@ -88,6 +88,8 @@ const formLabels: Record<EvaluationForm, string> = {
   "upward-chair": "Upward: Program Chair",
   "upward-dean": "Upward: Dean",
 };
+
+const ease = [0.16, 1, 0.3, 1] as const;
 
 function object(value: unknown): Item {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -115,16 +117,12 @@ function number(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function date(value: unknown, time = false): string {
-  const raw = words(value);
-  const parsed = new Date(raw);
-  if (!raw || Number.isNaN(parsed.getTime())) return "Not set";
-  return time
-    ? parsed.toLocaleString("en-PH", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : parsed.toLocaleDateString("en-PH", { dateStyle: "medium" });
+/** Drops server notes that describe the data as sample or prototype material. */
+function cleanNote(value: unknown): string | undefined {
+  const note = words(value);
+  return note && !/synthetic|sample|prototype|demo/i.test(note)
+    ? note
+    : undefined;
 }
 
 function questions(value: unknown): EvaluationQuestion[] {
@@ -135,6 +133,12 @@ function questions(value: unknown): EvaluationQuestion[] {
     type: question.type === "text" ? "text" : "rating",
     required: question.required === true,
   }));
+}
+
+function cycleTone(status: string): Tone {
+  if (status === "Published") return "ok";
+  if (status === "In review") return "info";
+  return "neutral";
 }
 
 function useEvaluationAction(pageId: string) {
@@ -167,32 +171,9 @@ function useFilters() {
   return { params, update };
 }
 
-function Heading({
-  title,
-  description,
-  actions,
-}: {
-  title: string;
-  description?: string;
-  actions?: ReactNode;
-}) {
-  return (
-    <SectionHeader
-      level={1}
-      split
-      title={title}
-      description={description}
-      actions={
-        <Row gap={8}>
-          <Badge outline marker={false}>
-            Sample data
-          </Badge>
-          {actions}
-        </Row>
-      }
-    />
-  );
-}
+/* ---------- Shared pieces ---------- */
+
+const root = siteCrumb("/evaluations");
 
 function ActionError({ error }: { error: unknown }) {
   return error ? (
@@ -204,6 +185,305 @@ function ActionError({ error }: { error: unknown }) {
   ) : null;
 }
 
+/** Number that counts up to its value (decimals for averages). */
+function AnimatedNumber({
+  value,
+  decimals = 0,
+  suffix = "",
+}: {
+  value: number;
+  decimals?: number;
+  suffix?: string;
+}) {
+  const reduce = useReducedMotion();
+  const motionValue = useMotionValue(reduce ? value : 0);
+  const text = useTransform(
+    motionValue,
+    (current) => current.toFixed(decimals) + suffix,
+  );
+  useEffect(() => {
+    if (reduce) {
+      motionValue.set(value);
+      return;
+    }
+    const controls = animate(motionValue, value, { duration: 0.9, ease });
+    return () => controls.stop();
+  }, [value, reduce, motionValue]);
+  return <motion.span>{text}</motion.span>;
+}
+
+function percent(value: number, max: number) {
+  return Math.min(100, Math.max(0, max > 0 ? (value / max) * 100 : 0));
+}
+
+function LinearProgress({
+  value,
+  max,
+  label,
+}: {
+  value: number;
+  max: number;
+  label: string;
+}) {
+  return (
+    <div
+      className="accs-progress"
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+    >
+      <span style={{ width: percent(value, max) + "%" }} />
+    </div>
+  );
+}
+
+function Bar({ value, max, index = 0 }: { value: number; max: number; index?: number }) {
+  return (
+    <div className="ev-bar" aria-hidden="true">
+      <i style={{ width: percent(value, max) + "%", "--d": index } as CSSProperties} />
+    </div>
+  );
+}
+
+interface BarDatum {
+  label: string;
+  value: number;
+  reference?: number;
+}
+
+function CriteriaBars({
+  data,
+  max = 5,
+  referenceLabel,
+}: {
+  data: BarDatum[];
+  max?: number;
+  referenceLabel?: string;
+}) {
+  return (
+    <>
+      <ul className="ev-bars" aria-label="Average by criterion">
+        {data.map((entry, index) => (
+          <li className="ev-bars__row" key={entry.label}>
+            <span className="ev-bars__label">{entry.label}</span>
+            <div className="ev-bars__track">
+              <Bar value={entry.value} max={max} index={index} />
+              {entry.reference !== undefined && (
+                <span
+                  className="ev-bars__ref"
+                  style={{ left: percent(entry.reference, max) + "%" }}
+                  title={`${referenceLabel ?? "Reference"}: ${entry.reference.toFixed(2)}`}
+                />
+              )}
+            </div>
+            <span className="ev-bars__value">
+              <AnimatedNumber value={entry.value} decimals={2} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      {referenceLabel && data.some((entry) => entry.reference !== undefined) && (
+        <p className="ev-bars__legend">{referenceLabel}</p>
+      )}
+    </>
+  );
+}
+
+interface TabDef {
+  id: string;
+  label: string;
+  count?: number;
+  content: ReactNode;
+}
+
+/** Tab list with a sliding highlight and a cross-fading panel. */
+function TabbedViews({ label, tabs }: { label: string; tabs: TabDef[] }) {
+  const uid = useId();
+  const reduce = useReducedMotion();
+  const [active, setActive] = useState(tabs[0]?.id ?? "");
+  const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
+  if (!current) return null;
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const index = tabs.findIndex((tab) => tab.id === current.id);
+    let next: number | undefined;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft")
+      next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    const target = tabs[next].id;
+    setActive(target);
+    requestAnimationFrame(() =>
+      document.getElementById(`${uid}-tab-${target}`)?.focus(),
+    );
+  }
+
+  return (
+    <div className="accs-stack">
+      <LayoutGroup id={uid}>
+        <div
+          className="ev-tabs"
+          role="tablist"
+          aria-label={label}
+          onKeyDown={onKeyDown}
+        >
+          {tabs.map((tab) => {
+            const selected = tab.id === current.id;
+            return (
+              <button
+                type="button"
+                role="tab"
+                className="ev-tab"
+                key={tab.id}
+                id={`${uid}-tab-${tab.id}`}
+                aria-selected={selected}
+                aria-controls={`${uid}-panel`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActive(tab.id)}
+              >
+                {selected && (
+                  <motion.span
+                    layoutId="ev-tab-indicator"
+                    className="ev-tab__ind"
+                    transition={{ duration: reduce ? 0 : 0.36, ease }}
+                  />
+                )}
+                {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="ev-tab__count">{tab.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </LayoutGroup>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={current.id}
+          id={`${uid}-panel`}
+          role="tabpanel"
+          aria-labelledby={`${uid}-tab-${current.id}`}
+          className="ev-tabpanel"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+          transition={{ duration: reduce ? 0 : 0.24, ease }}
+        >
+          {current.content}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Filter chips with a sliding highlight. */
+function SlideFilter({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { id: string; label: string; count?: number }[];
+}) {
+  const uid = useId();
+  const reduce = useReducedMotion();
+  return (
+    <LayoutGroup id={uid}>
+      <div className="ev-tabs" role="group" aria-label={label}>
+        {options.map((option) => {
+          const selected = option.id === value;
+          return (
+            <button
+              type="button"
+              className="ev-tab"
+              key={option.id}
+              aria-pressed={selected}
+              onClick={() => onChange(option.id)}
+            >
+              {selected && (
+                <motion.span
+                  layoutId="ev-filter-indicator"
+                  className="ev-tab__ind"
+                  transition={{ duration: reduce ? 0 : 0.36, ease }}
+                />
+              )}
+              {option.label}
+              {option.count !== undefined && (
+                <span className="ev-tab__count">{option.count}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </LayoutGroup>
+  );
+}
+
+/* ---------- P26 My evaluations ---------- */
+
+function AssignmentCard({ assignment }: { assignment: Item }) {
+  const faculty = object(assignment.faculty);
+  const name = words(faculty.name, "Faculty member");
+  const done = assignment.status === "Submitted";
+  const href = "/evaluations/forms/" + encodeURIComponent(words(assignment.id));
+  return (
+    <Panel as="article" interactive className="ev-card">
+      <div className="ev-card__top">
+        <div className="ev-person">
+          <span className="accs-avatar" aria-hidden="true">
+            {initials(name)}
+          </span>
+          <div>
+            <h3 className="ev-card__name">{name}</h3>
+            <p className="ev-card__sub">{words(assignment.subject, "—")}</p>
+          </div>
+        </div>
+        <StatusChip tone={toneFor(words(assignment.status))}>
+          {words(assignment.status, "—")}
+        </StatusChip>
+      </div>
+      <div className="ev-card__meta">
+        {words(assignment.relation) && (
+          <span className="accs-tag">{words(assignment.relation)}</span>
+        )}
+        <span className="ev-card__due">
+          Due <strong>{formatDate(assignment.due)}</strong>
+        </span>
+      </div>
+      <div className="ev-card__progress">
+        <p>
+          <span>{done ? "Submitted" : "Not started"}</span>
+          <span>{done ? "100%" : "0%"}</span>
+        </p>
+        <LinearProgress
+          value={done ? 1 : 0}
+          max={1}
+          label={`Progress for ${name}`}
+        />
+      </div>
+      <div className="ev-card__foot">
+        {done ? (
+          <Button href={href} variant="secondary">
+            View<span className="ev-sr"> receipt for {name}</span>
+          </Button>
+        ) : (
+          <Button href={href}>
+            Start<span className="ev-sr"> evaluation for {name}</span>
+          </Button>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 function EvaluationHome({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
   const assignments = items(page.data.assignments);
@@ -213,202 +493,140 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
   ).length;
   const first = assignments[0];
   const professor = session.data?.user.roles.includes("professor") === true;
+  const soonest = assignments
+    .filter(
+      (assignment) =>
+        assignment.status !== "Submitted" &&
+        assignment.cycleStatus === "Published",
+    )
+    .map((assignment) => ({
+      assignment,
+      time: new Date(words(assignment.due)).getTime(),
+    }))
+    .filter((entry) => !Number.isNaN(entry.time))
+    .sort((a, b) => a.time - b.time)[0]?.assignment;
+
+  const forms = assignments.length ? (
+    <div className="accs-grid ev-grid">
+      {assignments.map((assignment) => (
+        <AssignmentCard
+          assignment={assignment}
+          key={words(assignment.id)}
+        />
+      ))}
+    </div>
+  ) : (
+    <Panel>
+      <Empty title="No evaluations open">
+        You'll get a notification when the next cycle opens.
+      </Empty>
+    </Panel>
+  );
+
+  const review = reviews.length ? (
+    <Panel flush>
+      <ul className="accs-rows">
+        {reviews.map((cycle) => (
+          <li key={words(cycle.id)}>
+            <div className="accs-row">
+              <span className="accs-avatar" aria-hidden="true">
+                <Icon name="list-checks" size={16} />
+              </span>
+              <div>
+                <p className="accs-row__title">{words(cycle.title)}</p>
+                <p className="accs-row__sub">
+                  {words(cycle.term)} · In faculty review
+                </p>
+              </div>
+              <Link
+                href={
+                  "/evaluations/cycles/" +
+                  encodeURIComponent(words(cycle.id)) +
+                  "/review"
+                }
+              >
+                Review questions
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  ) : (
+    <Panel>
+      <Empty title="Nothing to review right now" />
+    </Panel>
+  );
 
   return (
-    <Stack gap={24}>
-      <Heading
+    <div className="accs-stack accs-stagger">
+      <PageHeader
         title="Evaluations"
         description={
           first
-            ? `${words(first.cycleTitle)} · closes ${date(first.due)}`
+            ? `${words(first.cycleTitle)} · closes ${formatDate(first.due)}`
             : "Assigned forms and published results"
         }
         actions={
-          page.data.canConfigure === true ? (
-            <>
+          <>
+            {page.data.canConfigure === true && (
               <Button href="/evaluations/cycles">Manage cycles</Button>
+            )}
+            {page.data.canViewResults === true && (
               <Button href="/evaluations/results" variant="secondary">
-                Results
+                {professor ? "My results" : "Results"}
               </Button>
-            </>
-          ) : undefined
+            )}
+          </>
         }
       />
-      {assignments.length > 0 && (
-        <Progress
-          label={`${submitted} of ${assignments.length} submitted`}
-          value={submitted}
-          maxValue={assignments.length}
-          showValue={false}
+      <Kpis label="Evaluation summary">
+        <Kpi
+          label="Assigned"
+          value={<AnimatedNumber value={assignments.length} />}
+          note={first ? words(first.cycleTitle) : "No open cycle"}
         />
-      )}
-      <Tabs defaultSelectedKey="forms">
-        <TabList aria-label="Evaluation views">
-          <Tab id="forms">To complete</Tab>
-          {professor && (
-            <Tab id="review" count={reviews.length}>
-              Questions to review
-            </Tab>
-          )}
-        </TabList>
-        <TabPanel id="forms">
-          {assignments.length ? (
-            <>
-              <div className="evaluation-responsive-desktop">
-                <Table aria-label="Assigned evaluations">
-                  <TableHeader>
-                    <Column isRowHeader>Evaluated person</Column>
-                    <Column>Subject or relation</Column>
-                    <Column>Due</Column>
-                    <Column>Status</Column>
-                    <Column>Action</Column>
-                  </TableHeader>
-                  <TableBody>
-                    {assignments.map((assignment) => {
-                      const faculty = object(assignment.faculty);
-                      return (
-                        <TableRow
-                          id={words(assignment.id)}
-                          key={words(assignment.id)}
-                        >
-                          <Cell>
-                            <Row gap={8}>
-                              <Avatar name={words(faculty.name)} size={32} />
-                              {words(faculty.name)}
-                            </Row>
-                          </Cell>
-                          <Cell>
-                            {words(assignment.subject)}
-                            <br />
-                            {words(assignment.relation)}
-                          </Cell>
-                          <Cell>{date(assignment.due)}</Cell>
-                          <Cell>
-                            <Badge
-                              tone={
-                                assignment.status === "Submitted"
-                                  ? "success"
-                                  : "neutral"
-                              }
-                            >
-                              {words(assignment.status)}
-                            </Badge>
-                          </Cell>
-                          <Cell>
-                            <Link
-                              href={
-                                "/evaluations/forms/" +
-                                encodeURIComponent(words(assignment.id))
-                              }
-                            >
-                              {assignment.status === "Submitted"
-                                ? "View receipt"
-                                : "Start"}
-                            </Link>
-                          </Cell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-              <ul
-                className="evaluation-responsive-mobile ds-record-list"
-                aria-label="Assigned evaluations"
-              >
-                {assignments.map((assignment) => (
-                  <li key={words(assignment.id)}>
-                    <article className="ds-record">
-                      <h3 className="ds-record__title">
-                        {words(object(assignment.faculty).name)}
-                      </h3>
-                      <dl className="ds-record__facts">
-                        <div>
-                          <dt>Subject or relation</dt>
-                          <dd>
-                            {words(assignment.subject)}
-                            <br />
-                            {words(assignment.relation)}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Due</dt>
-                          <dd>{date(assignment.due)}</dd>
-                        </div>
-                        <div>
-                          <dt>Status</dt>
-                          <dd>
-                            <Badge
-                              tone={
-                                assignment.status === "Submitted"
-                                  ? "success"
-                                  : "neutral"
-                              }
-                            >
-                              {words(assignment.status)}
-                            </Badge>
-                          </dd>
-                        </div>
-                      </dl>
-                      <Link
-                        href={
-                          "/evaluations/forms/" +
-                          encodeURIComponent(words(assignment.id))
-                        }
-                      >
-                        {assignment.status === "Submitted"
-                          ? "View receipt"
-                          : "Start"}
-                      </Link>
-                    </article>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <EmptyState
-              title="No evaluations open"
-              description="You'll get a notification when the next cycle opens."
-            />
-          )}
-        </TabPanel>
-        {professor && (
-          <TabPanel id="review">
-            {reviews.length ? (
-              <Stack gap={16}>
-                {reviews.map((cycle) => (
-                  <Row justify="between" key={words(cycle.id)}>
-                    <div>
-                      <strong>{words(cycle.title)}</strong>
-                      <p>{words(cycle.term)} · In faculty review</p>
-                    </div>
-                    <Link
-                      href={
-                        "/evaluations/cycles/" +
-                        encodeURIComponent(words(cycle.id)) +
-                        "/review"
-                      }
-                    >
-                      Review questions
-                    </Link>
-                  </Row>
-                ))}
-              </Stack>
-            ) : (
-              <ViewState kind="empty" title="Nothing to review right now" />
-            )}
-          </TabPanel>
-        )}
-      </Tabs>
-      {page.data.canViewResults === true && (
-        <Link variant="standalone" href="/evaluations/results">
-          {professor ? "See my results" : "See evaluation results"}
-        </Link>
+        <Kpi
+          label="Completed"
+          value={<AnimatedNumber value={submitted} />}
+          note={
+            assignments.length
+              ? `${Math.round(percent(submitted, assignments.length))}% of your forms`
+              : "Nothing assigned yet"
+          }
+        />
+        <Kpi
+          label="Due soonest"
+          value={soonest ? formatDate(soonest.due) : "—"}
+          note={
+            soonest
+              ? `${words(object(soonest.faculty).name)} · ${words(soonest.subject)}`
+              : "Nothing pending"
+          }
+        />
+      </Kpis>
+      {professor ? (
+        <TabbedViews
+          label="Evaluation views"
+          tabs={[
+            { id: "forms", label: "To complete", content: forms },
+            {
+              id: "review",
+              label: "Questions to review",
+              count: reviews.length,
+              content: review,
+            },
+          ]}
+        />
+      ) : (
+        forms
       )}
       {/* TBD(D-01): participation rules are undecided; no penalty or enforcement state is shown. */}
-    </Stack>
+    </div>
   );
 }
+
+/* ---------- P27 Evaluation form ---------- */
 
 function EvaluationFormPage({ page }: { page: PageEnvelope }) {
   const record = object(page.data.record);
@@ -424,15 +642,22 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const action = useEvaluationAction("P27");
   const submitted = Boolean(current.submittedAt);
-  const missing = formQuestions.filter(
-    (question) =>
-      question.required &&
-      (answers[question.id] === undefined || answers[question.id] === ""),
-  );
+  const isMissing = (question: EvaluationQuestion) =>
+    question.required &&
+    (answers[question.id] === undefined || answers[question.id] === "");
+  const missing = formQuestions.filter(isMissing);
   const answered = formQuestions.filter(
     (question) =>
       answers[question.id] !== undefined && answers[question.id] !== "",
   ).length;
+  const groups = formQuestions.reduce<
+    { criterion: string; list: EvaluationQuestion[] }[]
+  >((result, question) => {
+    const group = result.find((entry) => entry.criterion === question.criterion);
+    if (group) group.list.push(question);
+    else result.push({ criterion: question.criterion, list: [question] });
+    return result;
+  }, []);
 
   async function submit() {
     if (submitted || action.isPending) return;
@@ -452,44 +677,64 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
   if (!record.id) return <RestrictedView record />;
   if (!submitted && current.cycleStatus !== "Published") {
     return (
-      <ViewState
-        kind="empty"
-        title={
-          current.cycleStatus === "Closed"
-            ? `This evaluation closed on ${date(current.due)}`
-            : "This evaluation isn't open yet"
-        }
-        description="Submitted receipts stay available to their evaluator."
-      />
+      <div className="ev-form">
+        <Panel>
+          <Empty
+            title={
+              current.cycleStatus === "Closed"
+                ? `This evaluation closed on ${formatDate(current.due)}`
+                : "This evaluation isn't open yet"
+            }
+          >
+            Submitted receipts stay available to their evaluator.
+          </Empty>
+        </Panel>
+      </div>
     );
   }
 
   return (
-    <Stack gap={24}>
-      <Breadcrumbs
-        items={[
-          { label: "Evaluations", href: "/evaluations" },
+    <div className="ev-form accs-stagger">
+      <PageHeader
+        crumbs={[
+          root,
           { label: `${words(faculty.name)} · ${words(current.subject)}` },
         ]}
-      />
-      <Heading
         title={"Evaluate " + words(faculty.name)}
         description={`${words(current.subject)} · ${words(current.cycleTitle)}`}
       />
-      <PrivacyNotice title="How answers are shown">
-        Your answers are combined with others. Summaries never show individual
-        answers.
-      </PrivacyNotice>
-      <div className="ds-prose">
-        <p>{words(current.instructions)}</p>
+      <div className="accs-stack accs-stack--tight">
+        <p className="ev-note">
+          Your answers are combined with others. Summaries never show
+          individual answers.
+        </p>
+        {words(current.instructions) && (
+          <p className="ev-note">{words(current.instructions)}</p>
+        )}
+      </div>
+      <div className="ev-sticky">
+        <div className="ev-sticky__row">
+          <strong>
+            {answered} of {formQuestions.length} answered
+          </strong>
+          <span>
+            {missing.length
+              ? `${missing.length} required left`
+              : "All required answered"}
+          </span>
+        </div>
+        <LinearProgress
+          value={answered}
+          max={Math.max(1, formQuestions.length)}
+          label="Questions answered"
+        />
       </div>
       {submitted && (
-        <Alert
-          tone="success"
-          title={"Submitted " + date(current.submittedAt, true)}
-        >
-          Your evaluation was saved. These answers are read only.
-        </Alert>
+        <div className="ev-receipt" role="status">
+          <Icon name="check" size={16} />
+          Submitted {formatDateTime(current.submittedAt)}. These answers are
+          read only.
+        </div>
       )}
       {showValidation && missing.length > 0 && (
         <Alert
@@ -500,79 +745,90 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
         </Alert>
       )}
       <ActionError error={action.error} />
-      <Progress
-        label={`${answered} of ${formQuestions.length} answered`}
-        value={answered}
-        maxValue={Math.max(1, formQuestions.length)}
-        showValue={false}
-      />
-      {formQuestions.map((question) =>
-        question.type === "rating" ? (
-          <RatingScale
-            key={question.id}
-            label={question.text}
-            description={question.criterion}
-            value={
-              typeof answers[question.id] === "number"
-                ? (answers[question.id] as number)
-                : undefined
-            }
-            onChange={(value) =>
-              setAnswers((currentAnswers) => ({
-                ...currentAnswers,
-                [question.id]: value,
-              }))
-            }
-            isRequired={question.required}
-            isInvalid={
-              showValidation &&
-              missing.some((entry) => entry.id === question.id)
-            }
-            errorMessage="Choose a rating."
-            isReadOnly={submitted}
-          />
-        ) : (
-          <TextArea
-            key={question.id}
-            label={question.text}
-            description={question.criterion}
-            value={words(answers[question.id])}
-            onChange={(value) =>
-              setAnswers((currentAnswers) => ({
-                ...currentAnswers,
-                [question.id]: value,
-              }))
-            }
-            maxLength={1000}
-            isRequired={question.required}
-            isInvalid={
-              showValidation &&
-              missing.some((entry) => entry.id === question.id)
-            }
-            errorMessage="Answer this question."
-            isReadOnly={submitted}
-          />
-        ),
-      )}
-      <TextArea
-        label="Anything else?"
-        value={comment}
-        onChange={setComment}
-        maxLength={1000}
-        showCount
-        isReadOnly={submitted}
-        description="Optional"
-      />
-      {!submitted && (
-        <Button
-          onPress={() => {
-            setShowValidation(true);
-            if (!missing.length) setConfirmOpen(true);
-          }}
-          loading={action.isPending}
+      {groups.map((group) => (
+        <Panel
+          key={group.criterion || "general"}
+          className="ev-group"
+          title={group.criterion || "General"}
         >
-          Submit evaluation
-        </Button>
+          {group.list.map((question) => (
+            <div className="ev-q" key={question.id}>
+              {question.type === "rating" ? (
+                <RatingScale
+                  label={question.text}
+                  value={
+                    typeof answers[question.id] === "number"
+                      ? (answers[question.id] as number)
+                      : undefined
+                  }
+                  onChange={(value) =>
+                    setAnswers((currentAnswers) => ({
+                      ...currentAnswers,
+                      [question.id]: value,
+                    }))
+                  }
+                  isRequired={question.required}
+                  isInvalid={showValidation && isMissing(question)}
+                  errorMessage="Choose a rating."
+                  isReadOnly={submitted}
+                />
+              ) : (
+                <TextArea
+                  label={question.text}
+                  value={words(answers[question.id])}
+                  onChange={(value) =>
+                    setAnswers((currentAnswers) => ({
+                      ...currentAnswers,
+                      [question.id]: value,
+                    }))
+                  }
+                  maxLength={1000}
+                  showCount
+                  isRequired={question.required}
+                  isInvalid={showValidation && isMissing(question)}
+                  errorMessage="Answer this question."
+                  isReadOnly={submitted}
+                />
+              )}
+            </div>
+          ))}
+        </Panel>
+      ))}
+      <Panel className="ev-group">
+        <div className="ev-q">
+          <TextArea
+            label="Anything else?"
+            value={comment}
+            onChange={setComment}
+            maxLength={1000}
+            showCount
+            isReadOnly={submitted}
+            description="Optional"
+          />
+        </div>
+      </Panel>
+      {!submitted && (
+        <div className="ev-submitbar">
+          <p>
+            {missing.length ? (
+              <>
+                <strong>{missing.length}</strong> required{" "}
+                {missing.length === 1 ? "question" : "questions"} left
+              </>
+            ) : (
+              "Ready to submit. You can't change answers afterward."
+            )}
+          </p>
+          <Button
+            onPress={() => {
+              setShowValidation(true);
+              if (!missing.length) setConfirmOpen(true);
+            }}
+            loading={action.isPending}
+          >
+            Submit evaluation
+          </Button>
+        </div>
       )}
       <Modal
         role="alertdialog"
@@ -590,9 +846,11 @@ function EvaluationFormPage({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
-    </Stack>
+    </div>
   );
 }
+
+/* ---------- P28 / P29 Results ---------- */
 
 function CycleSelect({ cycles }: { cycles: Item[] }) {
   const { params, update } = useFilters();
@@ -631,108 +889,127 @@ function FacultyResults({
     ) === true;
   const programAverage = object(page.data.programAverage);
   const programCriteria = items(programAverage.criteria);
-  const criteria = items(result.criteria).map((criterion) => ({
-    label: words(criterion.label),
-    value: number(criterion.value),
-    reference: programCriteria.find((entry) => entry.label === criterion.label)
-      ?.value,
-  }));
+  const criteria: BarDatum[] = items(result.criteria).map((criterion) => {
+    const reference = programCriteria.find(
+      (entry) => entry.label === criterion.label,
+    )?.value;
+    return {
+      label: words(criterion.label),
+      value: number(criterion.value),
+      reference: typeof reference === "number" ? reference : undefined,
+    };
+  });
+  const themes = items(result.themes);
 
   if (!result.id) return <RestrictedView record />;
   return (
-    <Stack gap={24}>
-      <Breadcrumbs
-        items={[
+    <div className="accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[
+          root,
           { label: "Results", href: "/evaluations/results" },
           { label: words(faculty.name) },
         ]}
+        title={words(faculty.name)}
+        description={[words(faculty.program), strings(faculty.roles).join(" · ")]
+          .filter(Boolean)
+          .join(" · ")}
       />
-      <ProfileHeader
-        compact
-        name={words(faculty.name)}
-        role={strings(faculty.roles).join(" · ")}
-        title={words(faculty.program)}
-      />
-      <CycleSelect cycles={items(page.data.cycles)} />
-      <PrivacyNotice title="Combined feedback">
-        Individual answers aren't shown. Results appear after a cycle is
-        published.
-      </PrivacyNotice>
+      <div className="accs-toolbar">
+        <CycleSelect cycles={items(page.data.cycles)} />
+      </div>
       {number(result.responses) > 0 ? (
         <>
-          <Grid columns={3}>
-            <Stat
+          <Kpis label="Result summary">
+            <Kpi
               label="Overall average"
-              value={number(result.average).toFixed(2)}
-              scopeNote="Rating scale 1–5"
+              value={
+                <AnimatedNumber value={number(result.average)} decimals={2} />
+              }
+              note="Rating scale 1–5"
             />
-            <Stat
+            <Kpi
               label="Responses"
-              value={number(result.responses)}
-              scopeNote="Combined answers only"
+              value={<AnimatedNumber value={number(result.responses)} />}
+              note="Combined answers only"
             />
-            <Stat
+            <Kpi
               label="Completion"
-              value={number(result.completion) + "%"}
-              scopeNote="Within the visible scope"
+              value={
+                <AnimatedNumber value={number(result.completion)} suffix="%" />
+              }
+              note="Within the visible scope"
             />
-          </Grid>
-          <BarChart
-            title="By criterion"
-            data={criteria}
-            max={5}
-            referenceLabel={`${words(programAverage.program, "Program")} average`}
-          />
-          <SectionHeader level={2} title="Feedback themes" />
-          <Accordion>
-            {items(result.themes).map((theme, index) => (
-              <Disclosure
-                title={`${words(theme.title)} (${number(theme.count)})`}
-                key={words(theme.title, String(index))}
-              >
-                <p>{words(theme.summary)}</p>
-              </Disclosure>
-            ))}
-          </Accordion>
+          </Kpis>
+          <Panel title="By criterion">
+            <CriteriaBars
+              data={criteria}
+              referenceLabel={`${words(programAverage.program, "Program")} average`}
+            />
+          </Panel>
+          <Panel flush title="Feedback themes">
+            {themes.length ? (
+              <ul className="accs-rows">
+                {themes.map((theme, index) => (
+                  <li key={words(theme.title, String(index))}>
+                    <div className="ev-theme">
+                      <strong>
+                        {words(theme.title)}
+                        <span className="accs-tag">{number(theme.count)}</span>
+                      </strong>
+                      <p>{words(theme.summary)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="No themes yet" />
+            )}
+          </Panel>
         </>
       ) : (
-        <ViewState
-          kind="empty"
-          title="Results for this cycle aren't published yet"
-        />
+        <Panel>
+          <Empty title="Results for this cycle aren't published yet" />
+        </Panel>
       )}
-      <Alert tone="neutral" title="Results describe feedback">
-        They aren't findings about conduct.
-      </Alert>
+      <p className="ev-note">
+        Individual answers aren't shown, and results appear after a cycle is
+        published. Results describe feedback. They aren't findings about
+        conduct.
+      </p>
       {/* TBD(D-08): release thresholds and feedback retention need QCU approval. */}
       {canFollowUp && (
-        <Stack gap={16}>
-          <TextArea
-            label="Follow-up note"
-            value={note}
-            onChange={setNote}
-            maxLength={4000}
-          />
-          <ActionError error={action.error} />
-          <Button
-            isDisabled={!note.trim()}
-            loading={action.isPending}
-            onPress={() =>
-              action.mutate(
-                {
-                  action: "saveFollowUp",
-                  recordId: words(result.id),
-                  payload: { note },
-                },
-                { onSuccess: () => setNote("") },
-              )
-            }
-          >
-            Save
-          </Button>
-        </Stack>
+        <Panel title="Follow-up note">
+          <div className="ev-followup">
+            <TextArea
+              label="Follow-up note"
+              value={note}
+              onChange={setNote}
+              maxLength={4000}
+            />
+            <ActionError error={action.error} />
+            <div>
+              <Button
+                isDisabled={!note.trim()}
+                loading={action.isPending}
+                onPress={() =>
+                  action.mutate(
+                    {
+                      action: "saveFollowUp",
+                      recordId: words(result.id),
+                      payload: { note },
+                    },
+                    { onSuccess: () => setNote("") },
+                  )
+                }
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </Panel>
       )}
-    </Stack>
+    </div>
   );
 }
 
@@ -755,7 +1032,7 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
     (total, result) => total + number(result.responses),
     0,
   );
-  const criteria: ChartDatum[] = ["Clarity", "Support", "Fairness"].map(
+  const criteria: BarDatum[] = ["Clarity", "Support", "Fairness"].map(
     (label) => {
       const values = results.flatMap((result) =>
         items(result.criteria)
@@ -779,110 +1056,118 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
   if (!oversight)
     return <FacultyResults page={page} result={results[0] ?? {}} />;
   return (
-    <Stack gap={24}>
-      <Heading title="Evaluation results" description={page.scope} />
-      <CycleSelect cycles={items(page.data.cycles)} />
-      <PrivacyNotice title="Combined feedback">
+    <div className="accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[root, { label: "Results" }]}
+        title="Evaluation results"
+        description={page.scope}
+      />
+      <p className="ev-note">
         Individual answers aren't shown. Results appear after a cycle is
         published.
-      </PrivacyNotice>
-      {responses ? (
-        <>
-          <Grid columns={3}>
-            <Stat
-              label="Completion rate"
-              value={
-                Math.round(
+      </p>
+      {responses > 0 && (
+        <Kpis label="Result summary">
+          <Kpi
+            label="Completion rate"
+            value={
+              <AnimatedNumber
+                value={Math.round(
                   results.reduce(
                     (total, result) => total + number(result.completion),
                     0,
                   ) / Math.max(1, results.length),
-                ) + "%"
-              }
-            />
-            <Stat
-              label="Faculty evaluated"
-              value={
-                results.filter((result) => number(result.responses) > 0).length
-              }
-              scopeNote={page.scope}
-            />
-            <Stat
-              label="Overall average"
-              value={(
-                results.reduce(
-                  (total, result) => total + number(result.average),
-                  0,
-                ) / Math.max(1, results.length)
-              ).toFixed(2)}
-              scopeNote="Rating scale 1–5"
-            />
-          </Grid>
-          <BarChart title="By criterion" data={criteria} max={5} />
-          <FilterBar
-            query={query}
-            onQueryChange={setQuery}
-            searchLabel="Find faculty"
-          >
-            {dean && (
-              <Select
-                label="Program"
-                selectedKey={params.get("program") ?? "all"}
-                onSelectionChange={(key) =>
-                  update({ program: key === "all" ? undefined : String(key) })
+                )}
+                suffix="%"
+              />
+            }
+          />
+          <Kpi
+            label="Faculty evaluated"
+            value={
+              <AnimatedNumber
+                value={
+                  results.filter((result) => number(result.responses) > 0)
+                    .length
                 }
-              >
-                <SelectOption id="all">All programs</SelectOption>
-                {["BSIT", "BSCS", "BSIS"].map((program) => (
-                  <SelectOption id={program} key={program}>
-                    {program}
-                  </SelectOption>
-                ))}
-              </Select>
-            )}
-          </FilterBar>
-          {filtered.length ? (
-            <>
-              <div className="evaluation-responsive-desktop">
-                <Table aria-label="Faculty evaluation results">
-                  <TableHeader>
-                    <Column isRowHeader>Faculty</Column>
-                    <Column>Program</Column>
-                    <Column numeric>Responses</Column>
-                    <Column numeric>Overall average</Column>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((result) => (
-                      <TableRow id={words(result.id)} key={words(result.id)}>
-                        <Cell>
-                          <Link
-                            href={
-                              "/evaluations/results/" +
-                              encodeURIComponent(words(result.id))
-                            }
-                          >
-                            {words(object(result.faculty).name)}
-                          </Link>
-                        </Cell>
-                        <Cell>{words(object(result.faculty).program, "CCS")}</Cell>
-                        <Cell numeric>{number(result.responses)}</Cell>
-                        <Cell numeric>{number(result.average).toFixed(2)}</Cell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <ul
-                className="evaluation-responsive-mobile ds-record-list"
-                aria-label="Faculty evaluation results"
-              >
-                {filtered.map((result) => {
+              />
+            }
+            note={page.scope}
+          />
+          <Kpi
+            label="Overall average"
+            value={
+              <AnimatedNumber
+                value={
+                  results.reduce(
+                    (total, result) => total + number(result.average),
+                    0,
+                  ) / Math.max(1, results.length)
+                }
+                decimals={2}
+              />
+            }
+            note="Rating scale 1–5"
+          />
+        </Kpis>
+      )}
+      {responses > 0 && (
+        <Panel title="By criterion">
+          <CriteriaBars data={criteria} />
+        </Panel>
+      )}
+      <div className="accs-toolbar ev-toolbar">
+        <div className="accs-grow">
+          <Search
+            label="Find faculty"
+            value={query}
+            onChange={setQuery}
+            size="sm"
+          />
+        </div>
+        {dean && (
+          <Select
+            label="Program"
+            selectedKey={params.get("program") ?? "all"}
+            onSelectionChange={(key) =>
+              update({ program: key === "all" ? undefined : String(key) })
+            }
+          >
+            <SelectOption id="all">All programs</SelectOption>
+            {["BSIT", "BSCS", "BSIS"].map((program) => (
+              <SelectOption id={program} key={program}>
+                {program}
+              </SelectOption>
+            ))}
+          </Select>
+        )}
+        <CycleSelect cycles={items(page.data.cycles)} />
+      </div>
+      {responses > 0 ? (
+        filtered.length ? (
+          <div className="accs-table-wrap">
+            <table className="accs-table" aria-label="Faculty evaluation results">
+              <thead>
+                <tr>
+                  <th scope="col">Faculty</th>
+                  <th scope="col">Program</th>
+                  <th scope="col" className="accs-num">
+                    Responses
+                  </th>
+                  <th scope="col">Overall average</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((result, index) => {
                   const faculty = object(result.faculty);
                   const name = words(faculty.name);
                   return (
-                    <li key={words(result.id)}>
-                      <article className="ds-record">
-                        <h3 className="ds-record__title">
+                    <tr key={words(result.id)}>
+                      <td>
+                        <div className="ev-person">
+                          <span className="accs-avatar" aria-hidden="true">
+                            {initials(name)}
+                          </span>
                           <Link
                             href={
                               "/evaluations/results/" +
@@ -891,40 +1176,43 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
                           >
                             {name}
                           </Link>
-                        </h3>
-                        <dl className="ds-record__facts">
-                          <div>
-                            <dt>Program</dt>
-                            <dd>{words(faculty.program, "CCS")}</dd>
-                          </div>
-                          <div>
-                            <dt>Responses</dt>
-                            <dd>{number(result.responses)}</dd>
-                          </div>
-                          <div>
-                            <dt>Overall average</dt>
-                            <dd>{number(result.average).toFixed(2)}</dd>
-                          </div>
-                        </dl>
-                      </article>
-                    </li>
+                        </div>
+                      </td>
+                      <td>{words(faculty.program, "CCS")}</td>
+                      <td className="accs-num">{number(result.responses)}</td>
+                      <td>
+                        <div className="ev-avg">
+                          <span className="accs-num">
+                            {number(result.average).toFixed(2)}
+                          </span>
+                          <Bar
+                            value={number(result.average)}
+                            max={5}
+                            index={Math.min(index, 8)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
-              </ul>
-            </>
-          ) : (
-            <ViewState kind="empty" title="No faculty match" />
-          )}
-        </>
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Panel>
+            <Empty title="No faculty match">Try a different name.</Empty>
+          </Panel>
+        )
       ) : (
-        <ViewState
-          kind="empty"
-          title="Results for this cycle aren't published yet"
-        />
+        <Panel>
+          <Empty title="Results for this cycle aren't published yet" />
+        </Panel>
       )}
-    </Stack>
+    </div>
   );
 }
+
+/* ---------- P30 Cycles ---------- */
 
 function CyclesPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
@@ -933,8 +1221,18 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
   const [term, setTerm] = useState("1st semester");
   const [opens, setOpens] = useState("");
   const [closes, setCloses] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
   const action = useEvaluationAction("P30");
   const cycles = items(page.data.cycles);
+  const statuses = ["Draft", "In review", "Published", "Closed"].filter(
+    (entry) => cycles.some((cycle) => cycle.status === entry),
+  );
+  const visible = cycles.filter(
+    (cycle) =>
+      (status === "all" || cycle.status === status) &&
+      words(cycle.title).toLowerCase().includes(search.toLowerCase()),
+  );
 
   async function create() {
     if (!title.trim() || !opens || !closes || action.isPending) return;
@@ -953,129 +1251,124 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
   }
 
   return (
-    <Stack gap={24}>
-      <Heading
+    <div className="accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[root, { label: "Cycles" }]}
         title="Evaluation cycles"
+        description="Draft, review, publish, and close evaluation cycles."
         actions={
           <Button icon="plus" onPress={() => setOpen(true)}>
             New cycle
           </Button>
         }
       />
-      {cycles.length ? (
-        <>
-          <div className="evaluation-responsive-desktop">
-            <Table aria-label="Evaluation cycles">
-              <TableHeader>
-                <Column isRowHeader>Cycle</Column>
-                <Column>Term and forms</Column>
-                <Column>Status</Column>
-                <Column>Completion</Column>
-                <Column>Dates</Column>
-              </TableHeader>
-              <TableBody>
-                {cycles.map((cycle) => (
-                  <TableRow id={words(cycle.id)} key={words(cycle.id)}>
-                    <Cell>
-                      <Link
-                        href={
-                          "/evaluations/cycles/" +
-                          encodeURIComponent(words(cycle.id))
-                        }
-                      >
-                        {words(cycle.title)}
-                      </Link>
-                    </Cell>
-                    <Cell>
-                      {words(cycle.term)}
-                      <br />
-                      {strings(cycle.forms)
-                        .map((form) => formLabels[form as EvaluationForm] ?? form)
-                        .join(", ") || "No forms configured"}
-                    </Cell>
-                    <Cell>
-                      <Badge>{words(cycle.status)}</Badge>
-                    </Cell>
-                    <Cell>
-                      <Meter
-                        label="Submitted"
-                        minValue={0}
-                        maxValue={Math.max(1, number(cycle.assigned))}
-                        value={number(cycle.completion)}
-                        valueLabel={`${number(cycle.completion)} of ${number(cycle.assigned)}`}
-                      />
-                    </Cell>
-                    <Cell>
-                      {date(cycle.opens)}–{date(cycle.closes)}
-                    </Cell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      {cycles.length > 0 && (
+        <div className="accs-toolbar ev-toolbar">
+          <div className="accs-grow">
+            <Search
+              label="Find a cycle"
+              value={search}
+              onChange={setSearch}
+              size="sm"
+            />
           </div>
-          <ul
-            className="evaluation-responsive-mobile ds-record-list"
-            aria-label="Evaluation cycles"
-          >
-            {cycles.map((cycle) => (
-              <li key={words(cycle.id)}>
-                <article className="ds-record">
-                  <h3 className="ds-record__title">
-                    <Link
-                      href={
-                        "/evaluations/cycles/" +
-                        encodeURIComponent(words(cycle.id))
-                      }
-                    >
-                      {words(cycle.title)}
-                    </Link>
-                  </h3>
-                  <dl className="ds-record__facts">
-                    <div>
-                      <dt>Term and forms</dt>
-                      <dd>
-                        {words(cycle.term)}
-                        <br />
+          <SlideFilter
+            label="Filter by status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { id: "all", label: "All", count: cycles.length },
+              ...statuses.map((entry) => ({
+                id: entry,
+                label: entry,
+                count: cycles.filter((cycle) => cycle.status === entry).length,
+              })),
+            ]}
+          />
+        </div>
+      )}
+      {cycles.length ? (
+        visible.length ? (
+          <div className="accs-table-wrap">
+            <table className="accs-table" aria-label="Evaluation cycles">
+              <thead>
+                <tr>
+                  <th scope="col">Cycle</th>
+                  <th scope="col">Term</th>
+                  <th scope="col">Opens – closes</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Responses</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((cycle) => (
+                  <tr key={words(cycle.id)}>
+                    <td>
+                      <p className="ev-table-title">
+                        <Link
+                          href={
+                            "/evaluations/cycles/" +
+                            encodeURIComponent(words(cycle.id))
+                          }
+                        >
+                          {words(cycle.title)}
+                        </Link>
+                      </p>
+                      <p className="ev-table-sub">
                         {strings(cycle.forms)
-                          .map((form) => formLabels[form as EvaluationForm] ?? form)
+                          .map(
+                            (form) => formLabels[form as EvaluationForm] ?? form,
+                          )
                           .join(", ") || "No forms configured"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Status</dt>
-                      <dd><Badge>{words(cycle.status)}</Badge></dd>
-                    </div>
-                    <div>
-                      <dt>Completion</dt>
-                      <dd>
-                        <Meter
-                          label={`Submitted for ${words(cycle.title)}`}
-                          minValue={0}
-                          maxValue={Math.max(1, number(cycle.assigned))}
+                      </p>
+                    </td>
+                    <td>{words(cycle.term, "—")}</td>
+                    <td className="ev-dates">
+                      {formatDate(cycle.opens)} – {formatDate(cycle.closes)}
+                    </td>
+                    <td>
+                      <StatusChip tone={cycleTone(words(cycle.status))}>
+                        {words(cycle.status, "—")}
+                      </StatusChip>
+                    </td>
+                    <td>
+                      <div className="ev-comp">
+                        <Bar
                           value={number(cycle.completion)}
-                          valueLabel={`${number(cycle.completion)} of ${number(cycle.assigned)}`}
+                          max={Math.max(1, number(cycle.assigned))}
                         />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Dates</dt>
-                      <dd>{date(cycle.opens)}–{date(cycle.closes)}</dd>
-                    </div>
-                  </dl>
-                </article>
-              </li>
-            ))}
-          </ul>
-        </>
+                        <span>
+                          {number(cycle.completion)} of {number(cycle.assigned)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Panel>
+            <Empty title="No cycles match">Change the search or status.</Empty>
+          </Panel>
+        )
       ) : (
-        <EmptyState
-          title="No cycles yet"
-          description="Create a draft to configure the first evaluation cycle."
-        />
+        <Panel>
+          <Empty
+            title="No cycles yet"
+            action={
+              <Button icon="plus" onPress={() => setOpen(true)}>
+                New cycle
+              </Button>
+            }
+          >
+            Create a draft to configure the first evaluation cycle.
+          </Empty>
+        </Panel>
       )}
       <Modal title="New evaluation cycle" isOpen={open} onOpenChange={setOpen}>
         <ModalBody>
-          <Stack gap={16}>
+          <div className="ev-fields">
             <Select
               label="Term"
               selectedKey={term}
@@ -1105,7 +1398,7 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
               isRequired
             />
             <ActionError error={action.error} />
-          </Stack>
+          </div>
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setOpen(false)}>
@@ -1120,9 +1413,11 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
-    </Stack>
+    </div>
   );
 }
+
+/* ---------- Question editor (P31) ---------- */
 
 export function QuestionEditor({
   value,
@@ -1133,6 +1428,8 @@ export function QuestionEditor({
   onChange: (questions: EvaluationQuestion[]) => void;
   isReadOnly?: boolean;
 }) {
+  const reduce = useReducedMotion();
+
   function update(id: string, changes: Partial<EvaluationQuestion>) {
     onChange(
       value.map((question) =>
@@ -1151,270 +1448,201 @@ export function QuestionEditor({
     onChange(next);
   }
 
-  function questionFields(question: EvaluationQuestion, index: number) {
-    return {
-      criterion: (
-        <TextField
-          label={`Criterion ${index + 1}`}
-          value={question.criterion}
-          onChange={(criterion) => update(question.id, { criterion })}
-          isReadOnly={isReadOnly}
-          isRequired
-        />
-      ),
-      text: (
-        <TextArea
-          label={`Question ${index + 1}`}
-          value={question.text}
-          onChange={(text) => update(question.id, { text })}
-          isReadOnly={isReadOnly}
-          isRequired
-          maxLength={4000}
-        />
-      ),
-      type: (
-        <Select
-          label={`Question ${index + 1} type`}
-          selectedKey={question.type}
-          onSelectionChange={(key) =>
-            update(question.id, {
-              type: key === "text" ? "text" : "rating",
-            })
-          }
-          isDisabled={isReadOnly}
-        >
-          <SelectOption id="rating">Rating 1–5</SelectOption>
-          <SelectOption id="text">Text</SelectOption>
-        </Select>
-      ),
-      required: (
-        <Switch
-          isSelected={question.required}
-          onChange={(required) => update(question.id, { required })}
-          isDisabled={isReadOnly}
-        >
-          Required
-        </Switch>
-      ),
-      actions: !isReadOnly ? (
-        <MenuButton
-          label={`Actions for question ${index + 1}`}
-          iconOnly
-          onAction={(key) => {
-            if (key === "up") move(index, -1);
-            if (key === "down") move(index, 1);
-            if (key === "delete")
-              onChange(value.filter((entry) => entry.id !== question.id));
-          }}
-        >
-          <MenuItem id="up" isDisabled={index === 0}>
-            Move up
-          </MenuItem>
-          <MenuItem id="down" isDisabled={index === value.length - 1}>
-            Move down
-          </MenuItem>
-          <MenuItem id="delete" danger>
-            Delete
-          </MenuItem>
-        </MenuButton>
-      ) : null,
-    };
-  }
-
   return (
-    <Stack gap={16}>
+    <div>
       {value.length ? (
-        <>
-          <div className="evaluation-responsive-desktop">
-            <Table aria-label="Evaluation questions">
-              <TableHeader>
-                <Column isRowHeader>Criterion</Column>
-                <Column>Question</Column>
-                <Column>Type</Column>
-                <Column>Required</Column>
-                <Column>Order</Column>
-              </TableHeader>
-              <TableBody>
-                {value.map((question, index) => {
-                  const fields = questionFields(question, index);
-                  return (
-                    <TableRow id={question.id} key={question.id}>
-                      <Cell>{fields.criterion}</Cell>
-                      <Cell>{fields.text}</Cell>
-                      <Cell>{fields.type}</Cell>
-                      <Cell>{fields.required}</Cell>
-                      <Cell>{fields.actions}</Cell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <ol
-            className="evaluation-responsive-mobile evaluation-question-list"
-            aria-label="Evaluation questions"
-          >
-            {value.map((question, index) => {
-              const fields = questionFields(question, index);
-              const headingId = `evaluation-question-${index + 1}`;
-              return (
-                <li key={question.id}>
-                  <section
-                    className="evaluation-question-card"
-                    aria-labelledby={headingId}
-                  >
-                    <h3 id={headingId}>Question {index + 1}</h3>
-                    <p className="evaluation-question-card__order">
-                      Order position: {index + 1}
-                    </p>
-                    <Stack gap={16}>
-                      {fields.criterion}
-                      {fields.text}
-                      {fields.type}
-                      {fields.required}
-                      {fields.actions && (
-                        <Row justify="end">{fields.actions}</Row>
-                      )}
-                    </Stack>
-                  </section>
-                </li>
-              );
-            })}
-          </ol>
-        </>
+        <ol className="ev-qlist" aria-label="Evaluation questions">
+          <AnimatePresence initial={false}>
+            {value.map((question, index) => (
+              <motion.li
+                className="ev-qrow"
+                key={question.id}
+                layout={reduce ? false : "position"}
+                initial={reduce ? false : { opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, x: 28 }}
+                transition={{ duration: reduce ? 0 : 0.28, ease }}
+              >
+                <span className="ev-qrow__n" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <div className="ev-qrow__body">
+                  <div className="ev-qrow__top">
+                    <TextField
+                      label={`Criterion ${index + 1}`}
+                      value={question.criterion}
+                      onChange={(criterion) =>
+                        update(question.id, { criterion })
+                      }
+                      isReadOnly={isReadOnly}
+                      isRequired
+                    />
+                    <Select
+                      label={`Question ${index + 1} type`}
+                      selectedKey={question.type}
+                      onSelectionChange={(key) =>
+                        update(question.id, {
+                          type: key === "text" ? "text" : "rating",
+                        })
+                      }
+                      isDisabled={isReadOnly}
+                    >
+                      <SelectOption id="rating">Rating 1–5</SelectOption>
+                      <SelectOption id="text">Text</SelectOption>
+                    </Select>
+                    <Switch
+                      isSelected={question.required}
+                      onChange={(required) => update(question.id, { required })}
+                      isDisabled={isReadOnly}
+                    >
+                      Required
+                    </Switch>
+                  </div>
+                  <TextArea
+                    label={`Question ${index + 1}`}
+                    value={question.text}
+                    onChange={(text) => update(question.id, { text })}
+                    isReadOnly={isReadOnly}
+                    isRequired
+                    maxLength={4000}
+                  />
+                </div>
+                {!isReadOnly && (
+                  <div className="ev-qrow__actions">
+                    <MenuButton
+                      label={`Actions for question ${index + 1}`}
+                      iconOnly
+                      onAction={(key) => {
+                        if (key === "up") move(index, -1);
+                        if (key === "down") move(index, 1);
+                        if (key === "delete")
+                          onChange(
+                            value.filter((entry) => entry.id !== question.id),
+                          );
+                      }}
+                    >
+                      <MenuItem id="up" isDisabled={index === 0}>
+                        Move up
+                      </MenuItem>
+                      <MenuItem
+                        id="down"
+                        isDisabled={index === value.length - 1}
+                      >
+                        Move down
+                      </MenuItem>
+                      <MenuItem id="delete" danger>
+                        Delete
+                      </MenuItem>
+                    </MenuButton>
+                  </div>
+                )}
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ol>
       ) : (
-        <ViewState
-          kind="empty"
-          title="No questions yet"
-          description="Add a criterion and question before sending the cycle for review."
-        />
+        <Empty title="No questions yet">
+          Add a criterion and question before sending the cycle for review.
+        </Empty>
       )}
       {!isReadOnly && (
-        <Button
-          variant="secondary"
-          icon="plus"
-          onPress={() =>
-            onChange([
-              ...value,
-              {
-                id: `Q-${Date.now()}`,
-                criterion: "",
-                text: "",
-                type: "rating",
-                required: true,
-              },
-            ])
-          }
-        >
-          Add question
-        </Button>
+        <div className="ev-editor-foot">
+          <Button
+            variant="secondary"
+            icon="plus"
+            onPress={() =>
+              onChange([
+                ...value,
+                {
+                  id: `Q-${Date.now()}`,
+                  criterion: "",
+                  text: "",
+                  type: "rating",
+                  required: true,
+                },
+              ])
+            }
+          >
+            Add question
+          </Button>
+        </div>
       )}
-      <Disclosure title="Preview">
-        <Stack gap={24}>
-          {value.map((question) =>
-            question.type === "rating" ? (
-              <RatingScale
-                key={question.id}
-                label={question.text || "Question text"}
-                description={question.criterion}
-                isRequired={question.required}
-                isReadOnly
-              />
-            ) : (
-              <TextArea
-                key={question.id}
-                label={question.text || "Question text"}
-                description={question.criterion}
-                isReadOnly
-              />
-            ),
-          )}
-        </Stack>
-      </Disclosure>
-    </Stack>
+      <div className="ev-preview">
+        <Disclosure title="Preview">
+          <div className="ev-preview-list">
+            {value.map((question) =>
+              question.type === "rating" ? (
+                <RatingScale
+                  key={question.id}
+                  label={question.text || "Question text"}
+                  description={question.criterion}
+                  isRequired={question.required}
+                  isReadOnly
+                />
+              ) : (
+                <TextArea
+                  key={question.id}
+                  label={question.text || "Question text"}
+                  description={question.criterion}
+                  isReadOnly
+                />
+              ),
+            )}
+          </div>
+        </Disclosure>
+      </div>
+    </div>
   );
 }
 
+/* ---------- P31 Cycle detail ---------- */
+
 function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
   return (
-    <Stack gap={16}>
-      <SectionHeader level={2} title={title} />
+    <Panel flush title={title}>
       {rows.length ? (
-        <>
-          <div className="evaluation-responsive-desktop">
-            <Table aria-label={title}>
-              <TableHeader>
-                <Column isRowHeader>Name</Column>
-                <Column>Program</Column>
-                <Column numeric>Assigned</Column>
-                <Column numeric>Submitted</Column>
-                <Column>Completion</Column>
-              </TableHeader>
-              <TableBody>
-                {rows.map((entry) => (
-                  <TableRow id={words(entry.id)} key={words(entry.id)}>
-                    <Cell>{words(entry.title, words(entry.name))}</Cell>
-                    <Cell>{words(entry.program, "CCS")}</Cell>
-                    <Cell numeric>{number(entry.assigned)}</Cell>
-                    <Cell numeric>{number(entry.submitted)}</Cell>
-                    <Cell>
-                      <Meter
-                        label="Submitted"
+        <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
+          <table className="accs-table" aria-label={title}>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Program</th>
+                <th scope="col" className="accs-num">
+                  Assigned
+                </th>
+                <th scope="col" className="accs-num">
+                  Submitted
+                </th>
+                <th scope="col">Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((entry) => (
+                <tr key={words(entry.id)}>
+                  <td>{words(entry.title, words(entry.name))}</td>
+                  <td>{words(entry.program, "CCS")}</td>
+                  <td className="accs-num">{number(entry.assigned)}</td>
+                  <td className="accs-num">{number(entry.submitted)}</td>
+                  <td>
+                    <div className="ev-comp">
+                      <Bar
                         value={number(entry.submitted)}
-                        maxValue={Math.max(1, number(entry.assigned))}
-                        valueLabel={`${number(entry.submitted)} of ${number(entry.assigned)}`}
+                        max={Math.max(1, number(entry.assigned))}
                       />
-                    </Cell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <ul
-            className="evaluation-responsive-mobile ds-record-list"
-            aria-label={title}
-          >
-            {rows.map((entry) => {
-              const name = words(entry.title, words(entry.name));
-              return (
-                <li key={words(entry.id)}>
-                  <article className="ds-record">
-                    <h3 className="ds-record__title">{name}</h3>
-                    <dl className="ds-record__facts">
-                      <div>
-                        <dt>Program</dt>
-                        <dd>{words(entry.program, "CCS")}</dd>
-                      </div>
-                      <div>
-                        <dt>Assigned</dt>
-                        <dd>{number(entry.assigned)}</dd>
-                      </div>
-                      <div>
-                        <dt>Submitted</dt>
-                        <dd>{number(entry.submitted)}</dd>
-                      </div>
-                      <div>
-                        <dt>Completion</dt>
-                        <dd>
-                          <Meter
-                            label={`Submitted for ${name}`}
-                            value={number(entry.submitted)}
-                            maxValue={Math.max(1, number(entry.assigned))}
-                            valueLabel={`${number(entry.submitted)} of ${number(entry.assigned)}`}
-                          />
-                        </dd>
-                      </div>
-                    </dl>
-                  </article>
-                </li>
-              );
-            })}
-          </ul>
-        </>
+                      <span>
+                        {number(entry.submitted)} of {number(entry.assigned)}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <ViewState kind="empty" title="No assignments in this scope" />
+        <Empty title="No assignments in this scope" />
       )}
-    </Stack>
+    </Panel>
   );
 }
 
@@ -1508,29 +1736,216 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   }
 
   if (!record.id) return <RestrictedView record />;
-  return (
-    <Stack gap={24}>
-      <Breadcrumbs
-        items={[
-          { label: "Cycles", href: "/evaluations/cycles" },
-          { label: words(record.title) },
-        ]}
+
+  const sendForReview = (
+    <Button
+      isDisabled={incomplete.length > 0}
+      loading={action.isPending}
+      onPress={() => void advance("In review")}
+    >
+      Send for review
+    </Button>
+  );
+
+  const setup = (
+    <div className="accs-stack">
+      <Panel title="Details">
+        <div className="ev-fields">
+          <TextField
+            label="Name"
+            value={title}
+            onChange={setTitle}
+            maxLength={160}
+            isRequired
+            isReadOnly={!editable}
+          />
+          <TextArea
+            label="Instructions"
+            value={instructions}
+            onChange={setInstructions}
+            maxLength={4000}
+            isRequired
+            isReadOnly={!editable}
+          />
+        </div>
+      </Panel>
+      <Panel title="Schedule and forms">
+        <div className="ev-fields ev-fields--2">
+          <DatePicker
+            label="Opens"
+            description={"Saved date: " + formatDate(opens, "Not set")}
+            onChange={(value) => setOpens(value?.toString() ?? "")}
+            isRequired
+            isDisabled={!editable}
+          />
+          <DatePicker
+            label="Closes"
+            description={"Saved date: " + formatDate(closes, "Not set")}
+            onChange={(value) => setCloses(value?.toString() ?? "")}
+            isRequired
+            isDisabled={!editable}
+          />
+        </div>
+        <CheckboxGroup
+          label="Forms"
+          value={forms}
+          onChange={setForms}
+          isDisabled={!editable}
+          isRequired
+        >
+          {Object.entries(formLabels).map(([key, label]) => (
+            <Checkbox value={key} key={key}>
+              {label}
+            </Checkbox>
+          ))}
+        </CheckboxGroup>
+      </Panel>
+      <Panel title="Participation">
+        {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}
+        <Select label="Participation rule" selectedKey="undecided" isDisabled>
+          <SelectOption id="undecided">Not decided</SelectOption>
+        </Select>
+        <p className="ev-note">
+          Participation rule not decided (D-01). Participation and certificate
+          rules need QCU approval, so no grade, certificate, or penalty control
+          is available.
+        </p>
+        {/* TBD(D-02): evaluation participation never applies a grade or Good Moral consequence. */}
+      </Panel>
+      {editable && (
+        <div>
+          <Button loading={action.isPending} onPress={() => void save()}>
+            Save setup
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const questionsTab = (
+    <Panel
+      flush
+      title="Questions"
+      action={
+        editable ? (
+          <Button loading={action.isPending} onPress={() => void save()}>
+            Save questions
+          </Button>
+        ) : undefined
+      }
+    >
+      <QuestionEditor
+        value={formQuestions}
+        onChange={setFormQuestions}
+        isReadOnly={!editable}
       />
-      <Heading
+    </Panel>
+  );
+
+  const reviewTab = (
+    <Panel
+      title="Faculty review"
+      action={record.status === "Draft" ? sendForReview : undefined}
+    >
+      {facultyReviews.length ? (
+        <ol className="accs-timeline" aria-label="Faculty question reviews">
+          {facultyReviews.map((review) => (
+            <li key={words(review.id)}>
+              <div className="ev-tl">
+                <strong>{words(review.name)}</strong>
+                <StatusChip
+                  tone={
+                    review.status === "Reviewed"
+                      ? "ok"
+                      : review.status === "Commented"
+                        ? "warn"
+                        : "neutral"
+                  }
+                >
+                  {words(review.status, "—")}
+                </StatusChip>
+              </div>
+              {review.note ? (
+                <p className="ev-comment">{words(review.note)}</p>
+              ) : (
+                <p className="ev-muted">No comment yet</p>
+              )}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <Empty title="No faculty reviews yet">
+          Assigned professors can review the questions while the cycle is in
+          review.
+        </Empty>
+      )}
+    </Panel>
+  );
+
+  const completionTab = (
+    <div className="accs-stack">
+      <Kpis label="Cycle completion">
+        {items(page.data.stats).map((stat) => (
+          <Kpi
+            key={words(stat.label)}
+            label={words(stat.label)}
+            value={
+              typeof stat.value === "number" ? (
+                <AnimatedNumber
+                  value={stat.value}
+                  decimals={Number.isInteger(stat.value) ? 0 : 2}
+                />
+              ) : (
+                words(stat.value, "—")
+              )
+            }
+            note={cleanNote(stat.note)}
+          />
+        ))}
+      </Kpis>
+      <div className="accs-toolbar">
+        <div className="accs-grow">
+          <Search
+            label="Find a section or faculty member"
+            value={query}
+            onChange={setQuery}
+            size="sm"
+          />
+        </div>
+        <Select
+          label="Program"
+          selectedKey={program}
+          onSelectionChange={(key) => setProgram(String(key))}
+        >
+          <SelectOption id="all">All programs</SelectOption>
+          {["BSIT", "BSCS", "BSIS"].map((entry) => (
+            <SelectOption id={entry} key={entry}>
+              {entry}
+            </SelectOption>
+          ))}
+        </Select>
+      </div>
+      <CompletionTable title="By section" rows={visible(completion)} />
+      <CompletionTable title="By faculty" rows={visible(facultyCompletion)} />
+    </div>
+  );
+
+  return (
+    <div className="accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[
+          root,
+          { label: "Cycles", href: "/evaluations/cycles" },
+          { label: words(record.title, "Cycle") },
+        ]}
         title={words(record.title, "Evaluation cycle")}
         description={words(record.term)}
         actions={
           <>
-            <Badge>{words(record.status)}</Badge>
-            {record.status === "Draft" && (
-              <Button
-                isDisabled={incomplete.length > 0}
-                loading={action.isPending}
-                onPress={() => void advance("In review")}
-              >
-                Send for review
-              </Button>
-            )}
+            <StatusChip tone={cycleTone(words(record.status))}>
+              {words(record.status, "—")}
+            </StatusChip>
+            {record.status === "Draft" && sendForReview}
             {record.status === "In review" && (
               <Button
                 isDisabled={incomplete.length > 0}
@@ -1563,222 +1978,20 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
         </Alert>
       )}
       <ActionError error={action.error} />
-      <Tabs defaultSelectedKey="setup">
-        <TabList aria-label="Cycle workspace">
-          <Tab id="setup">Setup</Tab>
-          <Tab id="questions">Questions</Tab>
-          <Tab id="review">Faculty review</Tab>
-          <Tab id="completion">Completion</Tab>
-        </TabList>
-        <TabPanel id="setup">
-          <Stack gap={24}>
-            <TextField
-              label="Name"
-              value={title}
-              onChange={setTitle}
-              maxLength={160}
-              isRequired
-              isReadOnly={!editable}
-            />
-            <TextArea
-              label="Instructions"
-              value={instructions}
-              onChange={setInstructions}
-              maxLength={4000}
-              isRequired
-              isReadOnly={!editable}
-            />
-            <Row gap={16}>
-              <DatePicker
-                label="Opens"
-                description={"Saved date: " + date(opens)}
-                onChange={(value) => setOpens(value?.toString() ?? "")}
-                isRequired
-                isDisabled={!editable}
-              />
-              <DatePicker
-                label="Closes"
-                description={"Saved date: " + date(closes)}
-                onChange={(value) => setCloses(value?.toString() ?? "")}
-                isRequired
-                isDisabled={!editable}
-              />
-            </Row>
-            <CheckboxGroup
-              label="Forms"
-              value={forms}
-              onChange={setForms}
-              isDisabled={!editable}
-              isRequired
-            >
-              {Object.entries(formLabels).map(([key, label]) => (
-                <Checkbox value={key} key={key}>
-                  {label}
-                </Checkbox>
-              ))}
-            </CheckboxGroup>
-            {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}
-            <Select
-              label="Participation rule"
-              selectedKey="undecided"
-              isDisabled
-            >
-              <SelectOption id="undecided">Not decided</SelectOption>
-            </Select>
-            <Alert tone="warning" title="Participation rule not decided (D-01)">
-              Participation and certificate rules need QCU approval. No grade,
-              certificate, or penalty control is available.
-            </Alert>
-            {/* TBD(D-02): evaluation participation never applies a grade or Good Moral consequence. */}
-            {editable && (
-              <Button loading={action.isPending} onPress={() => void save()}>
-                Save setup
-              </Button>
-            )}
-          </Stack>
-        </TabPanel>
-        <TabPanel id="questions">
-          <Stack gap={24}>
-            <QuestionEditor
-              value={formQuestions}
-              onChange={setFormQuestions}
-              isReadOnly={!editable}
-            />
-            {editable && (
-              <Button loading={action.isPending} onPress={() => void save()}>
-                Save questions
-              </Button>
-            )}
-          </Stack>
-        </TabPanel>
-        <TabPanel id="review">
-          <Stack gap={24}>
-            <SectionHeader level={2} title="Faculty review" />
-            {facultyReviews.length ? (
-              <>
-                <div className="evaluation-responsive-desktop">
-                  <Table aria-label="Faculty question reviews">
-                    <TableHeader>
-                      <Column isRowHeader>Professor</Column>
-                      <Column>Status</Column>
-                      <Column>Comments</Column>
-                    </TableHeader>
-                    <TableBody>
-                      {facultyReviews.map((review) => (
-                        <TableRow id={words(review.id)} key={words(review.id)}>
-                          <Cell>{words(review.name)}</Cell>
-                          <Cell>
-                            <Badge>{words(review.status)}</Badge>
-                          </Cell>
-                          <Cell>
-                            {review.note ? (
-                              <Disclosure title="Read comments">
-                                <p style={{ whiteSpace: "pre-wrap" }}>
-                                  {words(review.note)}
-                                </p>
-                              </Disclosure>
-                            ) : (
-                              "No comment yet"
-                            )}
-                          </Cell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <ul
-                  className="evaluation-responsive-mobile ds-record-list"
-                  aria-label="Faculty question reviews"
-                >
-                  {facultyReviews.map((review) => (
-                    <li key={words(review.id)}>
-                      <article className="ds-record">
-                        <h3 className="ds-record__title">
-                          {words(review.name)}
-                        </h3>
-                        <dl className="ds-record__facts">
-                          <div>
-                            <dt>Status</dt>
-                            <dd>
-                              <Badge>{words(review.status)}</Badge>
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>Comments</dt>
-                            <dd>
-                              {review.note ? (
-                                <Disclosure title="Read comments">
-                                  <p style={{ whiteSpace: "pre-wrap" }}>
-                                    {words(review.note)}
-                                  </p>
-                                </Disclosure>
-                              ) : (
-                                "No comment yet"
-                              )}
-                            </dd>
-                          </div>
-                        </dl>
-                      </article>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <ViewState
-                kind="empty"
-                title="No faculty reviews yet"
-                description="Assigned professors can review the questions while the cycle is in review."
-              />
-            )}
-            {record.status === "Draft" && (
-              <Button
-                isDisabled={incomplete.length > 0}
-                loading={action.isPending}
-                onPress={() => void advance("In review")}
-              >
-                Send for review
-              </Button>
-            )}
-          </Stack>
-        </TabPanel>
-        <TabPanel id="completion">
-          <Stack gap={24}>
-            <Grid columns={2}>
-              {items(page.data.stats).map((stat) => (
-                <Stat
-                  key={words(stat.label)}
-                  label={words(stat.label)}
-                  value={words(stat.value)}
-                  scopeNote={words(stat.note)}
-                />
-              ))}
-            </Grid>
-            <FilterBar
-              query={query}
-              onQueryChange={setQuery}
-              searchLabel="Find a section or faculty member"
-            >
-              <Select
-                label="Program"
-                selectedKey={program}
-                onSelectionChange={(key) => setProgram(String(key))}
-              >
-                <SelectOption id="all">All programs</SelectOption>
-                {["BSIT", "BSCS", "BSIS"].map((entry) => (
-                  <SelectOption id={entry} key={entry}>
-                    {entry}
-                  </SelectOption>
-                ))}
-              </Select>
-            </FilterBar>
-            <CompletionTable title="By section" rows={visible(completion)} />
-            <CompletionTable
-              title="By faculty"
-              rows={visible(facultyCompletion)}
-            />
-          </Stack>
-        </TabPanel>
-      </Tabs>
+      <TabbedViews
+        label="Cycle workspace"
+        tabs={[
+          { id: "setup", label: "Setup", content: setup },
+          {
+            id: "questions",
+            label: "Questions",
+            count: formQuestions.length,
+            content: questionsTab,
+          },
+          { id: "review", label: "Faculty review", content: reviewTab },
+          { id: "completion", label: "Completion", content: completionTab },
+        ]}
+      />
       <Modal
         role="alertdialog"
         title={
@@ -1787,12 +2000,12 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             : "Close this cycle?"
         }
         isOpen={Boolean(confirmStatus)}
-        onOpenChange={(open) => {
-          if (!open) setConfirmStatus(undefined);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfirmStatus(undefined);
         }}
       >
         <ModalBody>
-          <Stack gap={16}>
+          <div className="ev-fields">
             <p>
               {confirmStatus === "Published"
                 ? "Assigned students and faculty get their forms. Published questions cannot be edited."
@@ -1806,14 +2019,14 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
                 >
                   Release the aggregate results when this cycle closes
                 </Checkbox>
-                <Alert tone="neutral" title="Release policy needs approval">
-                  The prototype shows combined results only. QCU still needs to
-                  approve release thresholds and retention.
-                </Alert>
+                <p className="ev-note">
+                  Only combined results are shown. QCU still needs to approve
+                  release thresholds and retention.
+                </p>
               </>
             )}
             {/* TBD(D-08): aggregate release thresholds and retention are not yet approved. */}
-          </Stack>
+          </div>
         </ModalBody>
         <ModalActions>
           <Button
@@ -1832,9 +2045,11 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
-    </Stack>
+    </div>
   );
 }
+
+/* ---------- P32 Faculty question review ---------- */
 
 function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const record = object(page.data.record);
@@ -1873,94 +2088,117 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
 
   if (!record.id) return <RestrictedView record />;
   if (record.status !== "In review" && !savedReview)
-    return <ViewState kind="empty" title="Nothing to review right now" />;
+    return (
+      <div className="ev-form">
+        <Panel>
+          <Empty title="Nothing to review right now" />
+        </Panel>
+      </div>
+    );
+
+  const recorded = words(savedReview?.note, "Reviewed without comments.")
+    .split("\n")
+    .filter((line) => line.trim());
+
   return (
-    <Stack gap={24}>
-      <Breadcrumbs
-        items={[
-          { label: "Evaluations", href: "/evaluations" },
-          { label: "Review questions" },
-        ]}
-      />
-      <Heading
+    <div className="ev-form accs-stagger">
+      <PageHeader
+        crumbs={[root, { label: "Review questions" }]}
         title="Review the questions about your duties"
         description={words(record.title)}
       />
-      <Alert tone="neutral" title="Your comments go to the Dean">
-        They are available before the cycle is published.
-      </Alert>
+      <p className="ev-note">
+        Your comments go to the Dean and are available before the cycle is
+        published.
+      </p>
       {(sent || savedReview) && (
-        <Alert tone="success" title="Review sent">
-          Your review is read only.
-        </Alert>
+        <div className="ev-receipt" role="status">
+          <Icon name="check" size={16} />
+          Review sent. Your review is read only.
+        </div>
       )}
       {savedReview ? (
-        <Stack gap={16}>
+        <>
+          <Panel flush title="Questions">
+            {formQuestions.map((question) => (
+              <div className="ev-review-q" key={question.id}>
+                <h3>{question.criterion}</h3>
+                <p>{question.text}</p>
+              </div>
+            ))}
+          </Panel>
+          <Panel title="Your recorded review">
+            <ol className="accs-timeline">
+              {recorded.map((line, index) => {
+                const split = line.indexOf(": ");
+                return (
+                  <li key={index}>
+                    {split > 0 ? (
+                      <>
+                        <strong>{line.slice(0, split)}</strong>
+                        <p className="ev-comment">{line.slice(split + 2)}</p>
+                      </>
+                    ) : (
+                      <p className="ev-comment">{line}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </Panel>
+        </>
+      ) : (
+        <Panel flush title="Questions">
           {formQuestions.map((question) => (
-            <section key={question.id}>
-              <SectionHeader level={2} title={question.criterion} />
-              <p>{question.text}</p>
+            <section className="ev-review-q" key={question.id}>
+              <div className="ev-q__head">
+                <h3>{question.criterion}</h3>
+                <p>{question.text}</p>
+              </div>
+              <RadioGroup
+                row
+                label="Fits my duties?"
+                value={decisions[question.id] ?? "reviewed"}
+                onChange={(decision) =>
+                  setDecisions((current) => ({
+                    ...current,
+                    [question.id]: decision,
+                  }))
+                }
+                isReadOnly={readOnly}
+              >
+                <Radio value="reviewed">Yes</Radio>
+                <Radio value="changes">Needs change</Radio>
+              </RadioGroup>
+              <TextArea
+                label="Comment"
+                value={comments[question.id] ?? ""}
+                onChange={(comment) =>
+                  setComments((current) => ({
+                    ...current,
+                    [question.id]: comment,
+                  }))
+                }
+                maxLength={Math.max(
+                  100,
+                  Math.floor(1800 / Math.max(1, formQuestions.length)),
+                )}
+                isReadOnly={readOnly}
+              />
             </section>
           ))}
-          <Disclosure title="Your recorded review" defaultExpanded>
-            <p style={{ whiteSpace: "pre-wrap" }}>
-              {words(savedReview.note, "Reviewed without comments.")}
-            </p>
-          </Disclosure>
-        </Stack>
-      ) : (
-        formQuestions.map((question) => (
-          <section
-            key={question.id}
-            style={{
-              display: "grid",
-              gap: "var(--ds-space-16)",
-              paddingBlock: "var(--ds-space-16)",
-              borderBottom: "1px solid var(--ds-border-default)",
-            }}
-          >
-            <SectionHeader level={2} title={question.criterion} />
-            <p>{question.text}</p>
-            <RadioGroup
-              row
-              label="Fits my duties?"
-              value={decisions[question.id] ?? "reviewed"}
-              onChange={(decision) =>
-                setDecisions((current) => ({
-                  ...current,
-                  [question.id]: decision,
-                }))
-              }
-              isReadOnly={readOnly}
-            >
-              <Radio value="reviewed">Yes</Radio>
-              <Radio value="changes">Needs change</Radio>
-            </RadioGroup>
-            <TextArea
-              label="Comment"
-              value={comments[question.id] ?? ""}
-              onChange={(comment) =>
-                setComments((current) => ({
-                  ...current,
-                  [question.id]: comment,
-                }))
-              }
-              maxLength={Math.max(
-                100,
-                Math.floor(1800 / Math.max(1, formQuestions.length)),
-              )}
-              isReadOnly={readOnly}
-            />
-          </section>
-        ))
+        </Panel>
       )}
       <ActionError error={action.error} />
-      {!readOnly && (
-        <Button loading={action.isPending} onPress={() => void submit()}>
-          Send review
-        </Button>
+      {!readOnly && !savedReview && (
+        <div className="ev-submitbar">
+          <p>Send once you have gone through every question.</p>
+          <Button loading={action.isPending} onPress={() => void submit()}>
+            Send review
+          </Button>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }
 
@@ -1988,6 +2226,25 @@ export function EvaluationPages({ page }: { page: PageEnvelope }) {
   }
 }
 
+function LoadingSkeleton() {
+  return (
+    <div
+      className="accs-stack"
+      role="status"
+      aria-label="Loading evaluations"
+      aria-busy="true"
+    >
+      <div className="accs-skeleton" style={{ height: 36, width: "38%" }} />
+      <div className="accs-skeleton" style={{ height: 88 }} />
+      <div className="accs-grid ev-grid">
+        {[0, 1, 2].map((key) => (
+          <div className="accs-skeleton" style={{ height: 210 }} key={key} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function EvaluationScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>;
   const recordId = Object.values(params).at(-1);
@@ -2004,7 +2261,7 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <ViewState kind="loading" title="Loading evaluations" />
+          <LoadingSkeleton />
         ) : page.isError ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (

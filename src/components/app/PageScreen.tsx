@@ -1,37 +1,19 @@
-import {
-  Alert,
-  AnnouncementCard,
-  Agenda,
-  AgendaItem,
-  Badge,
-  Card,
-  CardBody,
-  CardMeta,
-  CardTitle,
-  EmptyState,
-  Grid,
-  Link,
-  ReportRecord,
-  SectionHeader,
-  Tabs,
-  Tab,
-  TabList,
-  TabPanel,
-  ForumCard,
-  ViewState,
-} from '@meetingat10/design-system/react'
+import { Alert, Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams, useRouterState } from '@tanstack/react-router'
+import { useParams, useRouter, useRouterState } from '@tanstack/react-router'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 
 import { ApiError, type PageEnvelope } from '@/lib/api'
-import { pageQuery } from '@/lib/queries'
-import { sessionQuery } from '@/lib/queries'
-import { pageTitles } from '@/lib/page-catalog'
-import { Stat } from '@/components/ds-next'
+import { formatDate, initials, relativeTime } from '@/lib/format'
+import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
+import { pageQuery, sessionQuery } from '@/lib/queries'
+import { siteHref } from '@/lib/sites'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
+import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
+import { Counter, SlidePills, SwapView } from '@/components/app/portal-motion'
 
 type Item = Record<string, unknown>
 
@@ -47,28 +29,114 @@ function text(value: unknown, fallback = '') {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : fallback
 }
 
-function DashboardRecords({ items, kind }: { items: Item[]; kind: 'reports' | 'cases' }) {
-  const route = kind === 'reports' ? '/reports/' : '/cases/'
+/** Name from a string or a { name } author object. */
+function nameOf(value: unknown, fallback = '') {
+  return text(asItem(value)?.name, text(value, fallback))
+}
+
+/** "08:00" -> "8:00 AM". */
+function clock(value: unknown) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(text(value))
+  if (!match) return ''
+  const hour = Number(match[1])
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+const dayKey = (value: unknown) => text(value).slice(0, 10)
+const manilaToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+
+function greeting() {
+  const hour = Number(new Intl.DateTimeFormat('en-PH', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Manila' }).format(new Date()))
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+}
+
+function firstName(name: string) {
+  return name.replace(/^(Prof\.|Dr\.)\s+/, '').split(/\s+/)[0] ?? ''
+}
+
+/** True when the signed-in role may open the page that owns this path. Never link to pages a role cannot open. */
+function useAllow() {
+  const session = useQuery(sessionQuery())
+  const pages = session.data?.allowedPages ?? []
+  return (href: string) => {
+    const id = pageIdForPath(href.split(/[?#]/)[0])
+    return Boolean(id) && pages.includes(id as string)
+  }
+}
+
+/** Anchor that navigates in place on the same site and across hosts for other sites. */
+function Go({ href, children, ...rest }: { href: string; children: ReactNode } & Omit<ComponentProps<'a'>, 'href'>) {
+  const router = useRouter()
+  const target = siteHref(href)
   return (
-    <div className="app-record-list">
-      {items.map((item, index) => (
-        <ReportRecord
-          key={text(item.id, kind + '-' + index)}
-          reference={text(item.reference, 'RPT-SAMPLE')}
-          status={text(item.status, 'Submitted')}
-          title={text(item.title, 'General concern')}
-          facts={[
-            { label: 'Updated', value: text(item.updatedAt, '—') },
-            { label: 'Stage', value: text(item.stage, 'In review') },
-          ]}
-          href={route + encodeURIComponent(text(item.id))}
-        />
-      ))}
-    </div>
+    <a
+      {...rest}
+      href={target === href ? router.history.createHref(href) : target}
+      onClick={(event) => {
+        rest.onClick?.(event)
+        if (target !== href || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        router.history.push(href)
+      }}
+    >
+      {children}
+    </a>
   )
 }
 
+/** Panel header link, only when the role may open the target. */
+function PanelLink({ href, children }: { href: string; children: ReactNode }) {
+  const allow = useAllow()
+  return allow(href) ? <Go className="accs-panel__link" href={href}>{children}</Go> : null
+}
+
+/** One list row. Becomes a link only when the role may open `href`. */
+function Entry({
+  href,
+  lead,
+  side,
+  className,
+  children,
+}: {
+  href?: string
+  lead?: ReactNode
+  side?: ReactNode
+  className?: string
+  children: ReactNode
+}) {
+  const allow = useAllow()
+  const linked = Boolean(href && allow(href))
+  const classes = ['accs-row', !lead && 'pt-row--2', className].filter(Boolean).join(' ')
+  const body = (
+    <>
+      {lead}
+      <div className="pt-row__body">{children}</div>
+      {side ?? (linked ? <span className="pt-row__go"><Icon name="caret-right" size={16} /></span> : null)}
+    </>
+  )
+  return <li>{linked ? <Go className={classes} href={href as string}>{body}</Go> : <div className={classes}>{body}</div>}</li>
+}
+
+const Rows = ({ children }: { children: ReactNode }) => <ul className="accs-rows">{children}</ul>
+
+function Sub({ children }: { children: ReactNode }) {
+  return <p className="pt-row__sub">{children}</p>
+}
+
+function kpiTarget(label: string) {
+  if (/queue/i.test(label)) return '/cases'
+  if (/report|case/i.test(label)) return '/reports'
+  if (/consult/i.test(label)) return '/consultations'
+  if (/evaluation/i.test(label)) return '/evaluations'
+  if (/unread|update|notification/i.test(label)) return '/notifications'
+  if (/event|calendar/i.test(label)) return '/calendar'
+  return undefined
+}
+
 function DashboardPanel({ data, role }: { data: Item; role: string }) {
+  const allow = useAllow()
+  const session = useQuery(sessionQuery())
+  const me = session.data?.user.id
   const stats = asItems(data.stats)
   const announcements = asItems(data.announcements)
   const posts = asItems(data.posts)
@@ -76,230 +144,346 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
   const cases = asItems(data.cases)
   const sections = asItems(data.sections)
   const consultations = asItems(data.consultations)
-  const events = asItems(data.events)
   const todos = asItems(data.todos)
   const assignments = asItems(data.assignments)
   const notes = asItems(data.notifications)
-  const description = text(data.description)
+  const today = manilaToday()
+  const events = asItems(data.events)
+    .filter((event) => dayKey(event.date) >= today)
+    .sort((a, b) => dayKey(a.date).localeCompare(dayKey(b.date)) || text(a.start).localeCompare(text(b.start)))
+    .slice(0, 5)
+  const submitted = assignments.filter((item) => /submitted/i.test(text(item.status))).length
+  const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
+  const empty =
+    reports.length + cases.length + sections.length + consultations.length + announcements.length + posts.length +
+      events.length + assignments.length + todos.length + notes.length === 0
+
+  const recordRows = (items: Item[], route: string) => (
+    <Rows>
+      {items.map((item, index) => (
+        <Entry key={text(item.id, route + index)} href={route + encodeURIComponent(text(item.id))}>
+          <p className="pt-row__title">{text(item.title, text(item.category, 'General concern'))}</p>
+          <Sub>
+            <span className="accs-mono">{text(item.reference, text(item.id, '—'))}</span>
+            <StatusChip tone={toneFor(text(item.status, 'Submitted'))}>{text(item.status, 'Submitted')}</StatusChip>
+            {text(item.updatedAt) && <span>Updated {relativeTime(item.updatedAt)}</span>}
+          </Sub>
+        </Entry>
+      ))}
+    </Rows>
+  )
+
   return (
-    <div className="app-page">
-      {description && <p className="app-lead">{description}</p>}
+    <div className="accs-stack">
       {stats.length > 0 && (
-        <Grid columns={4} className="app-stat-grid">
-          {stats.map((stat, index) => (
-            <Stat
-              key={text(stat.id, text(stat.label, 'stat-' + index))}
-              label={text(stat.label, 'Overview')}
-              value={text(stat.value, '—')}
-              change={text(stat.note, text(stat.change))}
-              scopeNote={text(stat.scopeNote)}
-            />
-          ))}
-        </Grid>
+        <Kpis label="Overview">
+          {stats.map((stat, index) => {
+            const label = text(stat.label, 'Overview')
+            const target = kpiTarget(label)
+            const note = text(stat.note, text(stat.change))
+            return (
+              <Kpi
+                key={text(stat.id, label + index)}
+                label={label}
+                value={<Counter value={stat.value} />}
+                note={/synthetic|demo|sample|prototype/i.test(note) ? undefined : note || undefined}
+                href={target && allow(target) ? siteHref(target) : undefined}
+              />
+            )
+          })}
+        </Kpis>
       )}
-      <Grid columns="main">
-        <div className="app-dashboard-main">
-          {events.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} split title="Today" actions={<Link href="/calendar">Open calendar</Link>} />
-              <Agenda>
-                {events.map((item, index) => (
-                  <AgendaItem
-                    key={text(item.id, 'event-' + index)}
-                    chip={text(item.time, text(item.date, 'Today'))}
-                    lane="schedule"
-                    title={text(item.title, 'Campus event')}
-                    href="/calendar"
-                    linkLabel="View calendar"
-                  >
-                    {text(item.summary, text(item.location))}
-                  </AgendaItem>
-                ))}
-              </Agenda>
-            </section>
-          )}
-          {announcements.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} split title="Announcements" actions={<Link href="/feed">View feed</Link>} />
-              <div className="app-card-list">
-            {announcements.map((item, index) => (
-              <AnnouncementCard
-                key={text(item.id, 'announcement-' + index)}
-                title={text(item.title, 'Announcement')}
-                tag={text(item.type, 'Announcement')}
-                when={text(item.date)}
-                meta={text(item.source)}
-                href="/feed"
-                demo
+      {empty ? (
+        <Panel>
+          <Empty title="Nothing to show yet">Items for your role and scope will appear here when available.</Empty>
+        </Panel>
+      ) : (
+        <div className="accs-split">
+          <div className="accs-stack accs-stagger">
+            {events.length > 0 && (
+              <Panel
+                flush
+                title={events.every((event) => dayKey(event.date) === today) ? 'Today' : 'Coming up'}
+                action={<PanelLink href="/calendar">Open calendar</PanelLink>}
               >
-                {text(item.summary)}
-              </AnnouncementCard>
-            ))}
-              </div>
-            </section>
-          )}
-          {posts.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} split title={role === 'organization' ? 'Discussion' : 'From your spaces'} actions={<Link href={role === 'organization' ? '/organizations' : '/feed'}>View all</Link>} />
-              <div className="app-card-list">
-                {posts.map((item, index) => (
-                  <ForumCard
-                    key={text(item.id, 'post-' + index)}
-                    topic={text(item.label, 'Discussion')}
-                    title={text(item.title, 'Class discussion')}
-                    excerpt={text(item.summary)}
-                    author={text(item.author, 'ACCS member')}
-                    replies={Number(item.replies ?? 0)}
-                    status={text(item.status, 'Open discussion')}
-                    href={'/feed/' + encodeURIComponent(text(item.id))}
-                    demo
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {cases.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} split title={role === 'professor' ? 'Assigned reports' : 'Case queue'} actions={<Link href="/cases">Open queue</Link>} />
-              <DashboardRecords items={cases} kind="cases" />
-            </section>
-          )}
-          {sections.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} split title="Your sections" actions={<Link href="/spaces">View sections</Link>} />
-              <div className="app-card-list">
-                {sections.map((item, index) => (
-                  <Card key={text(item.id, 'section-' + index)}>
-                    <CardTitle>{text(item.title, text(item.name, 'Class section'))}</CardTitle>
-                    <CardBody>{text(item.detail, text(item.subject))}</CardBody>
-                    <CardMeta><Link href={'/spaces/' + encodeURIComponent(text(item.id))}>Open space</Link></CardMeta>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
+                <Rows>
+                  {events.map((item, index) => {
+                    const time = [clock(item.start), clock(item.end)].filter(Boolean).join(' – ')
+                    return (
+                      <Entry key={text(item.id, 'event-' + index)} lead={<DateTile value={item.date} />} href="/calendar">
+                        <p className="pt-row__title">{text(item.title, 'Campus event')}</p>
+                        <Sub>
+                          {time && <span className="pt-time">{time}</span>}
+                          {text(item.place, text(item.location)) && <span>{text(item.place, text(item.location))}</span>}
+                        </Sub>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {announcements.length > 0 && (
+              <Panel flush title="Announcements" action={<PanelLink href="/feed">View feed</PanelLink>}>
+                <Rows>
+                  {announcements.map((item, index) => {
+                    const urgent = text(item.priority) === 'high'
+                    return (
+                      <Entry key={text(item.id, 'announcement-' + index)} href={text(item.id) ? '/feed/' + encodeURIComponent(text(item.id)) : '/feed'}>
+                        <p className="pt-row__title">{text(item.title, 'Announcement')}</p>
+                        <Sub>
+                          <StatusChip tone={urgent ? 'warn' : 'neutral'}>{urgent ? 'Priority' : text(item.label, 'Announcement')}</StatusChip>
+                          {nameOf(item.author, text(item.source)) && <span>{nameOf(item.author, text(item.source))}</span>}
+                          {text(item.at, text(item.date)) && <span>{relativeTime(item.at ?? item.date)}</span>}
+                        </Sub>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {posts.length > 0 && (
+              <Panel
+                flush
+                title={role === 'organization' ? 'Discussion' : 'From your spaces'}
+                action={<PanelLink href={role === 'organization' ? '/organizations' : '/feed'}>View all</PanelLink>}
+              >
+                <Rows>
+                  {posts.map((item, index) => {
+                    const author = nameOf(item.author, 'ACCS member')
+                    const replies = Number(item.commentCount ?? item.replies ?? 0)
+                    return (
+                      <Entry
+                        key={text(item.id, 'post-' + index)}
+                        lead={<span className="accs-avatar" aria-hidden>{initials(author)}</span>}
+                        href={'/feed/' + encodeURIComponent(text(item.id))}
+                        side={
+                          <span className="pt-row__side">
+                            <span>{relativeTime(item.at)}</span>
+                            <span className="pt-row__count"><Icon name="chat" size={16} />{replies}<span className="pt-sr"> replies</span></span>
+                          </span>
+                        }
+                      >
+                        <p className="pt-row__title">{text(item.title, 'Class discussion')}</p>
+                        <Sub>
+                          <span>{author}</span>
+                          {text(item.label) && <span className="accs-tag">{text(item.label)}</span>}
+                        </Sub>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {sections.length > 0 && (
+              <Panel flush title="Your sections" action={<PanelLink href="/spaces">View sections</PanelLink>}>
+                <Rows>
+                  {sections.map((item, index) => (
+                    <Entry
+                      key={text(item.id, 'section-' + index)}
+                      lead={<span className="accs-avatar" aria-hidden><Icon name="chalkboard" size={16} /></span>}
+                      href={'/spaces/' + encodeURIComponent(text(item.id))}
+                    >
+                      <p className="pt-row__title">{text(item.title, text(item.name, 'Class section'))}</p>
+                      <Sub>{[text(item.subject, text(item.detail)), text(item.program)].filter(Boolean).join(' · ')}</Sub>
+                    </Entry>
+                  ))}
+                </Rows>
+              </Panel>
+            )}
+          </div>
+          <aside className="accs-stack accs-stagger">
+            {reports.length > 0 && (
+              <Panel flush title="My reports" action={<PanelLink href="/reports">View all</PanelLink>}>
+                {recordRows(reports, '/reports/')}
+              </Panel>
+            )}
+            {cases.length > 0 && (
+              <Panel flush title={caseTitle} action={<PanelLink href="/cases">Open queue</PanelLink>}>
+                {recordRows(cases, '/cases/')}
+              </Panel>
+            )}
+            {consultations.length > 0 && (
+              <Panel flush title="Consultations" action={<PanelLink href="/consultations">View all</PanelLink>}>
+                <Rows>
+                  {consultations.map((item, index) => {
+                    const student = asItem(item.student)
+                    const other = student && text(student.id) === me ? asItem(item.faculty) : student ?? asItem(item.faculty)
+                    const slot = asItem(item.slot)
+                    const status = text(item.status, 'Requested')
+                    return (
+                      <Entry key={text(item.id, 'consultation-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
+                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Consultation'))}</p>
+                        <Sub>
+                          <StatusChip tone={toneFor(status)}>{status}</StatusChip>
+                          {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
+                        </Sub>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {assignments.length > 0 && (
+              <Panel flush title="Evaluations due" action={<PanelLink href="/evaluations">Open evaluations</PanelLink>}>
+                <div className="pt-progress">
+                  <p><strong>{submitted} of {assignments.length} submitted</strong><span className="accs-num">{Math.round((submitted / assignments.length) * 100)}%</span></p>
+                  <div className="accs-progress" role="progressbar" aria-label="Evaluations submitted" aria-valuemin={0} aria-valuemax={assignments.length} aria-valuenow={submitted}>
+                    <span style={{ width: (submitted / assignments.length) * 100 + '%' }} />
+                  </div>
+                </div>
+                <Rows>
+                  {assignments.map((item, index) => {
+                    const status = text(item.status, 'Not started')
+                    return (
+                      <Entry key={text(item.id, 'assignment-' + index)} href="/evaluations">
+                        <p className="pt-row__title">{text(item.cycleTitle, text(item.title, 'Evaluation'))}</p>
+                        <Sub>
+                          <StatusChip tone={toneFor(status)}>{status}</StatusChip>
+                          {nameOf(item.faculty) && <span>{nameOf(item.faculty)}</span>}
+                          {text(item.due, text(item.dueDate)) && <span>Due {formatDate(item.due ?? item.dueDate)}</span>}
+                        </Sub>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {todos.length > 0 && (
+              <Panel flush title="To do" action={<PanelLink href="/calendar">Open calendar</PanelLink>}>
+                <Rows>
+                  {todos.map((item, index) => {
+                    const done = item.done === true || /done|complete/i.test(text(item.status))
+                    return (
+                      <Entry
+                        key={text(item.id, 'todo-' + index)}
+                        className={done ? 'pt-row--done' : undefined}
+                        lead={<span className="pt-check" data-done={done} aria-hidden>{done && <Icon name="check" size={16} />}</span>}
+                        side={text(item.date, text(item.dueDate)) ? <span className="pt-row__side">{formatDate(item.date ?? item.dueDate)}</span> : <span />}
+                      >
+                        <p className="pt-row__title">{text(item.title, 'Task')}<span className="pt-sr">{done ? ' (done)' : ''}</span></p>
+                      </Entry>
+                    )
+                  })}
+                </Rows>
+              </Panel>
+            )}
+            {notes.length > 0 && (
+              <Panel title="Recent updates" action={<PanelLink href="/notifications">View all</PanelLink>}>
+                <ol className="accs-timeline">
+                  {notes.map((item, index) => (
+                    <li key={text(item.id, 'notice-' + index)}>
+                      {allow('/notifications') ? <Go href="/notifications" className="pt-timeline__link">{text(item.title, 'Account update')}</Go> : <span className="pt-timeline__link">{text(item.title, 'Account update')}</span>}
+                      <span className="accs-timeline__time">{relativeTime(item.at)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </Panel>
+            )}
+            {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
+            {role === 'staff' && (
+              <Alert tone="neutral" title="Staff access is limited">
+                Staff content beyond CCS-wide material is still being defined.
+              </Alert>
+            )}
+          </aside>
         </div>
-        <aside className="app-dashboard-rail">
-          {reports.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} title="My reports" actions={<Link href="/reports">View all</Link>} />
-              <DashboardRecords items={reports} kind="reports" />
-            </section>
-          )}
-          {consultations.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} title="Consultations" actions={<Link href="/consultations">View all</Link>} />
-              <Agenda>
-                {consultations.map((item, index) => (
-                  <AgendaItem
-                    key={text(item.id, 'consultation-' + index)}
-                    chip={text(item.status, 'Requested')}
-                    lane="consult"
-                    title={text(item.title, 'Consultation request')}
-                    href="/consultations"
-                  >
-                    {text(item.when, text(item.date))}
-                  </AgendaItem>
-                ))}
-              </Agenda>
-            </section>
-          )}
-          {assignments.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} title="Evaluations" actions={<Link href="/evaluations">Open evaluations</Link>} />
-              {assignments.map((item, index) => (
-                <Card key={text(item.id, 'assignment-' + index)}>
-                  <CardTitle>{text(item.title, 'Evaluation due')}</CardTitle>
-                  <CardBody>{text(item.due, text(item.dueDate))}</CardBody>
-                  <CardMeta><Badge tone="info" form="pending">{text(item.status, 'Not started')}</Badge></CardMeta>
-                </Card>
-              ))}
-            </section>
-          )}
-          {todos.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} title="To do" actions={<Link href="/calendar">Open calendar</Link>} />
-              <Agenda>
-                {todos.map((item, index) => (
-                  <AgendaItem key={text(item.id, 'todo-' + index)} chip={text(item.dueDate, 'Personal')} title={text(item.title, 'Task')}>
-                    {text(item.status, 'Open')}
-                  </AgendaItem>
-                ))}
-              </Agenda>
-            </section>
-          )}
-          {notes.length > 0 && (
-            <section className="app-region">
-              <SectionHeader level={2} title="Recent updates" actions={<Link href="/notifications">View notifications</Link>} />
-              <Agenda>
-                {notes.map((item, index) => (
-                  <AgendaItem key={text(item.id, 'notice-' + index)} chip={text(item.type, 'Update')} title={text(item.title, 'Account update')} href="/notifications" />
-                ))}
-              </Agenda>
-            </section>
-          )}
-          {/* TBD(D-06): CCS Staff capabilities beyond CCS-wide content. */}
-          {role === 'staff' && (
-            <Alert tone="neutral" title="Staff access is limited">
-              Staff content beyond CCS-wide material is still being defined. <span className="tbd-comment">TBD(D-06)</span>
-            </Alert>
-          )}
-          {reports.length + cases.length + sections.length + consultations.length + announcements.length + posts.length + events.length + assignments.length + todos.length + notes.length === 0 && (
-            <EmptyState title="Nothing to show yet" description="Items for your role and scope will appear here when available." />
-          )}
-        </aside>
-      </Grid>
+      )}
     </div>
   )
 }
 
 function HomeDashboard({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
+  const allow = useAllow()
   const variants = asItems(page.data.roleSections)
   const roles = session.data?.user.roles ?? []
   const panels = variants.filter((variant) => roles.some((role) => role === variant.role))
-  if (roles.length > 1 && panels.length > 1) {
-    return (
-      <Tabs defaultSelectedKey={text(panels[0].role)}>
-        <TabList aria-label="Dashboard role views" items={panels}>
-          {(panel) => <Tab id={text(panel.role)}>As {text(panel.label, text(panel.role))}</Tab>}
-        </TabList>
-        {panels.map((panel) => (
-          <TabPanel key={text(panel.role)} id={text(panel.role)}>
-            <DashboardPanel data={panel} role={text(panel.role)} />
-          </TabPanel>
-        ))}
-      </Tabs>
-    )
-  }
-  const panel = panels[0] ?? page.data
-  return <DashboardPanel data={panel as Item} role={roles[0] ?? 'student'} />
+  const tabbed = roles.length > 1 && panels.length > 1
+  const [selected, setSelected] = useState('')
+  const active = panels.find((panel) => text(panel.role) === selected) ?? panels[0]
+  const panel = (tabbed ? active : panels[0]) ?? (page.data as Item)
+  const role = tabbed ? text(panel.role) : (roles[0] ?? 'student')
+
+  const shortcuts: { label: string; href: string; icon: 'plus' | 'calendar' | 'megaphone' | 'list-checks' | 'clock'; when?: string[] }[] = [
+    { label: 'New report', href: '/reports/new', icon: 'plus', when: ['student'] },
+    { label: 'Book consultation', href: '/consultations', icon: 'calendar', when: ['student'] },
+    { label: 'Post announcement', href: '/feed/new', icon: 'megaphone' },
+    { label: 'Manage availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
+    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas', 'president'] },
+  ]
+  const actions = shortcuts
+    .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href))
+    .slice(0, 2)
+  const name = firstName(session.data?.user.name ?? '')
+  const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
+
+  return (
+    <div className="accs-stack">
+      <PageHeader
+        title={name ? `${greeting()}, ${name}` : greeting()}
+        description={[date, page.scope].filter(Boolean).join(' · ')}
+        actions={
+          actions.length > 0 && (
+            <>
+              {actions.map((item, index) => (
+                <Button key={item.href} href={item.href} icon={item.icon} variant={index === 0 ? 'primary' : 'secondary'}>
+                  {item.label}
+                </Button>
+              ))}
+            </>
+          )
+        }
+      />
+      {tabbed && (
+        <SlidePills
+          label="Dashboard role views"
+          value={text(panel.role)}
+          onChange={setSelected}
+          options={panels.map((entry) => ({ id: text(entry.role), label: 'As ' + text(entry.label, text(entry.role)) }))}
+        />
+      )}
+      {tabbed && text(panel.description) && <p className="pt-scope">{text(panel.description)}</p>}
+      {tabbed ? (
+        <SwapView id={role}>
+          <DashboardPanel data={panel} role={role} />
+        </SwapView>
+      ) : (
+        <DashboardPanel data={panel} role={role} />
+      )}
+    </div>
+  )
 }
 
 function BasicPage({ page }: { page: PageEnvelope }) {
   const entries = Object.entries(page.data).filter(([, value]) => Array.isArray(value) && value.length > 0)
   if (!entries.length) {
-    return <EmptyState title="No items to show" description="There are no matching items in the available sample data." />
+    return (
+      <Panel>
+        <Empty title="No items to show">There is nothing here yet.</Empty>
+      </Panel>
+    )
   }
   return (
-    <div className="app-page">
+    <div className="accs-stack accs-stagger">
       {entries.map(([key, value]) => (
-        <section className="app-region" key={key}>
-          <SectionHeader level={2} title={key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())} />
-          <div className="app-card-list">
+        <Panel flush key={key} title={key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())}>
+          <Rows>
             {asItems(value).map((item, index) => {
-              const id = text(item.id, key + '-' + index)
-              const title = text(item.title, text(item.name, text(item.reference, 'Sample item')))
+              const status = text(item.status)
               return (
-                <Card key={id}>
-                  <CardTitle>{title}</CardTitle>
-                  {text(item.summary) && <CardBody>{text(item.summary)}</CardBody>}
-                  {text(item.status) && <CardMeta><Badge tone="info" form="pending">{text(item.status)}</Badge></CardMeta>}
-                </Card>
+                <Entry key={text(item.id, key + '-' + index)}>
+                  <p className="pt-row__title">{text(item.title, text(item.name, text(item.reference, '—')))}</p>
+                  {(status || text(item.summary)) && (
+                    <Sub>
+                      {status && <StatusChip tone={toneFor(status)}>{status}</StatusChip>}
+                      {text(item.summary) && <span>{text(item.summary)}</span>}
+                    </Sub>
+                  )}
+                </Entry>
               )
             })}
-          </div>
-        </section>
+          </Rows>
+        </Panel>
       ))}
     </div>
   )
@@ -327,15 +511,12 @@ export function PageScreen({ pageId }: { pageId: string }) {
           ) : ['P13', 'P14', 'P15', 'P16', 'P17'].includes(pageId) ? (
             <SchedulePage page={page.data} />
           ) : ['P18', 'P19', 'P20', 'P21', 'P22'].includes(pageId) ? <GrievancePage page={page.data} /> : <>
-            <SectionHeader
-              level={1}
-              title={page.data.title || pageTitles[pageId] || 'ACCS'}
-              description={page.data.scope}
-              actions={<Badge outline marker={false}>Sample data</Badge>}
-            />
             {pageId === 'P03'
               ? <HomeDashboard page={page.data} />
-              : <BasicPage page={page.data} />}
+              : <div className="accs-stack">
+                  <PageHeader title={page.data.title || pageTitles[pageId] || 'ACCS'} description={page.data.scope} />
+                  <BasicPage page={page.data} />
+                </div>}
           </>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 
-import { getDemoAccounts, getPage, getSession } from './api'
+import { getPage, getSession } from './api'
 
 export const sessionQuery = () =>
   queryOptions({
@@ -8,13 +8,6 @@ export const sessionQuery = () =>
     queryFn: getSession,
     retry: false,
     staleTime: 30_000,
-  })
-
-export const demoAccountsQuery = () =>
-  queryOptions({
-    queryKey: ['demo-accounts'],
-    queryFn: getDemoAccounts,
-    staleTime: 60_000,
   })
 
 export const pageQuery = (pageId: string, recordId?: string, filters = '') =>

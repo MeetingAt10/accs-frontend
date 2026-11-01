@@ -1,0 +1,46 @@
+/* Home (portal) dashboard, generic list pages, and the shared pill/row helpers used by the
+   notifications, assistant, directory, profile and settings pages. Built on styles.css primitives. */
+
+.pt-scope { margin: 0; color: var(--accs-muted); font-size: 0.875rem; }
+.pt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Pills with a sliding indicator (SlidePills). */
+.pt-pills { gap: 4px; padding: 4px; width: fit-content; max-width: 100%; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-surface); box-shadow: 0 1px 2px rgb(11 18 32 / 4%); }
+.pt-pill { position: relative; isolation: isolate; min-height: 36px; border-color: transparent; background: transparent; }
+.pt-pill:hover { background: var(--accs-sunken); border-color: transparent; }
+.pt-pill[aria-pressed='true'] { background: transparent; border-color: transparent; color: #fff; }
+.pt-pill__indicator { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accs-ink); box-shadow: 0 4px 12px -4px rgb(11 18 32 / 45%); }
+.pt-pill__label { position: relative; }
+
+/* Rows */
+.pt-row--2 { grid-template-columns: minmax(0, 1fr) auto; }
+.pt-row__body { display: grid; gap: 3px; min-width: 0; }
+.pt-row__title { margin: 0; font-weight: 600; color: var(--accs-ink); overflow-wrap: anywhere; line-height: 1.35; }
+.pt-row__sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }
+.pt-row__side { display: grid; justify-items: end; gap: 4px; color: var(--accs-muted); font-size: 0.75rem; white-space: nowrap; }
+.pt-row__count { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.pt-row__go { display: inline-flex; color: var(--accs-faint); transition: transform 200ms var(--accs-ease), color 200ms var(--accs-ease); }
+a.accs-row:hover .pt-row__go { color: var(--site-accent-ink); transform: translateX(3px); }
+a.accs-row:hover .pt-row__title { color: var(--site-accent-ink); }
+.pt-row--done .pt-row__title { color: var(--accs-muted); text-decoration: line-through; font-weight: 500; }
+.pt-time { font-family: var(--accs-font-mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+
+/* Checkbox-looking marker for to-do rows. */
+.pt-check { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid var(--accs-line-strong); border-radius: 6px; color: #fff; transition: background 200ms var(--accs-ease), border-color 200ms var(--accs-ease); }
+.pt-check[data-done='true'] { border-color: var(--accs-ok); background: var(--accs-ok); }
+
+/* Progress summary above a list. */
+.pt-progress { display: grid; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--accs-line); }
+.pt-progress p { display: flex; justify-content: space-between; gap: 12px; margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }
+.pt-progress strong { color: var(--accs-ink); font-weight: 600; }
+
+.pt-timeline__link { color: var(--accs-ink); font-weight: 600; text-decoration: none; }
+a.pt-timeline__link:hover { color: var(--site-accent-ink); text-decoration: underline; }
+
+/* The dashboard KPI strip reads as the hero: larger values. */
+.accs-stack > .accs-kpis .accs-kpi__value { font-size: 2rem; }
+
+@media (max-width: 640px) {
+  .accs-rows .accs-row { padding: 12px 16px; min-height: 48px; }
+  .pt-pills { border-radius: 16px; }
+}

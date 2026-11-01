@@ -1,0 +1,115 @@
+/* ==========================================================================
+   ACCS motion layer. One choreography for every page:
+   page sections rise in sequence, rows cascade, controls respond to touch.
+   All of it is removed under prefers-reduced-motion.
+   ========================================================================== */
+
+:root {
+  --accs-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --accs-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --accs-dur-1: 160ms;
+  --accs-dur-2: 280ms;
+  --accs-dur-3: 520ms;
+}
+
+@keyframes accs-rise {
+  from { opacity: 0; transform: translateY(10px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes accs-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes accs-scale-in {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes accs-grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes accs-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Page choreography: header, then each direct section, 60ms apart. */
+.accs-page-head,
+.accs-reveal {
+  animation: accs-rise var(--accs-dur-3) var(--accs-ease-out) both;
+}
+
+.accs-stagger > * {
+  animation: accs-rise var(--accs-dur-3) var(--accs-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 80ms);
+}
+.accs-stagger > :nth-child(1) { --i: 0; }
+.accs-stagger > :nth-child(2) { --i: 1; }
+.accs-stagger > :nth-child(3) { --i: 2; }
+.accs-stagger > :nth-child(4) { --i: 3; }
+.accs-stagger > :nth-child(5) { --i: 4; }
+.accs-stagger > :nth-child(6) { --i: 5; }
+.accs-stagger > :nth-child(7) { --i: 6; }
+.accs-stagger > :nth-child(n + 8) { --i: 7; }
+
+/* Rows cascade inside panels and lists. */
+.accs-rows > *,
+.accs-table tbody tr,
+.accs-grid > * {
+  animation: accs-rise var(--accs-dur-2) var(--accs-ease-out) both;
+}
+.accs-rows > :nth-child(2), .accs-table tbody tr:nth-child(2), .accs-grid > :nth-child(2) { animation-delay: 30ms; }
+.accs-rows > :nth-child(3), .accs-table tbody tr:nth-child(3), .accs-grid > :nth-child(3) { animation-delay: 60ms; }
+.accs-rows > :nth-child(4), .accs-table tbody tr:nth-child(4), .accs-grid > :nth-child(4) { animation-delay: 90ms; }
+.accs-rows > :nth-child(5), .accs-table tbody tr:nth-child(5), .accs-grid > :nth-child(5) { animation-delay: 120ms; }
+.accs-rows > :nth-child(6), .accs-table tbody tr:nth-child(6), .accs-grid > :nth-child(6) { animation-delay: 150ms; }
+.accs-rows > :nth-child(n + 7), .accs-table tbody tr:nth-child(n + 7), .accs-grid > :nth-child(n + 7) { animation-delay: 180ms; }
+
+/* KPI values settle in; progress bars grow from the left. */
+.accs-kpi { animation: accs-scale-in var(--accs-dur-3) var(--accs-ease-out) both; }
+.accs-kpi:nth-child(2) { animation-delay: 50ms; }
+.accs-kpi:nth-child(3) { animation-delay: 100ms; }
+.accs-kpi:nth-child(4) { animation-delay: 150ms; }
+.accs-kpi:nth-child(n + 5) { animation-delay: 200ms; }
+.accs-progress > span { transform-origin: left center; animation: accs-grow-x 900ms var(--accs-ease-out) both 200ms; }
+
+/* Tactile controls */
+.accs-pill,
+.accs-icon-btn,
+.accs-panel--interactive,
+a.accs-row,
+a.accs-kpi {
+  transition:
+    background-color var(--accs-dur-1) var(--accs-ease-out),
+    border-color var(--accs-dur-1) var(--accs-ease-out),
+    color var(--accs-dur-1) var(--accs-ease-out),
+    box-shadow var(--accs-dur-2) var(--accs-ease-out),
+    transform var(--accs-dur-2) var(--accs-ease-out);
+}
+.accs-pill:active,
+.accs-icon-btn:active { transform: scale(0.96); }
+.accs-panel--interactive:hover { transform: translateY(-2px); }
+.accs-panel--interactive:active { transform: translateY(0) scale(0.995); }
+
+/* Skeleton loading surface */
+.accs-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--accs-line) 0%, var(--accs-sunken) 50%, var(--accs-line) 100%);
+  background-size: 200% 100%;
+  animation: accs-shimmer 1.4s linear infinite;
+}
+
+/* Route changes (TanStack defaultViewTransition) */
+::view-transition-old(root) { animation: accs-fade 160ms ease-in reverse both; }
+::view-transition-new(root) { animation: accs-rise 360ms var(--accs-ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .accs-page-head, .accs-reveal, .accs-stagger > *, .accs-rows > *, .accs-table tbody tr, .accs-grid > *,
+  .accs-kpi, .accs-progress > span, .accs-skeleton { animation: none !important; }
+  .accs-panel--interactive:hover, .accs-pill:active, .accs-icon-btn:active { transform: none; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}

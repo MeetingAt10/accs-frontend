@@ -1,20 +1,12 @@
 import {
-  Accordion,
   Alert,
-  Breadcrumbs,
   Button,
-  Disclosure,
-  Grid,
+  Icon,
   Link,
   PrivacyNotice,
-  Radio,
-  RadioGroup,
-  RoleBadge,
-  Row,
-  SectionHeader,
+  Search,
   Select,
   SelectOption,
-  Stack,
   TextArea,
   TextField,
   ViewState,
@@ -22,18 +14,24 @@ import {
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 
-import { ProfileHeader, PersonCard, FilterBar } from "@/components/ds-next";
+import { Empty, PageHeader, Panel, StatusChip } from "@/components/app/page-shell";
+import { Collapse, SlidePills, ease } from "@/components/app/portal-motion";
+import { ProfileHeader, PersonCard } from "@/components/ds-next";
 import { StandingBadge } from "@/components/app/records";
 import {
   ApiError,
+  changePassword,
   performPageAction,
   signOut,
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
+import { pageIdForPath } from "@/lib/page-catalog";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import "./people-account.css";
 
 type Item = Record<string, unknown>;
 
@@ -63,22 +61,35 @@ function useAction(pageId: string) {
   });
 }
 
-function Heading({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
-  return <SectionHeader level={1} title={title} description={description} />;
+const roleTags = (roles: string[]) =>
+  roles.map((role) => (
+    <span className="accs-tag pa-role" key={role}>
+      {role}
+    </span>
+  ));
+
+function FactRows({ rows }: { rows: [string, ReactNode][] }) {
+  const shown = rows.filter(([, value]) => value);
+  return (
+    <dl className="pa-facts">
+      {shown.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export function DirectoryPage({ page }: { page: PageEnvelope }) {
+  const reduce = useReducedMotion();
   const people = items(page.data.people);
   const [search, setSearch] = useState("");
   const [office, setOffice] = useState("All");
   const [program, setProgram] = useState("All");
   const [role, setRole] = useState("All");
+  const roleOptions = [...new Set(people.flatMap((person) => strings(person.roles)))];
   const visible = people.filter((person) => {
     const text =
       `${word(person.name)} ${word(person.title)} ${word(person.office)} ${word(person.program)} ${word(person.email)} ${strings(person.roles).join(" ")}`.toLowerCase();
@@ -92,127 +103,96 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
     );
   });
   return (
-    <Stack gap={20}>
-      <Heading
+    <div className="accs-stack">
+      <PageHeader
         title="Directory"
-        description="CCS, Guidance, and OSAS personnel."
+        description={`CCS, Guidance, and OSAS personnel · ${visible.length} ${visible.length === 1 ? "person" : "people"}`}
       />
-      <FilterBar
-        query={search}
-        onQueryChange={setSearch}
-        searchLabel="Search personnel"
-        searchPlaceholder="Name or office"
-      >
-        <Select
-          label="Office"
-          selectedKey={office}
-          onSelectionChange={(key) => setOffice(String(key))}
-        >
-          <SelectOption id="All">All offices</SelectOption>
-          <SelectOption id="CCS">CCS</SelectOption>
-          <SelectOption id="Guidance">Guidance</SelectOption>
-          <SelectOption id="OSAS">OSAS</SelectOption>
-        </Select>
-        <Select
-          label="Program"
-          selectedKey={program}
-          onSelectionChange={(key) => setProgram(String(key))}
-        >
-          <SelectOption id="All">All programs</SelectOption>
-          <SelectOption id="BSIT">IT</SelectOption>
-          <SelectOption id="BSCS">CS</SelectOption>
-          <SelectOption id="BSIS">IS</SelectOption>
-        </Select>
-        <Select
-          label="Role"
-          selectedKey={role}
-          onSelectionChange={(key) => setRole(String(key))}
-        >
-          <SelectOption id="All">All roles</SelectOption>
-          {[
-            "professor",
-            "chair",
-            "dean",
-            "staff",
-            "guidance",
-            "osas",
-            "administrator",
-            "president",
-          ].map((value) => (
-            <SelectOption key={value} id={value}>
-              {value}
-            </SelectOption>
-          ))}
-        </Select>
-      </FilterBar>
-      {visible.length ? (
-        <Grid columns={3}>
-          {visible.map((person) => (
-            <PersonCard
-              key={word(person.id)}
-              name={word(person.name)}
-              role={strings(person.roles).map((entry) => (
-                <RoleBadge key={entry}>{entry}</RoleBadge>
-              ))}
-              office={word(person.office, word(person.program))}
-              description={word(person.title)}
-              meta={
-                <Link href={`mailto:${word(person.email)}`}>
-                  {word(person.email)}
-                </Link>
-              }
-              href={"/people/" + encodeURIComponent(word(person.id))}
+      <div className="pa-toolbar">
+        <div className="pa-toolbar__row">
+          <div className="pa-toolbar__search">
+            <Search
+              label="Search personnel"
+              placeholder="Name or office"
+              value={search}
+              onChange={setSearch}
+              size="sm"
             />
-          ))}
-        </Grid>
-      ) : (
-        <ViewState
-          kind="empty"
-          title="No one matches"
-          description="Try another name, role, office, or program."
+          </div>
+          <Select
+            label="Office"
+            selectedKey={office}
+            onSelectionChange={(key) => setOffice(String(key))}
+          >
+            <SelectOption id="All">All offices</SelectOption>
+            <SelectOption id="CCS">CCS</SelectOption>
+            <SelectOption id="Guidance">Guidance</SelectOption>
+            <SelectOption id="OSAS">OSAS</SelectOption>
+          </Select>
+          <Select
+            label="Program"
+            selectedKey={program}
+            onSelectionChange={(key) => setProgram(String(key))}
+          >
+            <SelectOption id="All">All programs</SelectOption>
+            <SelectOption id="BSIT">IT</SelectOption>
+            <SelectOption id="BSCS">CS</SelectOption>
+            <SelectOption id="BSIS">IS</SelectOption>
+          </Select>
+        </div>
+        <SlidePills
+          label="Filter by role"
+          value={role}
+          onChange={setRole}
+          options={[
+            { id: "All", label: "Everyone" },
+            ...roleOptions.map((value) => ({
+              id: value,
+              label: <span className="pa-role">{value}</span>,
+            })),
+          ]}
         />
-      )}
-    </Stack>
-  );
-}
-
-function Facts({ person }: { person: Item }) {
-  const roles = strings(person.roles);
-  return (
-    <dl className="ds-record__facts">
-      <div>
-        <dt>Roles</dt>
-        <dd>
-          {roles.map((role) => (
-            <RoleBadge key={role}>{role}</RoleBadge>
-          ))}
-        </dd>
       </div>
-      {Boolean(person.office) && (
-        <div>
-          <dt>Office</dt>
-          <dd>{word(person.office)}</dd>
+      {visible.length ? (
+        <div className="pa-grid">
+          <AnimatePresence mode="popLayout">
+            {visible.map((person, index) => (
+              <motion.div
+                key={word(person.id)}
+                layout={reduce ? false : "position"}
+                initial={reduce ? false : { opacity: 0, y: 14, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                transition={{
+                  duration: reduce ? 0 : 0.34,
+                  ease,
+                  delay: reduce ? 0 : Math.min(index, 10) * 0.03,
+                }}
+              >
+                <PersonCard
+                  name={word(person.name)}
+                  role={roleTags(strings(person.roles))}
+                  office={word(person.office, word(person.program))}
+                  description={word(person.title)}
+                  meta={
+                    <Link href={`mailto:${word(person.email)}`}>
+                      {word(person.email)}
+                    </Link>
+                  }
+                  href={"/people/" + encodeURIComponent(word(person.id))}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
+      ) : (
+        <Panel>
+          <Empty title="No one matches">
+            Try another name, role, office, or program.
+          </Empty>
+        </Panel>
       )}
-      {Boolean(person.program) && (
-        <div>
-          <dt>Program</dt>
-          <dd>{word(person.program)}</dd>
-        </div>
-      )}
-      {Boolean(person.bio) && (
-        <div>
-          <dt>About</dt>
-          <dd>{word(person.bio)}</dd>
-        </div>
-      )}
-      {Boolean(person.education) && (
-        <div>
-          <dt>Education</dt>
-          <dd>{word(person.education)}</dd>
-        </div>
-      )}
-    </dl>
+    </div>
   );
 }
 
@@ -239,62 +219,90 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
         description="It may not exist, or it may belong to someone else."
       />
     );
-  const roleBadges = (
-    <Row gap={8}>
-      {strings(person.roles).map((role) => (
-        <RoleBadge key={role}>{role}</RoleBadge>
-      ))}
-    </Row>
-  );
   return (
-    <Stack gap={20}>
-      <Breadcrumbs
-        items={[
-          { label: "Directory", href: "/directory" },
-          { label: word(person.name) },
-        ]}
-      />
+    <div className="accs-stack">
+      <div>
+        <Button variant="tertiary" size="sm" icon="arrow-left" href="/directory">
+          Directory
+        </Button>
+      </div>
       <ProfileHeader
         name={word(person.name)}
-        role={roleBadges}
+        role={roleTags(strings(person.roles))}
         title={word(person.title)}
         office={word(person.office, word(person.program))}
         email={word(person.email)}
+        actions={
+          <>
+            {messageAllowed && (
+              <Button
+                icon="chat"
+                href={"/messages?recipient=" + encodeURIComponent(id)}
+              >
+                Message
+              </Button>
+            )}
+            {viewerRoles.includes("student") && isFaculty && (
+              <Button
+                variant="secondary"
+                icon="calendar"
+                href={"/consultations/faculty/" + encodeURIComponent(id)}
+              >
+                See open consultation times
+              </Button>
+            )}
+          </>
+        }
       />
-      <section>
-        <SectionHeader level={2} title="About" />
-        <Facts person={person} />
-      </section>
-      {isStudent && (
-        <Row gap={8}>
-          <StandingBadge standing={person.standing} />
-          <span>
-            {person.standing === "Good standing"
-              ? "All features are available."
-              : "Some features are paused."}
-          </span>
-        </Row>
-      )}
-      <Row gap={8}>
-        {messageAllowed && (
-          <Button href={"/messages?recipient=" + encodeURIComponent(id)}>
-            Message
-          </Button>
-        )}
-        {viewerRoles.includes("student") && isFaculty && (
-          <Button
-            variant="secondary"
-            href={"/consultations/faculty/" + encodeURIComponent(id)}
-          >
-            See open consultation times
-          </Button>
-        )}
-      </Row>
+      <div className="accs-split accs-stagger">
+        <div className="accs-stack">
+          <Panel title="About">
+            {word(person.bio) ? (
+              <p className="pa-prose">{word(person.bio)}</p>
+            ) : (
+              <p className="pa-muted">No details shared yet.</p>
+            )}
+          </Panel>
+          {Boolean(person.education) && (
+            <Panel title="Education">
+              <p className="pa-prose">{word(person.education)}</p>
+            </Panel>
+          )}
+        </div>
+        <aside className="accs-stack">
+          <Panel title="Details">
+            <FactRows
+              rows={[
+                ["Office", word(person.office)],
+                ["Program", word(person.program)],
+                ["Email", word(person.email)],
+              ]}
+            />
+          </Panel>
+          {Boolean(person.officeHours) && (
+            <Panel title="Office hours">
+              <p className="pa-prose">{word(person.officeHours)}</p>
+            </Panel>
+          )}
+          {isStudent && (
+            <Panel title="Standing">
+              <div className="pa-standing">
+                <StandingBadge standing={person.standing} />
+                <span>
+                  {person.standing === "Good standing"
+                    ? "All features are available."
+                    : "Some features are paused."}
+                </span>
+              </div>
+            </Panel>
+          )}
+        </aside>
+      </div>
       <PrivacyNotice title="Profile information is limited">
         Personal phone numbers, social links, private media, and offense details
         are not shown here.
       </PrivacyNotice>
-    </Stack>
+    </div>
   );
 }
 
@@ -305,84 +313,81 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const [about, setAbout] = useState(word(record.bio));
   const [education, setEducation] = useState(word(record.education));
   const [officeHours, setOfficeHours] = useState(word(record.officeHours));
-  const preview: Item = { ...record, title, bio: about, education };
   const roles = strings(record.roles);
   return (
-    <Stack gap={20}>
-      <Heading title="My profile" description="What others see." />
+    <div className="accs-stack">
+      <PageHeader title="My profile" description="What others see." />
       <ProfileHeader
-        name={word(preview.name)}
-        role={
-          <Row gap={8}>
-            {roles.map((role) => (
-              <RoleBadge key={role}>{role}</RoleBadge>
-            ))}
-          </Row>
-        }
+        name={word(record.name)}
+        role={roleTags(roles)}
         title={title}
         office={word(record.office, word(record.program))}
         email={word(record.email)}
       />
-      <section>
-        <SectionHeader level={2} title="From QCU records" />
-        <dl className="ds-record__facts">
-          <div>
-            <dt>Name</dt>
-            <dd>{word(record.name)}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{word(record.email)}</dd>
-          </div>
-          <div>
-            <dt>Roles</dt>
-            <dd>{roles.join(", ")}</dd>
-          </div>
-          <div>
-            <dt>Program or office</dt>
-            <dd>{word(record.program, word(record.office))}</dd>
-          </div>
-        </dl>
-        <p>Contact the CCS office to correct official account details.</p>
-      </section>
-      <section>
-        <SectionHeader level={2} title="Profile details" />
-        <TextField
-          label="Title"
-          value={title}
-          onChange={setTitle}
-          maxLength={100}
-        />
-        <TextArea
-          label="About"
-          value={about}
-          onChange={setAbout}
-          maxLength={1000}
-          showCount
-        />
-        <TextField
-          label="Office hours"
-          value={officeHours}
-          onChange={setOfficeHours}
-          maxLength={200}
-        />
-        <TextField
-          label="Degree and school"
-          value={education}
-          onChange={setEducation}
-          maxLength={500}
-          description="Education fields are proposed and remain subject to approval. TBD(D-08)."
-        />
-        <Alert tone="neutral" title="Keep profile details professional">
-          Don't add phone numbers or social links. Profiles show your QCU email
-          only. Profile photo upload remains unavailable pending policy
-          approval. <span className="tbd-comment">TBD(D-08)</span>
-        </Alert>
-        {action.error && (
-          <Alert tone="danger" title="The profile couldn't be saved">
-            {action.error.message}
+      <div className="accs-split accs-stagger">
+        <div className="accs-stack">
+          <Panel title="About">
+            <TextField
+              label="Title"
+              value={title}
+              onChange={setTitle}
+              maxLength={100}
+            />
+            <TextArea
+              label="About"
+              value={about}
+              onChange={setAbout}
+              maxLength={1000}
+              showCount
+            />
+          </Panel>
+          <Panel title="Office hours">
+            <TextField
+              label="Office hours"
+              value={officeHours}
+              onChange={setOfficeHours}
+              maxLength={200}
+            />
+          </Panel>
+          <Panel title="Education">
+            {/* TBD(D-08): education fields are proposed and remain subject to approval. */}
+            <TextField
+              label="Degree and school"
+              value={education}
+              onChange={setEducation}
+              maxLength={500}
+              description="Education fields are proposed and remain subject to approval."
+            />
+          </Panel>
+        </div>
+        <aside className="accs-stack">
+          <Panel title="From QCU records">
+            <FactRows
+              rows={[
+                ["Name", word(record.name)],
+                ["Email", word(record.email)],
+                ["Roles", roles.join(", ")],
+                ["Program or office", word(record.program, word(record.office))],
+              ]}
+            />
+            <p className="pa-muted">
+              Contact the CCS office to correct official account details.
+            </p>
+          </Panel>
+          {/* TBD(D-08): profile photo upload requires policy approval. */}
+          <Alert tone="neutral" title="Keep profile details professional">
+            Don't add phone numbers or social links. Profiles show your QCU
+            email only. Profile photo upload remains unavailable pending policy
+            approval.
           </Alert>
-        )}
+        </aside>
+      </div>
+      {action.error && (
+        <Alert tone="danger" title="The profile couldn't be saved">
+          {action.error.message}
+        </Alert>
+      )}
+      <div className="pa-savebar">
         <Button
           loading={action.isPending}
           onPress={() =>
@@ -394,8 +399,8 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
         >
           Save
         </Button>
-      </section>
-    </Stack>
+      </div>
+    </div>
   );
 }
 
@@ -411,7 +416,33 @@ const topicFor = (faq: Item) => {
   return "Getting started";
 };
 
+function FaqRow({ faq, canOpen }: { faq: Item; canOpen: boolean }) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <li className="pa-faq" data-open={open || undefined}>
+      <button
+        type="button"
+        className="pa-faq__q"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{word(faq.question)}</span>
+        <Icon name="caret-down" size={16} className="pa-faq__caret" />
+      </button>
+      <Collapse open={open} id={panelId}>
+        <div className="pa-faq__a">
+          <p>{word(faq.answer)}</p>
+          {canOpen && <Link href={word(faq.href, "/help")}>Open this page</Link>}
+        </div>
+      </Collapse>
+    </li>
+  );
+}
+
 export function HelpPage({ page }: { page: PageEnvelope }) {
+  const session = useQuery(sessionQuery());
   const faqs = items(page.data.faq);
   const [search, setSearch] = useState("");
   const visible = faqs.filter((faq) =>
@@ -420,53 +451,74 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
       .includes(search.toLowerCase()),
   );
   const topics = [...new Set(visible.map(topicFor))];
+  // Never offer a link to a page this role cannot open.
+  const canOpen = (href: string) => {
+    const pageId = pageIdForPath(href.split(/[?#]/)[0]);
+    return !pageId || session.data?.allowedPages.includes(pageId) === true;
+  };
   return (
-    <Stack gap={20}>
-      <Heading title="Help" />
-      <FilterBar
-        query={search}
-        onQueryChange={setSearch}
-        searchLabel="Search help"
-        searchPlaceholder="Search questions"
+    <div className="accs-stack">
+      <PageHeader
+        title="Help"
+        description="Answers about reports, consultations, evaluations, and your account."
+        actions={
+          <Button href="/assistant" variant="secondary" icon="chats">
+            Ask the assistant
+          </Button>
+        }
       />
+      <div className="pa-toolbar">
+        <Search
+          label="Search help"
+          placeholder="Search questions"
+          value={search}
+          onChange={setSearch}
+          size="sm"
+        />
+      </div>
       {topics.length ? (
-        <Accordion>
+        <div className="accs-stack accs-stagger">
           {topics.map((topic) => (
-            <Disclosure key={topic} title={topic}>
-              <Stack gap={12}>
+            <Panel flush key={topic} title={topic}>
+              <ul className="pa-faqs">
                 {visible
                   .filter((faq) => topicFor(faq) === topic)
                   .map((faq) => (
-                    <Disclosure key={word(faq.id)} title={word(faq.question)}>
-                      <p>{word(faq.answer)}</p>
-                      <Link href={word(faq.href, "/help")}>Open this page</Link>
-                    </Disclosure>
+                    <FaqRow
+                      key={word(faq.id, word(faq.question))}
+                      faq={faq}
+                      canOpen={canOpen(word(faq.href, "/help"))}
+                    />
                   ))}
-                {topic === "Reports and privacy" && (
-                  <PrivacyNotice title="Who can open a report">
-                    A report is available to its verified reporter and
-                    authorized handlers within the current routing and conflict
-                    rules. Anonymous reports remain tied to a verified account.
-                  </PrivacyNotice>
-                )}
-              </Stack>
-            </Disclosure>
+              </ul>
+              {topic === "Reports and privacy" && (
+                <p className="pa-note">
+                  A report is available to its verified reporter and authorized
+                  handlers within the current routing and conflict rules.
+                  Anonymous reports remain tied to a verified account.
+                </p>
+              )}
+            </Panel>
           ))}
-        </Accordion>
+        </div>
       ) : (
-        <ViewState
-          kind="empty"
-          title="No help topics match"
-          description="Try another search or ask the assistant."
-        />
+        <Panel>
+          <Empty
+            title="No help topics match"
+            action={
+              <Button href="/assistant" variant="secondary">
+                Ask the assistant
+              </Button>
+            }
+          >
+            Try another search or ask the assistant.
+          </Empty>
+        </Panel>
       )}
-      <Row gap={12}>
-        <Button href="/assistant" variant="secondary">
-          Ask the assistant
-        </Button>
-        <Link href="/directory?q=CCS">Contact the CCS office</Link>
-      </Row>
-    </Stack>
+      <p className="pa-muted">
+        Still stuck? <Link href="/directory?q=CCS">Contact the CCS office</Link>.
+      </p>
+    </div>
   );
 }
 
@@ -474,6 +526,121 @@ function applyTheme(theme: string) {
   if (theme === "system")
     document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", theme);
+}
+
+function strengthOf(value: string) {
+  return [
+    value.length >= 10,
+    /[A-Z]/.test(value) && /[a-z]/.test(value),
+    /\d/.test(value),
+    /[^A-Za-z0-9]/.test(value),
+  ].filter(Boolean).length;
+}
+
+const passwordMessages: Record<string, string> = {
+  INVALID_CREDENTIALS: "Your current password is incorrect.",
+  TOO_MANY_ATTEMPTS: "Too many attempts. Try again in 15 minutes.",
+};
+
+function ChangePasswordPanel() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [message, setMessage] = useState<{ ok: boolean; text: string }>();
+  const mutation = useMutation({
+    mutationFn: changePassword,
+    onSuccess: (result) => {
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setMessage({ ok: true, text: result.message || "Password changed." });
+    },
+    onError: (error) => {
+      const code = error instanceof ApiError ? error.code : undefined;
+      const field = error instanceof ApiError ? error.fields?.[0]?.message : undefined;
+      setMessage({
+        ok: false,
+        text:
+          (code && passwordMessages[code]) ||
+          field ||
+          (error instanceof Error
+            ? error.message
+            : "The password couldn't be changed."),
+      });
+    },
+  });
+  const score = strengthOf(next);
+  const mismatch = Boolean(confirm) && next !== confirm;
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (mutation.isPending) return;
+    if (!current || !next) return setMessage({ ok: false, text: "Enter your current and new password." });
+    if (score < 4)
+      return setMessage({
+        ok: false,
+        text: "Use 10 or more characters with upper and lower case, a digit, and a symbol.",
+      });
+    if (next !== confirm) return setMessage({ ok: false, text: "The new passwords don't match." });
+    setMessage(undefined);
+    mutation.mutate({ currentPassword: current, password: next });
+  }
+  return (
+    <Panel title="Change password">
+      <form className="pa-pw" onSubmit={submit} noValidate>
+        <TextField
+          label="Current password"
+          type="password"
+          autoComplete="current-password"
+          value={current}
+          onChange={setCurrent}
+        />
+        <TextField
+          label="New password"
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={setNext}
+          description="10 or more characters with upper and lower case, a digit, and a symbol."
+        />
+        <div className="pa-meter" aria-hidden data-score={score}>
+          {[0, 1, 2, 3].map((index) => (
+            <span key={index} data-on={index < score || undefined} />
+          ))}
+        </div>
+        <TextField
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={setConfirm}
+          isInvalid={mismatch}
+          errorMessage="The new passwords don't match."
+        />
+        <AnimatePresence initial={false}>
+          {message && (
+            <motion.p
+              key={message.text}
+              className="pa-msg"
+              data-ok={message.ok || undefined}
+              role={message.ok ? "status" : "alert"}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.24, ease }}
+            >
+              <Icon name={message.ok ? "check-circle" : "warning-circle"} size={16} />
+              {message.text}
+            </motion.p>
+          )}
+        </AnimatePresence>
+        <div>
+          <Button type="submit" loading={mutation.isPending}>
+            Change password
+          </Button>
+        </div>
+      </form>
+    </Panel>
+  );
 }
 
 export function SettingsPage({ page }: { page: PageEnvelope }) {
@@ -503,87 +670,107 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
   };
   const roleLabels = strings(record.roles);
   return (
-    <Stack gap={24}>
-      <Heading title="Settings" />
-      <section>
-        <SectionHeader level={2} title="Account" />
-        <dl className="ds-record__facts">
-          <div>
-            <dt>Name</dt>
-            <dd>{word(record.name)}</dd>
-          </div>
-          <div>
-            <dt>QCU email</dt>
-            <dd>{word(record.email)}</dd>
-          </div>
-          <div>
-            <dt>Roles</dt>
-            <dd>
-              {roleLabels.map((role) => (
-                <RoleBadge key={role}>
-                  {role}
-                  {record.program && ["chair", "student"].includes(role)
-                    ? ` · ${word(record.program)}`
-                    : ""}
-                </RoleBadge>
-              ))}
-            </dd>
-          </div>
-          <div>
-            <dt>Account status</dt>
-            <dd>Active</dd>
-          </div>
-        </dl>
-      </section>
-      <section>
-        <SectionHeader level={2} title="Appearance" />
-        <RadioGroup
-          label="Theme"
-          row
-          value={theme}
-          onChange={(value) => saveAppearance(value, density)}
-        >
-          <Radio value="light">Light</Radio>
-          <Radio value="dark">Dark</Radio>
-          <Radio value="system">Match my device</Radio>
-        </RadioGroup>
-        <RadioGroup
-          label="Density"
-          row
-          value={density}
-          onChange={(value) => saveAppearance(theme, value)}
-        >
-          <Radio value="comfortable">Comfortable</Radio>
-          <Radio value="compact">Compact</Radio>
-        </RadioGroup>
-        {action.error && (
-          <Alert tone="danger" title="Settings couldn't be saved">
-            {action.error.message}
-          </Alert>
-        )}
-      </section>
-      <section>
-        <SectionHeader level={2} title="Account links" />
-        <Row gap={12}>
-          <Link href="/help">How roles are assigned</Link>
-          <Button variant="secondary" onPress={() => void signOutAction()}>
-            Sign out
-          </Button>
-        </Row>
-        <Button
-          variant="secondary"
-          isDisabled
-          aria-describedby="other-device-note"
-        >
-          Sign out of other devices
-        </Button>
-        <p id="other-device-note">
-          Session policy is not configured in this prototype.{" "}
-          <span className="tbd-comment">TBD(ALL-01-G)</span>
-        </p>
-      </section>
-      <Link href="/settings/notifications">Notification priorities</Link>
-    </Stack>
+    <div className="accs-stack">
+      <PageHeader
+        title="Settings"
+        description="Your account, appearance, and sign-in security."
+      />
+      <div className="accs-split accs-stagger">
+        <div className="accs-stack">
+          <Panel title="Account">
+            <FactRows
+              rows={[
+                ["Name", word(record.name)],
+                ["QCU email", word(record.email)],
+                [
+                  "Roles",
+                  <span className="pa-tags" key="roles">
+                    {roleLabels.map((role) => (
+                      <span className="accs-tag pa-role" key={role}>
+                        {role}
+                        {record.program && ["chair", "student"].includes(role)
+                          ? ` · ${word(record.program)}`
+                          : ""}
+                      </span>
+                    ))}
+                  </span>,
+                ],
+                ["Account status", <StatusChip tone="ok" key="status">Active</StatusChip>],
+              ]}
+            />
+          </Panel>
+          <Panel title="Appearance">
+            <div className="pa-setting">
+              <div>
+                <p className="pa-setting__label">Theme</p>
+                <p className="pa-muted">Applies on this device.</p>
+              </div>
+              <SlidePills
+                label="Theme"
+                value={theme}
+                onChange={(value) => saveAppearance(value, density)}
+                options={[
+                  { id: "light", label: "Light" },
+                  { id: "dark", label: "Dark" },
+                  { id: "system", label: "Match my device" },
+                ]}
+              />
+            </div>
+            <div className="pa-setting">
+              <div>
+                <p className="pa-setting__label">Density</p>
+                <p className="pa-muted">Spacing of lists and tables.</p>
+              </div>
+              <SlidePills
+                label="Density"
+                value={density}
+                onChange={(value) => saveAppearance(theme, value)}
+                options={[
+                  { id: "comfortable", label: "Comfortable" },
+                  { id: "compact", label: "Compact" },
+                ]}
+              />
+            </div>
+            {action.error && (
+              <Alert tone="danger" title="Settings couldn't be saved">
+                {action.error.message}
+              </Alert>
+            )}
+          </Panel>
+          <ChangePasswordPanel />
+        </div>
+        <aside className="accs-stack">
+          <Panel title="Session">
+            <div className="pa-session">
+              <Button
+                variant="secondary"
+                icon="sign-out"
+                onPress={() => void signOutAction()}
+              >
+                Sign out
+              </Button>
+              <Button
+                variant="secondary"
+                isDisabled
+                aria-describedby="other-device-note"
+              >
+                Sign out of other devices
+              </Button>
+              {/* TBD(ALL-01-G): session policy is not configured yet. */}
+              <p id="other-device-note" className="pa-muted">
+                Signing out of other devices isn't available yet.
+              </p>
+            </div>
+          </Panel>
+          <Panel title="Shortcuts">
+            <div className="pa-links">
+              <Link href="/settings/notifications">Notification priorities</Link>
+              <Link href="/help">How roles are assigned</Link>
+            </div>
+          </Panel>
+        </aside>
+      </div>
+    </div>
   );
 }
 

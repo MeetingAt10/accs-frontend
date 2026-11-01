@@ -1,25 +1,57 @@
-import { Button, PrivacyNotice, ViewState } from '@meetingat10/design-system/react'
+import { Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery, type QueryClient } from '@tanstack/react-query'
+import { useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
-import { ApiError } from '@/lib/api'
 import { routePermission } from '@/lib/page-catalog'
 import { sessionQuery } from '@/lib/queries'
+import { canOpenSite, currentSite, landingFor, roleLabel, siteById, siteForPath, siteHref } from '@/lib/sites'
 
-export function RestrictedView({ record = false }: { record?: boolean }) {
+import './sites.css'
+
+/** Calm "no access" screen: lock, one explanation, one way back. */
+function DeniedView({ title, children, page }: { title: string; children: ReactNode; page?: boolean }) {
+  const session = useQuery(sessionQuery()).data
   return (
-    <div className="app-page app-restricted-view">
-      <ViewState
-        kind="restricted"
-        title={record ? "This record isn't available to you" : "This page isn't available to you"}
-        description="The item may not exist, or your current role and scope may not include it."
-      />
-      <PrivacyNotice title="Access follows your role and relationship">
-        A link or notification does not grant access. Ask the responsible office if you think you need this item.
-      </PrivacyNotice>
-    </div>
+    <section className={page ? 'shell-denied shell-denied--page' : 'shell-denied'} aria-labelledby="denied-title">
+      <span className="shell-denied__icon" aria-hidden>
+        <Icon name="lock" size={24} />
+      </span>
+      <h1 className="shell-denied__title" id="denied-title">
+        {title}
+      </h1>
+      <p className="shell-denied__text">{children}</p>
+      <Button variant="primary" href={session ? siteHref(landingFor(session)) : '/sign-in'}>
+        Go to your home
+      </Button>
+    </section>
   )
 }
+
+/** 403 for a page or site the role may not open. `page` fills the screen (used instead of the app shell). */
+export function AccessDenied({ page = false }: { page?: boolean }) {
+  const session = useQuery(sessionQuery()).data
+  const path = useRouterState({ select: (state) => state.location.pathname })
+  const blocked = session && [siteForPath(path), currentSite()].find((id) => id && !canOpenSite(session, id))
+  const role = session?.user.roles.map(roleLabel).join(' / ') ?? 'account'
+  return (
+    <DeniedView page={page} title="You don't have access to this page">
+      Your role ({role}) can't open {blocked ? `the ${siteById[blocked].label} site` : 'this page'}. If you need access, ask the CCS
+      administrator.
+    </DeniedView>
+  )
+}
+
+/** Record-level 404/403 inside a page the role may open: the item is missing or outside the person's scope. */
+export function RestrictedView({ record = false }: { record?: boolean }) {
+  return (
+    <DeniedView title={record ? "This record isn't available to you" : "This page isn't available to you"}>
+      It may not exist, or your role and scope may not include it. A link or notification does not grant access.
+    </DeniedView>
+  )
+}
+
+const recordPages = ['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P27', 'P29', 'P31', 'P32', 'P34', 'P38', 'P47', 'P50']
 
 export function RequirePermission({ pageId, children }: { pageId: string; children: ReactNode }) {
   const session = useQuery(sessionQuery())
@@ -36,7 +68,7 @@ export function RequirePermission({ pageId, children }: { pageId: string; childr
     session.data?.permissions.includes(key),
   )
   if (session.error || !session.data?.allowedPages.includes(pageId) || !hasPermission) {
-    return <RestrictedView record={['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P27', 'P29', 'P31', 'P32', 'P34', 'P38', 'P47', 'P50'].includes(pageId)} />
+    return recordPages.includes(pageId) ? <RestrictedView record /> : <AccessDenied />
   }
   return children
 }
@@ -54,8 +86,7 @@ export async function RoutePermission(queryClient: QueryClient, pageId: string) 
       session.permissions.includes(key),
     )
     return { permission: session.allowedPages.includes(pageId) && hasPermission }
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return { permission: false }
+  } catch {
     return { permission: false }
   }
 }

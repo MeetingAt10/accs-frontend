@@ -1,30 +1,9 @@
 import {
-  Agenda,
-  AgendaItem,
   Alert,
-  AnnouncementCard,
-  Avatar,
-  Badge,
-  Breadcrumbs,
   Button,
-  Card,
-  CardAction,
-  CardBody,
-  CardHeader,
-  CardLink,
-  CardMeta,
-  CardTitle,
-  Cell,
   Checkbox,
-  Column,
-  Container,
   DatePicker,
-  Disclosure,
-  Divider,
-  DoorPlate,
-  EmptyState,
-  ForumCard,
-  Grid,
+  Icon,
   Link,
   MenuButton,
   MenuItem,
@@ -34,10 +13,8 @@ import {
   Pagination,
   Radio,
   RadioGroup,
-  RoleBadge,
   Row,
   Search,
-  SectionHeader,
   Segment,
   SegmentedControl,
   Select,
@@ -45,37 +22,36 @@ import {
   Tab,
   TabList,
   TabPanel,
-  Table,
-  TableBody,
-  TableHeader,
-  TableRow,
   Tabs,
-  Tag,
-  TagGroup,
   TextArea,
   TextField,
-  Tile,
   ViewState,
   toast,
+  EmptyState,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker, useRouter, useRouterState } from '@tanstack/react-router'
-import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
+import { useRef, useState, type FormEvent } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
 import { RestrictedView } from '@/components/app/guards'
 import {
-  Comment,
-  CommentThread,
-  FilterBar,
-  ReactionButton,
-} from '@/components/ds-next'
+  DateTile,
+  Empty,
+  PageHeader,
+  Panel,
+  StatusChip,
+  toneFor,
+} from '@/components/app/page-shell'
+import { Comment, CommentThread, ReactionButton } from '@/components/ds-next'
 import {
   performPageAction,
   type PageAction,
   type PageEnvelope,
   type Session,
 } from '@/lib/api'
+import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import './community.css'
 
@@ -196,14 +172,6 @@ function record<T>(value: unknown): T | undefined {
     : undefined
 }
 
-function formatDate(value: string | undefined) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
 function personRole(person: Person) {
   return (person.roles ?? []).map((role) => roleNames[role] ?? role).join(' · ')
 }
@@ -268,34 +236,27 @@ function ActionError({ error }: { error: unknown }) {
   )
 }
 
-function Heading({
-  title,
-  description,
-  actions,
-}: {
-  title: string
-  description?: string
-  actions?: ReactNode
-}) {
+const ease = [0.16, 1, 0.3, 1] as const
+const priorityRank = ['urgent', 'important', 'general']
+
+function Initials({ name, small }: { name: string; small?: boolean }) {
   return (
-    <SectionHeader
-      level={1}
-      split
-      title={title}
-      description={description}
-      actions={
-        <Row gap={8}>
-          <Badge outline marker={false}>
-            Sample data
-          </Badge>
-          {actions}
-        </Row>
-      }
-    />
+    <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} aria-hidden>
+      {initials(name) || '?'}
+    </span>
   )
 }
 
-function PostCards({
+function authorName(post: CommunityPost) {
+  return post.anonymous ? 'Anonymous' : (post.author?.name ?? 'College member')
+}
+
+function priorityLabel(priority: string) {
+  const value = priority || 'general'
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function ThreadList({
   posts,
   spaces,
   organizations,
@@ -304,59 +265,186 @@ function PostCards({
   spaces?: Space[]
   organizations?: Organization[]
 }) {
+  const reduce = useReducedMotion()
   const announcements = posts
     .filter((post) => post.kind === 'announcement')
     .sort(
-      (a, b) =>
-        ['urgent', 'important', 'general'].indexOf(a.priority) -
-        ['urgent', 'important', 'general'].indexOf(b.priority),
+      (a, b) => priorityRank.indexOf(a.priority) - priorityRank.indexOf(b.priority),
     )
-  const discussions = posts.filter((post) => post.kind !== 'announcement')
+  const ordered = [
+    ...announcements,
+    ...posts.filter((post) => post.kind !== 'announcement'),
+  ]
 
   return (
-    <div className="app-card-list">
-      {announcements.map((post) => (
-        <AnnouncementCard
-          key={post.id}
-          lane={
-            post.audience.startsWith('organization:') ? 'community' : 'schedule'
-          }
-          title={post.title}
-          when={formatDate(post.at)}
-          dateTime={post.at}
-          href={`/feed/${encodeURIComponent(post.id)}`}
-          meta={
-            <Row gap={8}>
-              <span>
-                {post.author?.name ?? 'College office'} ·{' '}
-                {audienceName(post.audience, spaces, organizations)}
-              </span>
-              <Badge
-                tone={post.priority === 'urgent' ? 'warning' : 'neutral'}
-                outline
+    <Panel flush className="fx-threads-panel">
+      <ul className="fx-threads" aria-label="Posts">
+        <AnimatePresence initial mode="popLayout">
+          {ordered.map((post, index) => {
+            const name = authorName(post)
+            const announcement = post.kind === 'announcement'
+            return (
+              <motion.li
+                key={post.id}
+                className="fx-thread"
+                layout={!reduce}
+                initial={reduce ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? undefined : { opacity: 0, x: -16 }}
+                transition={{
+                  duration: 0.36,
+                  ease,
+                  delay: reduce ? 0 : Math.min(index, 8) * 0.04,
+                }}
               >
-                {post.priority || 'general'}
-              </Badge>
-            </Row>
-          }
+                <div className="fx-vote">
+                  <Icon name="caret-up" size={16} weight="bold" />
+                  <span className="accs-num">{post.reactionCount}</span>
+                  <span className="fx-sr">agreements</span>
+                </div>
+                <div className="fx-thread__body">
+                  <div className="fx-thread__tags">
+                    <span className="accs-tag fx-tag--label">
+                      {announcement ? 'Announcement' : post.label}
+                    </span>
+                    <span className="accs-tag">
+                      {post.audience === 'college'
+                        ? 'CCS'
+                        : audienceName(post.audience, spaces, organizations)}
+                    </span>
+                    {announcement && (
+                      <StatusChip tone={toneFor(post.priority || 'general')}>
+                        {priorityLabel(post.priority)}
+                      </StatusChip>
+                    )}
+                  </div>
+                  <h3 className="fx-thread__title">
+                    <Link
+                      variant="quiet"
+                      className="fx-title-link"
+                      href={`/feed/${encodeURIComponent(post.id)}`}
+                    >
+                      {post.title}
+                    </Link>
+                  </h3>
+                  <p className="fx-thread__excerpt">{post.body}</p>
+                  <p className="fx-thread__meta">
+                    <Initials name={name} small />
+                    <span className="fx-thread__author">{name}</span>
+                    <span aria-hidden>·</span>
+                    <time dateTime={post.at} title={formatDateTime(post.at)}>
+                      {relativeTime(post.at)}
+                    </time>
+                    <span className="fx-thread__replies">
+                      <Icon name="chat" size={16} />
+                      <span className="accs-num">{post.commentCount}</span>
+                      <span className="fx-sr">replies</span>
+                    </span>
+                  </p>
+                </div>
+              </motion.li>
+            )
+          })}
+        </AnimatePresence>
+      </ul>
+    </Panel>
+  )
+}
+
+function RailLink({ href, children }: { href: string; children: string }) {
+  return (
+    <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
+      {children}
+    </Link>
+  )
+}
+
+function FeedRail({
+  posts,
+  spaces,
+  organizations,
+}: {
+  posts: CommunityPost[]
+  spaces: Space[]
+  organizations: Organization[]
+}) {
+  const announcements = posts
+    .filter((post) => post.kind === 'announcement')
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 4)
+  const orgs = [...organizations]
+    .sort((a, b) => Number(b.member) - Number(a.member))
+    .slice(0, 5)
+  return (
+    <aside className="fx-rail accs-stagger" aria-label="Forum sidebar">
+      {announcements.length > 0 && (
+        <Panel title="Announcements" flush>
+          <ul className="fx-mini">
+            {announcements.map((post) => (
+              <li key={post.id}>
+                <Link
+                  variant="quiet"
+                  className="fx-mini__row"
+                  href={`/feed/${encodeURIComponent(post.id)}`}
+                >
+                  <span className="fx-mini__title">{post.title}</span>
+                  <span className="fx-mini__sub">
+                    {priorityLabel(post.priority)} · {relativeTime(post.at)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      {spaces.length > 0 && (
+        <Panel
+          title="Your spaces"
+          flush
+          action={<RailLink href="/spaces">View all</RailLink>}
         >
-          {post.body.slice(0, 220)}
-        </AnnouncementCard>
-      ))}
-      {discussions.length > 0 && <Divider label="Discussions" />}
-      {discussions.map((post) => (
-        <ForumCard
-          key={post.id}
-          topic={post.label}
-          title={post.title}
-          excerpt={post.body.slice(0, 220)}
-          author={post.author?.name ?? 'College member'}
-          replies={post.commentCount}
-          status={`${audienceName(post.audience, spaces, organizations)} · ${formatDate(post.at)}`}
-          href={`/feed/${encodeURIComponent(post.id)}`}
-        />
-      ))}
-    </div>
+          <ul className="fx-mini">
+            {spaces.slice(0, 5).map((space) => (
+              <li key={space.id}>
+                <Link
+                  variant="quiet"
+                  className="fx-mini__row"
+                  href={`/spaces/${encodeURIComponent(space.id)}`}
+                >
+                  <span className="fx-mini__title">{space.title}</span>
+                  <span className="fx-mini__sub">{space.subject}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      {orgs.length > 0 && (
+        <Panel
+          title="Organizations"
+          flush
+          action={<RailLink href="/organizations">Browse</RailLink>}
+        >
+          <ul className="fx-mini">
+            {orgs.map((organization) => (
+              <li key={organization.id}>
+                <Link
+                  variant="quiet"
+                  className="fx-mini__row"
+                  href={`/organizations/${encodeURIComponent(organization.id)}`}
+                >
+                  <span className="fx-mini__title">{organization.name}</span>
+                  <span className="fx-mini__sub">
+                    {organization.memberCount ?? 0} members
+                    {organization.member ? ' · You’re a member' : ''}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+    </aside>
   )
 }
 
@@ -418,7 +506,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     (option, index) =>
       scopes.findIndex((candidate) => candidate.id === option.id) === index,
   )
-  const posts = list<CommunityPost>(page.data.posts)
+  const allPosts = list<CommunityPost>(page.data.posts)
+  const posts = allPosts
     .filter((post) => post.audience === scope)
     .filter(
       (post) =>
@@ -439,18 +528,24 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
   )
   const pagePosts = posts.slice((pageNumber - 1) * 10, pageNumber * 10)
   const canParticipate = roles.some((role) => participatingRoles.includes(role))
-  const filters = [
-    ...(query ? [{ id: 'q', label: `Search: ${query}` }] : []),
-    ...labels.map((label) => ({ id: label, label })),
-  ]
+  const canPost = canParticipate && page.data.canPost === true
+  const filtered = Boolean(query || labels.length)
+  const composeHref = `/feed/new${scope === 'college' ? '' : `?space=${encodeURIComponent(scope)}`}`
+
+  function toggleLabel(label: string) {
+    const next = labels.includes(label)
+      ? labels.filter((item) => item !== label)
+      : [...labels, label]
+    update({ label: next.join(',') || undefined })
+  }
 
   function clearFilters() {
     update({ q: undefined, label: undefined, sort: undefined, page: undefined })
   }
 
   return (
-    <>
-      <Heading
+    <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
         title="Feed"
         description="Discussions and announcements in your permitted spaces."
         actions={
@@ -460,115 +555,143 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
               href="/feed/new"
               isDisabled={page.data.canPost !== true}
             >
-              New post
+              Start a discussion
             </Button>
           )
         }
       />
-      <Tabs
-        selectedKey={scope}
-        onSelectionChange={(key) => update({ scope: String(key) })}
-      >
-        <TabList aria-label="Feed scope">
-          {uniqueScopes.map((option) => (
-            <Tab id={option.id} key={option.id}>
-              {option.label}
-            </Tab>
-          ))}
-        </TabList>
-        {uniqueScopes.map((option) => (
-          <TabPanel id={option.id} key={option.id}>
-            <div className="app-page">
-              <FilterBar
-                query={query}
-                onQueryChange={(q) => update({ q })}
-                searchLabel="Search posts"
-              >
-                <Select
-                  label="Sort"
-                  selectedKey={sort}
-                  onSelectionChange={(key) => update({ sort: String(key) })}
-                >
-                  <SelectOption id="newest">Newest</SelectOption>
-                  <SelectOption id="active">Most active</SelectOption>
-                </Select>
-              </FilterBar>
-              <TagGroup
-                label="Post labels"
-                selectionMode="multiple"
-                selectedKeys={new Set(labels)}
-                onSelectionChange={(keys) =>
-                  update({
-                    label:
-                      keys === 'all'
-                        ? ['Announcements', ...postLabels].join(',')
-                        : [...keys].map(String).join(','),
-                  })
-                }
-              >
-                {['Announcements', ...postLabels].map((label) => (
-                  <Tag id={label} key={label}>
-                    {label}
-                  </Tag>
-                ))}
-              </TagGroup>
-              {filters.length > 0 && (
-                <TagGroup
-                  label="Active filters"
-                  items={filters}
-                  onRemove={(keys) =>
-                    update({
-                      q: keys.has('q') ? undefined : query,
-                      label: labels
-                        .filter((label) => !keys.has(label))
-                        .join(','),
-                    })
-                  }
-                >
-                  {(filter) => <Tag id={filter.id}>{filter.label}</Tag>}
-                </TagGroup>
-              )}
-              {posts.length ? (
-                <>
-                  <PostCards
-                    posts={pagePosts}
-                    spaces={spaces}
-                    organizations={organizations}
-                  />
-                  <Pagination
-                    page={pageNumber}
-                    pageCount={pageCount}
-                    onPageChange={(next) => update({ page: String(next) })}
-                    summary={`Showing ${(pageNumber - 1) * 10 + 1}–${Math.min(pageNumber * 10, posts.length)} of ${posts.length} posts`}
-                  />
-                </>
-              ) : (
-                <ViewState
-                  kind="empty"
-                  title={
-                    query
-                      ? `No posts match '${query}'`
-                      : labels.length
-                        ? 'No posts match these filters'
-                        : 'No posts in this space yet'
-                  }
-                  description="Only content in the selected scope is shown."
-                  actions={
-                    query || labels.length > 0 ? (
-                      <Button variant="secondary" onPress={clearFilters}>
-                        Clear filters
-                      </Button>
-                    ) : undefined
-                  }
+      <div className="accs-split fx-split">
+        <div className="fx-main">
+          {canPost && (
+            <Link href={composeHref} className="fx-compose" variant="quiet">
+              <Initials name={session.user.name} />
+              <span className="fx-compose__hint">Start a discussion…</span>
+              <span className="fx-compose__cta">
+                <Icon name="pencil" size={16} />
+                Write
+              </span>
+            </Link>
+          )}
+          <div className="fx-toolbar">
+            <div className="fx-toolbar__row">
+              <div className="fx-toolbar__search">
+                <Search
+                  label="Search posts"
+                  size="sm"
+                  value={query}
+                  onChange={(q) => update({ q })}
                 />
+              </div>
+              {uniqueScopes.length > 1 && (
+                <Select
+                  label="Audience"
+                  selectedKey={scope}
+                  onSelectionChange={(key) => update({ scope: String(key) })}
+                >
+                  {uniqueScopes.map((option) => (
+                    <SelectOption id={option.id} key={option.id}>
+                      {option.label}
+                    </SelectOption>
+                  ))}
+                </Select>
               )}
             </div>
-          </TabPanel>
-        ))}
-      </Tabs>
-    </>
+            <div className="fx-toolbar__row fx-toolbar__row--pills">
+              <LayoutGroup id="fx-sort">
+                <div className="fx-seg" role="group" aria-label="Sort posts">
+                  {[
+                    { id: 'newest', label: 'Latest' },
+                    { id: 'active', label: 'Most active' },
+                  ].map((option) => (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className="fx-seg__item"
+                      aria-pressed={sort === option.id}
+                      onClick={() => update({ sort: option.id })}
+                    >
+                      {sort === option.id && (
+                        <motion.span
+                          layoutId="fx-sort-indicator"
+                          className="fx-seg__thumb"
+                          transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                        />
+                      )}
+                      <span className="fx-seg__label">{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </LayoutGroup>
+              <div className="accs-pills fx-cats" role="group" aria-label="Post labels">
+                <button
+                  type="button"
+                  className="accs-pill fx-cat"
+                  aria-pressed={!labels.length}
+                  onClick={() => update({ label: undefined })}
+                >
+                  All
+                </button>
+                {['Announcements', ...postLabels].map((label) => (
+                  <button
+                    type="button"
+                    key={label}
+                    className="accs-pill fx-cat"
+                    aria-pressed={labels.includes(label)}
+                    onClick={() => toggleLabel(label)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {posts.length ? (
+            <>
+              <ThreadList
+                posts={pagePosts}
+                spaces={spaces}
+                organizations={organizations}
+              />
+              {pageCount > 1 && (
+                <Pagination
+                  page={pageNumber}
+                  pageCount={pageCount}
+                  onPageChange={(next) => update({ page: String(next) })}
+                  summary={`Showing ${(pageNumber - 1) * 10 + 1}–${Math.min(pageNumber * 10, posts.length)} of ${posts.length} posts`}
+                />
+              )}
+            </>
+          ) : (
+            <Panel>
+              <Empty
+                title={
+                  query
+                    ? `No posts match '${query}'`
+                    : labels.length
+                      ? 'No posts match these filters'
+                      : 'No posts here yet'
+                }
+                action={
+                  filtered ? (
+                    <Button variant="secondary" onPress={clearFilters}>
+                      Clear filters
+                    </Button>
+                  ) : canPost ? (
+                    <Button href={composeHref}>Start a discussion</Button>
+                  ) : undefined
+                }
+              >
+                Only content in the selected audience is shown.
+              </Empty>
+            </Panel>
+          )}
+        </div>
+        <FeedRail posts={allPosts} spaces={spaces} organizations={organizations} />
+      </div>
+    </div>
   )
 }
+
 
 export function PostComposer({
   page,
@@ -690,178 +813,224 @@ export function PostComposer({
   }
 
   return (
-    <Container width="reading" className="community-composer-container">
-      <Breadcrumbs
-        items={[{ label: 'Feed', href: '/feed' }, { label: 'New post' }]}
+    <div className="fx-page fx-compose-page accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[{ label: 'Feed', href: '/feed' }, { label: 'New post' }]}
+        title={kind === 'announcement' ? 'New announcement' : 'Start a discussion'}
+        description="Share a question, update, or idea with the people in the audience you choose."
       />
-      <Heading title="New post" />
       {invalidRequestedAudience && (
         <Alert tone="danger" title="You can't post there">
           Choose one of the audiences listed below.
         </Alert>
       )}
-      <form className="app-page community-form" onSubmit={submit} noValidate>
-        {announcementAudiences.length > 0 && (
-          <SegmentedControl
-            aria-label="Post type"
-            selectedKey={kind}
-            onSelectionChange={(key) =>
-              changeKind(String(key) as 'discussion' | 'announcement')
-            }
-          >
-            <Segment id="discussion">Post</Segment>
-            <Segment id="announcement">Announcement</Segment>
-          </SegmentedControl>
-        )}
-        <Select
-          label="Post in"
-          isRequired
-          selectedKey={audience || null}
-          onSelectionChange={(key) => setAudience(String(key ?? ''))}
-          isInvalid={Boolean(errors.audience)}
-          errorMessage={errors.audience}
-          placeholder="Choose an audience"
-        >
-          {options.map((option) => (
-            <SelectOption
-              id={option}
-              key={option}
-              description={`Visible to ${audienceName(option, spaces, organizations)}`}
-            >
-              {audienceName(option, spaces, organizations)}
-            </SelectOption>
-          ))}
-        </Select>
-        {kind === 'discussion' && (
-          <RadioGroup
-            label="Label"
-            row
-            isRequired
-            value={label}
-            onChange={setLabel}
-            isInvalid={Boolean(errors.label)}
-            errorMessage={errors.label}
-          >
-            {(labels.length ? labels : postLabels).map((option) => (
-              <Radio value={option} key={option}>
-                {option}
-              </Radio>
-            ))}
-          </RadioGroup>
-        )}
-        <TextField
-          label="Title"
-          value={title}
-          onChange={setTitle}
-          maxLength={160}
-          isRequired
-          isInvalid={Boolean(errors.title)}
-          errorMessage={errors.title}
-        />
-        <TextArea
-          label={kind === 'announcement' ? 'Announcement' : 'Post'}
-          value={body}
-          onChange={setBody}
-          maxLength={5000}
-          showCount
-          isRequired
-          isInvalid={Boolean(errors.body)}
-          errorMessage={errors.body}
-          description="Keep personal details out. Posts are checked for harmful words."
-        />
-        {session.user.roles.includes('student') &&
-          kind === 'discussion' &&
-          page.data.anonymityAllowed === true && (
-            <IdentityChoice
-              context="post"
-              value={identity}
-              onChange={setIdentity}
-            />
-          )}
-        {kind === 'announcement' && (
-          <RadioGroup
-            label="Priority"
-            row
-            value={priority}
-            onChange={setPriority}
-            description="Priority levels are awaiting policy approval."
-          >
-            <Radio value="general">General</Radio>
-            <Radio value="important">Important</Radio>
-            <Radio value="urgent">Urgent</Radio>
-          </RadioGroup>
-        )}
-        {/* TBD(D-06): announcement priority levels and wider organization publishing await approval. */}
-        {eventRequired && (
-          <Disclosure title="Event details" defaultExpanded>
-            <div className="app-page">
-              <DatePicker
-                label="Event date"
-                isRequired
-                onChange={(value) => setEventDate(value?.toString() ?? '')}
-                isInvalid={Boolean(errors.eventDate)}
-                errorMessage={errors.eventDate}
-              />
-              <TextField
-                label="Time"
-                value={eventTime}
-                onChange={setEventTime}
-                placeholder="14:00"
-                description="Use 24-hour time, HH:MM."
-                isRequired
-                isInvalid={Boolean(errors.eventTime)}
-                errorMessage={errors.eventTime}
-              />
-              <TextField
-                label="Place"
-                value={eventPlace}
-                onChange={setEventPlace}
-                isRequired
-                isInvalid={Boolean(errors.eventPlace)}
-                errorMessage={errors.eventPlace}
-              />
-              <TextField
-                label="Contact"
-                value={eventContact}
-                onChange={setEventContact}
-                isRequired
-                isInvalid={Boolean(errors.eventContact)}
-                errorMessage={errors.eventContact}
-              />
-              <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
-                Notify members
-              </Checkbox>
+      <Panel as="div" className="fx-form-panel">
+        <form className="fx-form" onSubmit={submit} noValidate>
+          <section className="fx-group" aria-labelledby="fx-group-where">
+            <div className="fx-group__head">
+              <h2 id="fx-group-where" className="fx-group__title">
+                Where to post
+              </h2>
+              <p className="fx-group__hint">
+                Only people in the audience can see this post.
+              </p>
             </div>
-          </Disclosure>
-        )}
-        {/* TBD(D-08): attachment handling and retention are not approved. */}
-        <Alert tone="neutral" title="Attachments are not enabled">
-          Attachment handling is awaiting approval. Keep this post to text for
-          now.
-        </Alert>
-        {session.user.roles.some((role) =>
-          ['guidance', 'osas'].includes(role),
-        ) && (
-          <Alert
-            tone="neutral"
-            title="Keep case information in the case record"
-          >
-            Don't include case details here.
-          </Alert>
-        )}
-        <ActionError error={action.error} />
-        <Row>
-          <Button type="submit" loading={action.isPending}>
-            Publish
-          </Button>
-          <Button
-            variant="secondary"
-            onPress={() => router.history.push('/feed')}
-          >
-            Cancel
-          </Button>
-        </Row>
-      </form>
+            <div className="fx-group__body">
+              {announcementAudiences.length > 0 && (
+                <SegmentedControl
+                  aria-label="Post type"
+                  selectedKey={kind}
+                  onSelectionChange={(key) =>
+                    changeKind(String(key) as 'discussion' | 'announcement')
+                  }
+                >
+                  <Segment id="discussion">Post</Segment>
+                  <Segment id="announcement">Announcement</Segment>
+                </SegmentedControl>
+              )}
+              <Select
+                label="Post in"
+                isRequired
+                selectedKey={audience || null}
+                onSelectionChange={(key) => setAudience(String(key ?? ''))}
+                isInvalid={Boolean(errors.audience)}
+                errorMessage={errors.audience}
+                placeholder="Choose an audience"
+              >
+                {options.map((option) => (
+                  <SelectOption
+                    id={option}
+                    key={option}
+                    description={`Visible to ${audienceName(option, spaces, organizations)}`}
+                  >
+                    {audienceName(option, spaces, organizations)}
+                  </SelectOption>
+                ))}
+              </Select>
+              {kind === 'discussion' && (
+                <RadioGroup
+                  label="Label"
+                  row
+                  isRequired
+                  value={label}
+                  onChange={setLabel}
+                  isInvalid={Boolean(errors.label)}
+                  errorMessage={errors.label}
+                >
+                  {(labels.length ? labels : postLabels).map((option) => (
+                    <Radio value={option} key={option}>
+                      {option}
+                    </Radio>
+                  ))}
+                </RadioGroup>
+              )}
+              {kind === 'announcement' && (
+                <RadioGroup
+                  label="Priority"
+                  row
+                  value={priority}
+                  onChange={setPriority}
+                  description="Priority levels are awaiting policy approval."
+                >
+                  <Radio value="general">General</Radio>
+                  <Radio value="important">Important</Radio>
+                  <Radio value="urgent">Urgent</Radio>
+                </RadioGroup>
+              )}
+            </div>
+          </section>
+          {/* TBD(D-06): announcement priority levels and wider organization publishing await approval. */}
+          <section className="fx-group" aria-labelledby="fx-group-content">
+            <div className="fx-group__head">
+              <h2 id="fx-group-content" className="fx-group__title">
+                Your post
+              </h2>
+              <p className="fx-group__hint">
+                Keep personal details out. Posts are checked for harmful words.
+              </p>
+            </div>
+            <div className="fx-group__body">
+              <TextField
+                label="Title"
+                value={title}
+                onChange={setTitle}
+                maxLength={160}
+                isRequired
+                isInvalid={Boolean(errors.title)}
+                errorMessage={errors.title}
+              />
+              <TextArea
+                label={kind === 'announcement' ? 'Announcement' : 'Post'}
+                value={body}
+                onChange={setBody}
+                maxLength={5000}
+                showCount
+                isRequired
+                isInvalid={Boolean(errors.body)}
+                errorMessage={errors.body}
+              />
+              {session.user.roles.includes('student') &&
+                kind === 'discussion' &&
+                page.data.anonymityAllowed === true && (
+                  <IdentityChoice
+                    context="post"
+                    value={identity}
+                    onChange={setIdentity}
+                  />
+                )}
+            </div>
+          </section>
+          <AnimatePresence initial={false}>
+            {eventRequired && (
+              <motion.section
+                key="event"
+                className="fx-group fx-group--event"
+                aria-labelledby="fx-group-event"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.36, ease }}
+              >
+                <div className="fx-group__head">
+                  <h2 id="fx-group-event" className="fx-group__title">
+                    Event details
+                  </h2>
+                  <p className="fx-group__hint">
+                    Members see this on the post and in the calendar.
+                  </p>
+                </div>
+                <div className="fx-group__body fx-group__body--grid">
+                  <DatePicker
+                    label="Event date"
+                    isRequired
+                    onChange={(value) => setEventDate(value?.toString() ?? '')}
+                    isInvalid={Boolean(errors.eventDate)}
+                    errorMessage={errors.eventDate}
+                  />
+                  <TextField
+                    label="Time"
+                    value={eventTime}
+                    onChange={setEventTime}
+                    placeholder="14:00"
+                    description="Use 24-hour time, HH:MM."
+                    isRequired
+                    isInvalid={Boolean(errors.eventTime)}
+                    errorMessage={errors.eventTime}
+                  />
+                  <TextField
+                    label="Place"
+                    value={eventPlace}
+                    onChange={setEventPlace}
+                    isRequired
+                    isInvalid={Boolean(errors.eventPlace)}
+                    errorMessage={errors.eventPlace}
+                  />
+                  <TextField
+                    label="Contact"
+                    value={eventContact}
+                    onChange={setEventContact}
+                    isRequired
+                    isInvalid={Boolean(errors.eventContact)}
+                    errorMessage={errors.eventContact}
+                  />
+                  <div className="fx-group__wide">
+                    <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
+                      Notify members
+                    </Checkbox>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+          {/* TBD(D-08): attachment handling and retention are not approved. */}
+          <p className="fx-note">
+            <Icon name="paperclip" size={16} />
+            Attachments are not enabled yet. Keep this post to text for now.
+          </p>
+          {session.user.roles.some((role) =>
+            ['guidance', 'osas'].includes(role),
+          ) && (
+            <Alert
+              tone="neutral"
+              title="Keep case information in the case record"
+            >
+              Don't include case details here.
+            </Alert>
+          )}
+          <ActionError error={action.error} />
+          <div className="fx-form__actions">
+            <Button
+              variant="secondary"
+              onPress={() => router.history.push('/feed')}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={action.isPending}>
+              Publish
+            </Button>
+          </div>
+        </form>
+      </Panel>
       <Modal
         title="Discard this post?"
         role="alertdialog"
@@ -890,7 +1059,7 @@ export function PostComposer({
           </Button>
         </ModalActions>
       </Modal>
-    </Container>
+    </div>
   )
 }
 
@@ -903,42 +1072,41 @@ export function PostView({
   spaces?: Space[]
   organizations?: Organization[]
 }) {
+  const name = authorName(post)
+  const role = personRole(post.author ?? { name: '' })
+  const announcement = post.kind === 'announcement'
   return (
-    <article className="community-post-view">
-      <SectionHeader level={1} title={post.title} />
-      <Row gap={8}>
-        <Avatar name={post.author?.name ?? 'College member'} size={36} />
-        <strong>{post.author?.name ?? 'College member'}</strong>
-        {personRole(post.author ?? { name: '' }) && (
-          <RoleBadge>{personRole(post.author)}</RoleBadge>
+    <article className="fx-post">
+      <div className="fx-thread__tags">
+        <span className="accs-tag fx-tag--label">
+          {announcement ? 'Announcement' : post.label}
+        </span>
+        <span className="accs-tag">
+          {audienceName(post.audience, spaces, organizations)}
+        </span>
+        {announcement && (
+          <StatusChip tone={toneFor(post.priority || 'general')}>
+            {priorityLabel(post.priority)}
+          </StatusChip>
         )}
-        <span>{audienceName(post.audience, spaces, organizations)}</span>
-        <time dateTime={post.at}>{formatDate(post.at)}</time>
-      </Row>
-      <Row gap={8}>
-        <Badge outline>
-          {post.kind === 'announcement' ? 'Announcement' : post.label}
-        </Badge>
-        {post.kind === 'announcement' && (
-          <Badge
-            tone={post.priority === 'urgent' ? 'warning' : 'neutral'}
-            outline
-          >
-            {post.priority}
-          </Badge>
-        )}
-        {post.private && (
-          <Badge outline marker={false}>
-            Members
-          </Badge>
-        )}
-      </Row>
-      <div className="ds-prose community-post-body">{post.body}</div>
+        {post.private && <span className="accs-tag">Members only</span>}
+      </div>
+      <div className="fx-post__author">
+        <Initials name={name} />
+        <div className="fx-post__who">
+          <strong>{name}</strong>
+          <span>
+            {role && <>{role} · </>}
+            <time dateTime={post.at}>{formatDateTime(post.at)}</time>
+          </span>
+        </div>
+      </div>
+      <div className="fx-post__body">{post.body}</div>
       {post.eventDate && (
-        <dl className="ds-record__facts">
+        <dl className="fx-facts">
           <div>
             <dt>Event date</dt>
-            <dd>{post.eventDate}</dd>
+            <dd>{formatDate(post.eventDate)}</dd>
           </div>
           <div>
             <dt>Time</dt>
@@ -957,6 +1125,7 @@ export function PostView({
     </article>
   )
 }
+
 
 function PostDetailPage({
   page,
@@ -986,6 +1155,7 @@ function PostDetailPage({
   const [editPriority, setEditPriority] = useState('general')
   const [editError, setEditError] = useState('')
   const [promptDismissed, setPromptDismissed] = useState(false)
+  const [composerOpen, setComposerOpen] = useState(false)
   const composerQuery = useQuery({
     ...pageQuery('P05'),
     enabled: Boolean(post?.owned && session.allowedPages.includes('P05')),
@@ -1005,9 +1175,11 @@ function PostDetailPage({
     )
 
   function focusReply() {
-    document
-      .querySelector<HTMLTextAreaElement>('#community-comment-form textarea')
-      ?.focus()
+    const field = document.querySelector<HTMLTextAreaElement>(
+      '#community-comment-form textarea',
+    )
+    if (field) field.focus()
+    else setComposerOpen(true)
   }
 
   function openReport(type: 'post' | 'comment', id: string) {
@@ -1130,166 +1302,213 @@ function PostDetailPage({
 
   return (
     <>
-      <Breadcrumbs
-        items={[{ label: 'Feed', href: '/feed' }, { label: 'Post' }]}
+      <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[{ label: 'Feed', href: '/feed' }, { label: 'Post' }]}
+        title={post.title}
       />
-      <PostView post={post} />
-      <Row>
-        <ReactionButton
-          count={post.reactionCount}
-          isSelected={post.reacted}
-          isDisabled={page.data.canReact !== true}
-          loading={action.isPending}
-          onChange={() =>
-            action.mutate({ action: 'react', recordId: post.id, payload: {} })
-          }
-        />
-        {page.data.canComment === true && (
-          <Button variant="tertiary" onPress={focusReply}>
-            Reply
-          </Button>
-        )}
-        <MenuButton
-          iconOnly
-          label="Post actions"
-          onAction={(key) => menuAction(String(key))}
-        >
-          <MenuItem id="copy">Copy link</MenuItem>
-          <MenuItem id="report">Report post</MenuItem>
-          {canConvert && <MenuItem id="convert">Start a report</MenuItem>}
-          {post.owned && session.permissions.includes('post.create') && (
-            <MenuItem id="edit">Edit post</MenuItem>
-          )}
-          {post.owned && (
-            <MenuItem id="delete" danger>
-              Delete post
-            </MenuItem>
-          )}
-        </MenuButton>
-        {ownReport && (
-          <Link href={`/reports/${encodeURIComponent(ownReport.id)}`}>
-            View your linked report
-          </Link>
-        )}
-      </Row>
-      {showConversionPrompt && (
-        <Alert
-          tone="info"
-          title="Many people agree with this. Turn it into a report?"
-          actions={
-            <Row>
-              <Button href={`/reports/new?from=${encodeURIComponent(post.id)}`}>
-                Start a report
-              </Button>
-              <Button
-                variant="tertiary"
-                onPress={() => setPromptDismissed(true)}
-              >
-                Not now
-              </Button>
-            </Row>
-          }
-        >
-          Only you can decide. Nothing is filed unless you choose to.
-        </Alert>
-      )}
-      <ActionError error={action.error} />
-      <section className="app-page" aria-labelledby="community-comments-title">
-        <SectionHeader
-          level={2}
-          title="Comments"
-          description={`${post.commentCount} ${post.commentCount === 1 ? 'comment' : 'comments'}`}
-          id="community-comments-title"
-        />
-        {post.comments.length ? (
-          <>
-            <CommentThread>
-              {post.comments.slice(0, shownComments).map((comment) => (
-                <Comment
-                  key={comment.id}
-                  author={comment.author?.name ?? 'College member'}
-                  role={personRole(comment.author ?? { name: '' })}
-                  date={formatDate(comment.at)}
-                  dateTime={comment.at}
-                  actions={
-                    <>
-                      {page.data.canComment === true && (
-                        <Button
-                          variant="tertiary"
-                          size="sm"
-                          onPress={focusReply}
-                        >
-                          Reply
-                        </Button>
-                      )}
-                      <MenuButton
-                        iconOnly
-                        label="Comment actions"
-                        onAction={() => openReport('comment', comment.id)}
-                      >
-                        <MenuItem id="report">Report comment</MenuItem>
-                      </MenuButton>
-                    </>
-                  }
-                >
-                  {comment.body}
-                </Comment>
-              ))}
-            </CommentThread>
-            {post.comments.length > shownComments && (
-              <Button
-                variant="secondary"
-                onPress={() => setShownComments((count) => count + 10)}
-              >
-                Show more comments
-              </Button>
-            )}
-          </>
-        ) : (
-          <ViewState
-            kind="empty"
-            title="No comments yet"
-            description="A comment can add context or ask a question."
-          />
-        )}
-        {page.data.canComment === true ? (
-          <form
-            id="community-comment-form"
-            className="app-page"
-            onSubmit={sendComment}
-          >
-            <TextArea
-              label="Add a comment"
-              value={body}
-              onChange={setBody}
-              isRequired
-              maxLength={4000}
-              showCount
+      <div className="fx-thread-page">
+        <Panel as="div" className="fx-post-panel">
+          <PostView post={post} />
+          <div className="fx-actions">
+            <ReactionButton
+              count={post.reactionCount}
+              isSelected={post.reacted}
+              isDisabled={page.data.canReact !== true}
+              loading={action.isPending}
+              onChange={() =>
+                action.mutate({ action: 'react', recordId: post.id, payload: {} })
+              }
             />
-            {isStudent && (
-              <IdentityChoice
-                context="post"
-                value={identity}
-                onChange={setIdentity}
-              />
-            )}
-            <Row>
-              <Button
-                type="submit"
-                loading={action.isPending}
-                isDisabled={!body.trim()}
-              >
-                Comment
+            {page.data.canComment === true && (
+              <Button variant="tertiary" icon="chat" onPress={focusReply}>
+                Reply
               </Button>
-            </Row>
-          </form>
-        ) : session.user.restrictions.includes('post.comment') ? (
-          <Alert tone="neutral" title="Commenting is paused">
-            You can continue reading.{' '}
-            <Link href="/standing">View account standing</Link>.
+            )}
+            {ownReport && (
+              <Link href={`/reports/${encodeURIComponent(ownReport.id)}`}>
+                View your linked report
+              </Link>
+            )}
+            <span className="fx-actions__spacer" />
+            <MenuButton
+              iconOnly
+              icon="dots-three"
+              label="Post actions"
+              onAction={(key) => menuAction(String(key))}
+            >
+              <MenuItem id="copy">Copy link</MenuItem>
+              <MenuItem id="report">Report post</MenuItem>
+              {canConvert && <MenuItem id="convert">Start a report</MenuItem>}
+              {post.owned && session.permissions.includes('post.create') && (
+                <MenuItem id="edit">Edit post</MenuItem>
+              )}
+              {post.owned && (
+                <MenuItem id="delete" danger>
+                  Delete post
+                </MenuItem>
+              )}
+            </MenuButton>
+          </div>
+        </Panel>
+        {showConversionPrompt && (
+          <Alert
+            tone="info"
+            title="Many people agree with this. Turn it into a report?"
+            actions={
+              <Row>
+                <Button href={`/reports/new?from=${encodeURIComponent(post.id)}`}>
+                  Start a report
+                </Button>
+                <Button
+                  variant="tertiary"
+                  onPress={() => setPromptDismissed(true)}
+                >
+                  Not now
+                </Button>
+              </Row>
+            }
+          >
+            Only you can decide. Nothing is filed unless you choose to.
           </Alert>
-        ) : null}
-      </section>
+        )}
+        <ActionError error={action.error} />
+        <Panel
+          as="section"
+          className="fx-comments"
+          aria-label="Comments"
+          title={
+            <>
+              Comments <span className="fx-count accs-num">{post.commentCount}</span>
+            </>
+          }
+        >
+          {post.comments.length ? (
+            <>
+              <CommentThread>
+                {post.comments.slice(0, shownComments).map((comment) => (
+                  <Comment
+                    key={comment.id}
+                    author={comment.author?.name ?? 'College member'}
+                    role={personRole(comment.author ?? { name: '' })}
+                    date={relativeTime(comment.at)}
+                    fullDate={formatDateTime(comment.at)}
+                    dateTime={comment.at}
+                    actions={
+                      <>
+                        {page.data.canComment === true && (
+                          <Button
+                            variant="tertiary"
+                            size="sm"
+                            onPress={focusReply}
+                          >
+                            Reply
+                          </Button>
+                        )}
+                        <MenuButton
+                          iconOnly
+                          icon="dots-three"
+                          label="Comment actions"
+                          onAction={() => openReport('comment', comment.id)}
+                        >
+                          <MenuItem id="report">Report comment</MenuItem>
+                        </MenuButton>
+                      </>
+                    }
+                  >
+                    {comment.body}
+                  </Comment>
+                ))}
+              </CommentThread>
+              {post.comments.length > shownComments && (
+                <Button
+                  variant="secondary"
+                  onPress={() => setShownComments((count) => count + 10)}
+                >
+                  Show more comments
+                </Button>
+              )}
+            </>
+          ) : (
+            <Empty title="No comments yet">
+              A comment can add context or ask a question.
+            </Empty>
+          )}
+          {page.data.canComment === true ? (
+            <div className="fx-reply">
+              <AnimatePresence initial={false} mode="wait">
+                {composerOpen || body ? (
+                  <motion.form
+                    key="form"
+                    id="community-comment-form"
+                    className="fx-reply__form"
+                    onSubmit={sendComment}
+                    initial={{ opacity: 0, y: 8, scale: 0.985 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.985 }}
+                    transition={{ duration: 0.26, ease }}
+                  >
+                    <TextArea
+                      label="Add a comment"
+                      value={body}
+                      onChange={setBody}
+                      isRequired
+                      autoFocus
+                      maxLength={4000}
+                      showCount
+                    />
+                    {isStudent && (
+                      <IdentityChoice
+                        context="post"
+                        value={identity}
+                        onChange={setIdentity}
+                      />
+                    )}
+                    <div className="fx-form__actions">
+                      <Button
+                        variant="tertiary"
+                        onPress={() => {
+                          setBody('')
+                          setComposerOpen(false)
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        loading={action.isPending}
+                        isDisabled={!body.trim()}
+                      >
+                        Comment
+                      </Button>
+                    </div>
+                  </motion.form>
+                ) : (
+                  <motion.button
+                    key="bar"
+                    type="button"
+                    className="fx-compose fx-compose--button"
+                    onClick={() => setComposerOpen(true)}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.16 }}
+                  >
+                    <Initials name={session.user.name} />
+                    <span className="fx-compose__hint">Add a comment…</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : session.user.restrictions.includes('post.comment') ? (
+            <Alert tone="neutral" title="Commenting is paused">
+              You can continue reading.{' '}
+              <Link href="/standing">View account standing</Link>.
+            </Alert>
+          ) : null}
+        </Panel>
+      </div>
+      </div>
       <Modal
         title={
           reportTarget?.type === 'comment'
@@ -1444,7 +1663,7 @@ function PostDetailPage({
   )
 }
 
-function MemberTable({
+function MemberList({
   members,
   academic = false,
   organization = false,
@@ -1461,119 +1680,90 @@ function MemberTable({
   const pageCount = Math.max(1, Math.ceil(filtered.length / 20))
   const currentPage = Math.min(page, pageCount)
   const visible = filtered.slice((currentPage - 1) * 20, currentPage * 20)
+  const noun = academic ? 'students' : 'members'
 
   return (
-    <div className="app-page">
-      <Search
-        label={academic ? 'Search roster' : 'Search members'}
-        showLabel
-        value={query}
-        onChange={(value) => {
-          setQuery(value)
-          setPage(1)
-        }}
-      />
+    <div className="fx-members">
+      <div className="fx-toolbar fx-toolbar--slim">
+        <div className="fx-toolbar__search">
+          <Search
+            label={academic ? 'Search roster' : 'Search members'}
+            size="sm"
+            value={query}
+            onChange={(value) => {
+              setQuery(value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <span className="fx-count-label">
+          <span className="accs-num">{filtered.length}</span> {noun}
+        </span>
+      </div>
       {filtered.length ? (
         <>
-          <div className="community-members-table">
-            <Table aria-label={academic ? 'Class roster' : 'Member names'}>
-              <TableHeader>
-                <Column id="name" isRowHeader>
-                  Name
-                </Column>
-                {academic && <Column id="studentId">Student ID</Column>}
-                {academic && <Column id="program">Program</Column>}
-                <Column id="role">{academic ? 'Status' : 'Role'}</Column>
-              </TableHeader>
-              <TableBody>
-                {visible.map((member, index) => (
-                  <TableRow
-                    id={member.id ?? `member-${index}`}
-                    key={member.id ?? `member-${index}`}
-                  >
-                    <Cell>
-                      <Row gap={8}>
-                        <Avatar name={member.name} size={32} />
-                        {member.name}
-                      </Row>
-                    </Cell>
-                    {academic && <Cell reference>{member.studentId ?? '—'}</Cell>}
-                    {academic && <Cell>{member.program ?? '—'}</Cell>}
-                    <Cell>
-                      {academic ? (
-                        <Badge tone="neutral" outline>
-                          Enrolled
-                        </Badge>
-                      ) : organization ? (
-                        (member.organizationRole ?? member.role ?? 'Member')
-                      ) : (
-                        personRole(member)
+          <Panel flush>
+            <ul
+              className="accs-rows"
+              aria-label={academic ? 'Class roster' : 'Member names'}
+            >
+              {visible.map((member, index) => (
+                <li key={member.id ?? `member-${index}`}>
+                  <div className="accs-row fx-member">
+                    <Initials name={member.name} />
+                    <div className="fx-member__text">
+                      <p className="accs-row__title">{member.name}</p>
+                      {academic && (
+                        <p className="accs-row__sub">
+                          <span className="accs-mono">
+                            {member.studentId ?? '—'}
+                          </span>
+                          {' · '}
+                          {member.program ?? '—'}
+                        </p>
                       )}
-                    </Cell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <ul
-            className="community-members-cards"
-            aria-label={academic ? 'Class roster' : 'Member names'}
-          >
-            {visible.map((member, index) => (
-              <li key={member.id ?? `member-${index}`}>
-                <Card className="community-member-card">
-                  <CardHeader>
-                    <Avatar name={member.name} size={36} />
-                  </CardHeader>
-                  <CardTitle>{member.name}</CardTitle>
-                  <dl className="ds-record__facts">
-                    {academic && (
-                      <>
-                        <div>
-                          <dt>Student ID</dt>
-                          <dd>{member.studentId ?? '—'}</dd>
-                        </div>
-                        <div>
-                          <dt>Program</dt>
-                          <dd>{member.program ?? '—'}</dd>
-                        </div>
-                      </>
-                    )}
-                    <div>
-                      <dt>{academic ? 'Status' : 'Role'}</dt>
-                      <dd>
-                        {academic ? (
-                          <Badge tone="neutral" outline>
-                            Enrolled
-                          </Badge>
-                        ) : organization ? (
-                          (member.organizationRole ?? member.role ?? 'Member')
-                        ) : (
-                          personRole(member)
-                        )}
-                      </dd>
                     </div>
-                  </dl>
-                </Card>
-              </li>
-            ))}
-          </ul>
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            summary={`${filtered.length} ${academic ? 'students' : 'members'}`}
-          />
+                    <span className="accs-tag">
+                      {academic
+                        ? 'Enrolled'
+                        : organization
+                          ? (member.organizationRole ?? member.role ?? 'Member')
+                          : personRole(member)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          {pageCount > 1 && (
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              onPageChange={setPage}
+              summary={`${filtered.length} ${noun}`}
+            />
+          )}
         </>
       ) : (
-        <ViewState
-          kind="empty"
-          title={
-            query ? 'No members match this search' : 'No member names to show'
-          }
-        />
+        <Panel>
+          <Empty
+            title={
+              query ? 'No members match this search' : 'No member names to show'
+            }
+          />
+        </Panel>
       )}
     </div>
+  )
+}
+
+function adviserNames(space: Space, fallback: string) {
+  return space.professors?.map((person) => person.name).join(', ') || fallback
+}
+
+function studentTotal(space: Space) {
+  return (
+    space.studentCount ?? space.studentIds?.length ?? space.students?.length ?? 0
   )
 }
 
@@ -1593,7 +1783,10 @@ function SpacesPage({
   const spaces = list<Space>(page.data.spaces).filter(
     (space) =>
       (!program || space.program === program) &&
-      (!year || String(space.year ?? space.title.match(/\d/)?.[0]) === year),
+      (!year || String(space.year ?? space.title.match(/\d/)?.[0]) === year) &&
+      `${space.title} ${space.subject}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   )
   const pageCount = Math.max(1, Math.ceil(spaces.length / 20))
   const pageNumber = Math.min(
@@ -1603,8 +1796,8 @@ function SpacesPage({
   const visible = spaces.slice((pageNumber - 1) * 20, pageNumber * 20)
 
   return (
-    <>
-      <Heading
+    <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
         title={
           dean
             ? 'Sections'
@@ -1615,184 +1808,150 @@ function SpacesPage({
         description="Current term · approved enrollment and teaching assignments"
       />
       {oversight && (
-        <FilterBar
-          query={query}
-          onQueryChange={(q) => update({ q })}
-          searchLabel="Find a section"
-        >
-          {dean && (
+        <div className="fx-toolbar">
+          <div className="fx-toolbar__row">
+            <div className="fx-toolbar__search">
+              <Search
+                label="Find a section"
+                size="sm"
+                value={query}
+                onChange={(q) => update({ q })}
+              />
+            </div>
+            {dean && (
+              <Select
+                label="Program"
+                selectedKey={program || 'all'}
+                onSelectionChange={(key) =>
+                  update({ program: key === 'all' ? undefined : String(key) })
+                }
+              >
+                <SelectOption id="all">All programs</SelectOption>
+                {['BSIT', 'BSCS', 'BSIS'].map((value) => (
+                  <SelectOption id={value} key={value}>
+                    {value}
+                  </SelectOption>
+                ))}
+              </Select>
+            )}
             <Select
-              label="Program"
-              selectedKey={program || 'all'}
+              label="Year level"
+              selectedKey={year || 'all'}
               onSelectionChange={(key) =>
-                update({ program: key === 'all' ? undefined : String(key) })
+                setYear(key === 'all' ? '' : String(key))
               }
             >
-              <SelectOption id="all">All programs</SelectOption>
-              {['BSIT', 'BSCS', 'BSIS'].map((value) => (
+              <SelectOption id="all">All years</SelectOption>
+              {['1', '2', '3', '4'].map((value) => (
                 <SelectOption id={value} key={value}>
-                  {value}
+                  Year {value}
                 </SelectOption>
               ))}
             </Select>
-          )}
-          <Select
-            label="Year level"
-            selectedKey={year || 'all'}
-            onSelectionChange={(key) =>
-              setYear(key === 'all' ? '' : String(key))
-            }
-          >
-            <SelectOption id="all">All years</SelectOption>
-            {['1', '2', '3', '4'].map((value) => (
-              <SelectOption id={value} key={value}>
-                Year {value}
-              </SelectOption>
-            ))}
-          </Select>
-        </FilterBar>
+          </div>
+        </div>
       )}
       {spaces.length ? (
         oversight ? (
           <>
-            <div className="community-sections-table">
-              <Table aria-label="Program sections">
-                <TableHeader>
-                  <Column id="section" isRowHeader>
-                    Section
-                  </Column>
-                  <Column id="program">Program</Column>
-                  <Column id="year">Year</Column>
-                  <Column id="adviser">Adviser</Column>
-                  <Column id="students" numeric>
-                    Students
-                  </Column>
-                  <Column id="subject">Subject</Column>
-                </TableHeader>
-                <TableBody>
+            <div className="accs-table-wrap">
+              <table className="accs-table" aria-label="Program sections">
+                <thead>
+                  <tr>
+                    <th scope="col">Section</th>
+                    <th scope="col">Program</th>
+                    <th scope="col">Year</th>
+                    <th scope="col">Adviser</th>
+                    <th scope="col" className="accs-num">
+                      Students
+                    </th>
+                    <th scope="col">Subject</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {visible.map((space) => (
-                    <TableRow
-                      id={space.id}
-                      key={space.id}
-                      href={`/spaces/${encodeURIComponent(space.id)}`}
-                    >
-                      <Cell>{space.title}</Cell>
-                      <Cell>{space.program}</Cell>
-                      <Cell>
-                        {space.year ?? space.title.match(/\d/)?.[0] ?? '—'}
-                      </Cell>
-                      <Cell>
-                        {space.professors
-                          ?.map((person) => person.name)
-                          .join(', ') || 'Unassigned'}
-                      </Cell>
-                      <Cell numeric>
+                    <tr key={space.id}>
+                      <td>
+                        <Link
+                          variant="quiet"
+                          className="fx-table-link"
+                          href={`/spaces/${encodeURIComponent(space.id)}`}
+                        >
+                          {space.title}
+                        </Link>
+                      </td>
+                      <td>
+                        <span className="accs-tag">{space.program}</span>
+                      </td>
+                      <td>{space.year ?? space.title.match(/\d/)?.[0] ?? '—'}</td>
+                      <td>{adviserNames(space, 'Unassigned')}</td>
+                      <td className="accs-num">
                         {space.studentCount ?? space.studentIds?.length ?? 0}
-                      </Cell>
-                      <Cell>{space.subject}</Cell>
-                    </TableRow>
+                      </td>
+                      <td>{space.subject}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-            <ul
-              className="community-sections-cards"
-              aria-label="Program sections"
-            >
-              {visible.map((space) => (
-                <li key={space.id}>
-                  <Card link className="community-section-card">
-                    <CardHeader>
-                      <span className="ds-card__ref">Section</span>
-                    </CardHeader>
-                    <CardTitle
-                      href={`/spaces/${encodeURIComponent(space.id)}`}
-                    >
-                      {space.title}
-                    </CardTitle>
-                    <dl className="ds-record__facts">
-                      <div>
-                        <dt>Program</dt>
-                        <dd>{space.program}</dd>
-                      </div>
-                      <div>
-                        <dt>Year</dt>
-                        <dd>
-                          {space.year ?? space.title.match(/\d/)?.[0] ?? '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Adviser</dt>
-                        <dd>
-                          {space.professors
-                            ?.map((person) => person.name)
-                            .join(', ') || 'Unassigned'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Students</dt>
-                        <dd>
-                          {space.studentCount ?? space.studentIds?.length ?? 0}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Subject</dt>
-                        <dd>{space.subject}</dd>
-                      </div>
-                    </dl>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-            <Pagination
-              page={pageNumber}
-              pageCount={pageCount}
-              onPageChange={(next) => update({ page: String(next) })}
-              summary={`${spaces.length} sections and subjects`}
-            />
+            {pageCount > 1 && (
+              <Pagination
+                page={pageNumber}
+                pageCount={pageCount}
+                onPageChange={(next) => update({ page: String(next) })}
+                summary={`${spaces.length} sections and subjects`}
+              />
+            )}
           </>
         ) : (
-          <Grid columns={3}>
+          <div className="accs-grid fx-cards">
             {spaces.map((space) => (
-              <Card key={space.id} className="community-space-card">
-                <CardHeader>
-                  <DoorPlate size="sm" outline code={space.title} />
-                </CardHeader>
-                <CardTitle>{space.subject}</CardTitle>
-                <CardBody>
-                  {space.professors?.map((person) => person.name).join(', ') ||
-                    'Faculty assignment pending'}
-                </CardBody>
-                <CardMeta>
-                  <span>
-                    {space.studentCount ?? space.studentIds?.length ?? 0}{' '}
-                    students
-                  </span>
+              <Panel as="article" interactive className="fx-card" key={space.id}>
+                <div className="fx-card__tags">
+                  <span className="accs-tag fx-tag--label">{space.program}</span>
+                  <span className="accs-tag">{space.title}</span>
+                </div>
+                <h2 className="fx-card__title">
                   <Link
+                    variant="quiet"
+                    className="fx-card__link"
                     href={`/spaces/${encodeURIComponent(space.id)}`}
-                    aria-label={`Open ${space.title}`}
                   >
-                    <CardAction>Open space</CardAction>
+                    {space.subject}
                   </Link>
-                </CardMeta>
-                {space.threadId && (
-                  <Link
-                    href={`/messages/${encodeURIComponent(space.threadId)}`}
-                  >
-                    Group chat
-                  </Link>
-                )}
-              </Card>
+                </h2>
+                <p className="fx-card__sub">
+                  {adviserNames(space, 'Faculty assignment pending')}
+                </p>
+                <div className="fx-card__foot">
+                  <span className="fx-card__stat">
+                    <Icon name="users" size={16} />
+                    <span className="accs-num">{studentTotal(space)}</span> students
+                  </span>
+                  {space.threadId && (
+                    <Link
+                      variant="quiet"
+                      className="fx-card__aux"
+                      href={`/messages/${encodeURIComponent(space.threadId)}`}
+                    >
+                      <Icon name="chat" size={16} />
+                      Group chat
+                    </Link>
+                  )}
+                </div>
+              </Panel>
             ))}
-          </Grid>
+          </div>
         )
       ) : (
-        <EmptyState
-          title="No classes linked to your account yet"
-          description="Classes come from enrollment records. Contact the CCS office if this is wrong."
-        />
+        <Panel>
+          <Empty title="No classes linked to your account yet">
+            Classes come from enrollment records. Contact the CCS office if this
+            is wrong.
+          </Empty>
+        </Panel>
       )}
-    </>
+    </div>
   )
 }
 
@@ -1816,6 +1975,10 @@ function SpacePage({
   const posts = list<CommunityPost>(page.data.posts).filter((post) =>
     `${post.title} ${post.body}`.toLowerCase().includes(query.toLowerCase()),
   )
+  const discussions = posts.filter(
+    (post) => oversightOnly || post.kind !== 'announcement',
+  )
+  const announcements = posts.filter((post) => post.kind === 'announcement')
   const disabledPosting = session.user.restrictions.includes('post.create')
   const canShowPost =
     page.data.canPost === true ||
@@ -1823,20 +1986,18 @@ function SpacePage({
   const newPost = `/feed/new?space=${encodeURIComponent(`space:${space.id}`)}`
 
   return (
-    <>
-      <Breadcrumbs
-        items={[
+    <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[
           { label: 'Classes and sections', href: '/spaces' },
           { label: space.title },
         ]}
-      />
-      <Heading
         title={`${space.title} · ${space.subject}`}
-        description={`${space.professors?.map((person) => person.name).join(', ') || 'Faculty assignment pending'} · ${space.studentCount ?? space.studentIds?.length ?? space.students?.length ?? 0} students`}
+        description={`${adviserNames(space, 'Faculty assignment pending')} · ${studentTotal(space)} students`}
         actions={
           <>
             {canShowPost && (
-              <Button href={newPost} isDisabled={disabledPosting}>
+              <Button icon="plus" href={newPost} isDisabled={disabledPosting}>
                 New post
               </Button>
             )}
@@ -1857,115 +2018,166 @@ function SpacePage({
           <Tab id="discussion">Discussion</Tab>
           {!oversightOnly && <Tab id="announcements">Announcements</Tab>}
           <Tab id="members">{academic ? 'Roster' : 'Members'}</Tab>
+          <Tab id="about">About</Tab>
         </TabList>
         <TabPanel id="discussion">
-          <div className="app-page">
-            <FilterBar
-              query={query}
-              onQueryChange={setQuery}
-              searchLabel="Search class posts"
-            />
-            {posts.filter(
-              (post) => oversightOnly || post.kind !== 'announcement',
-            ).length ? (
-              <PostCards
-                posts={posts.filter(
-                  (post) => oversightOnly || post.kind !== 'announcement',
-                )}
-                spaces={[space]}
-              />
+          <div className="fx-tab">
+            <div className="fx-toolbar fx-toolbar--slim">
+              <div className="fx-toolbar__search">
+                <Search
+                  label="Search class posts"
+                  size="sm"
+                  value={query}
+                  onChange={setQuery}
+                />
+              </div>
+            </div>
+            {discussions.length ? (
+              <ThreadList posts={discussions} spaces={[space]} />
             ) : (
-              <ViewState
-                kind="empty"
-                title={
-                  query
-                    ? 'No class posts match this search'
-                    : 'No discussions yet'
-                }
-              />
+              <Panel>
+                <Empty
+                  title={
+                    query
+                      ? 'No class posts match this search'
+                      : 'No discussions yet'
+                  }
+                />
+              </Panel>
             )}
           </div>
         </TabPanel>
         {!oversightOnly && (
           <TabPanel id="announcements">
-            {posts.some((post) => post.kind === 'announcement') ? (
-              <PostCards
-                posts={posts.filter((post) => post.kind === 'announcement')}
-                spaces={[space]}
-              />
-            ) : (
-              <ViewState kind="empty" title="No class announcements yet" />
-            )}
+            <div className="fx-tab">
+              {announcements.length ? (
+                <ThreadList posts={announcements} spaces={[space]} />
+              ) : (
+                <Panel>
+                  <Empty title="No class announcements yet" />
+                </Panel>
+              )}
+            </div>
           </TabPanel>
         )}
         <TabPanel id="members">
-          <div className="app-page">
+          <div className="fx-tab">
             {/* TBD(D-08): classmate-list visibility awaits final policy; only names and roles are shown to students. */}
             {!academic && (
-              <Alert
-                tone="neutral"
-                title="Member list visibility is under review"
-              >
-                This view shows names and roles only.
-              </Alert>
+              <p className="fx-note">
+                <Icon name="info" size={16} />
+                Member list visibility is under review. This view shows names
+                and roles only.
+              </p>
             )}
-            <MemberTable members={space.students ?? []} academic={academic} />
+            <MemberList members={space.students ?? []} academic={academic} />
+          </div>
+        </TabPanel>
+        <TabPanel id="about">
+          <div className="fx-tab">
+            <Panel>
+              <dl className="fx-facts">
+                <div>
+                  <dt>Subject</dt>
+                  <dd>{space.subject}</dd>
+                </div>
+                <div>
+                  <dt>Section</dt>
+                  <dd>{space.title}</dd>
+                </div>
+                <div>
+                  <dt>Program</dt>
+                  <dd>{space.program}</dd>
+                </div>
+                <div>
+                  <dt>Adviser</dt>
+                  <dd>{adviserNames(space, 'Faculty assignment pending')}</dd>
+                </div>
+              </dl>
+            </Panel>
           </div>
         </TabPanel>
       </Tabs>
-    </>
+    </div>
   )
 }
 
 function OrganizationsPage({ page }: { page: PageEnvelope }) {
   const { params, update } = useFilters()
   const query = params.get('q') ?? ''
-  const organizations = list<Organization>(page.data.organizations)
+  const organizations = list<Organization>(page.data.organizations).filter(
+    (organization) =>
+      `${organization.name} ${organization.description}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  )
   return (
-    <>
-      <Heading
+    <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
         title="Organizations"
         description="Approved CCS student organizations."
       />
-      <Search
-        label="Find an organization"
-        showLabel
-        value={query}
-        onChange={(q) => update({ q })}
-      />
+      <div className="fx-toolbar fx-toolbar--slim">
+        <div className="fx-toolbar__search">
+          <Search
+            label="Find an organization"
+            size="sm"
+            value={query}
+            onChange={(q) => update({ q })}
+          />
+        </div>
+      </div>
       {organizations.length ? (
-        <Grid columns={3}>
+        <div className="accs-grid fx-cards">
           {organizations.map((organization) => (
-            <CardLink
-              href={`/organizations/${encodeURIComponent(organization.id)}`}
+            <Panel
+              as="article"
+              interactive
+              className="fx-card"
               key={organization.id}
-              className="community-organization-card"
             >
-              <Tile icon="flag" tone="community" />
-              <h2 className="ds-card__title">{organization.name}</h2>
-              <p className="ds-card__body">{organization.description}</p>
-              <Row gap={8}>
-                <span>{organization.memberCount ?? 0} members</span>
+              <div className="fx-card__top">
+                <span className="fx-mark" aria-hidden>
+                  {initials(organization.name)}
+                </span>
                 {organization.member && (
-                  <Badge tone="info" outline>
-                    Member
-                  </Badge>
+                  <StatusChip tone="accent">Member</StatusChip>
                 )}
-              </Row>
-            </CardLink>
+              </div>
+              <h2 className="fx-card__title">
+                <Link
+                  variant="quiet"
+                  className="fx-card__link"
+                  href={`/organizations/${encodeURIComponent(organization.id)}`}
+                >
+                  {organization.name}
+                </Link>
+              </h2>
+              <p className="fx-card__sub fx-card__sub--clamp">
+                {organization.description}
+              </p>
+              <div className="fx-card__foot">
+                <span className="fx-card__stat">
+                  <Icon name="users" size={16} />
+                  <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
+                  members
+                </span>
+              </div>
+            </Panel>
           ))}
-        </Grid>
+        </div>
       ) : (
-        <ViewState
-          kind="empty"
-          title={
-            query
-              ? `No organization named '${query}'`
-              : 'No organizations to show'
-          }
-        />
+        <Panel>
+          <Empty
+            title={
+              query
+                ? `No organization named '${query}'`
+                : 'No organizations to show'
+            }
+          />
+        </Panel>
       )}
-    </>
+    </div>
   )
 }
 
@@ -1988,20 +2200,19 @@ function OrganizationPage({
   const composerHref = `/feed/new?space=${encodeURIComponent(`organization:${organization.id}`)}`
 
   return (
-    <>
-      <Breadcrumbs
-        items={[
+    <div className="fx-page accs-stack accs-stagger">
+      <PageHeader
+        crumbs={[
           { label: 'Organizations', href: '/organizations' },
           { label: organization.name },
         ]}
-      />
-      <Heading
         title={organization.name}
         description={organization.description}
         actions={
           <>
             {representative && (
               <Button
+                icon="megaphone"
                 href={`${composerHref}&type=announcement`}
                 isDisabled={disabledPosting}
               >
@@ -2010,6 +2221,7 @@ function OrganizationPage({
             )}
             {memberCanPost && (
               <Button
+                icon="plus"
                 variant={representative ? 'secondary' : 'primary'}
                 href={composerHref}
                 isDisabled={disabledPosting}
@@ -2020,11 +2232,13 @@ function OrganizationPage({
           </>
         }
       />
-      <Row gap={8}>
-        <Tile icon="flag" tone="community" label="Verified organization" />
-        <Badge tone="info">Verified organization</Badge>
-        {organization.member && <Badge outline>Member</Badge>}
-      </Row>
+      <div className="fx-badges">
+        <StatusChip tone="ok">Verified organization</StatusChip>
+        {organization.member && <StatusChip tone="accent">Member</StatusChip>}
+        <span className="fx-count-label">
+          <span className="accs-num">{organization.memberCount ?? 0}</span> members
+        </span>
+      </div>
       <Tabs defaultSelectedKey="feed">
         <TabList aria-label="Organization views">
           <Tab id="feed">Feed</Tab>
@@ -2033,81 +2247,109 @@ function OrganizationPage({
           <Tab id="about">About</Tab>
         </TabList>
         <TabPanel id="feed">
-          {posts.length ? (
-            <PostCards posts={posts} organizations={[organization]} />
-          ) : (
-            <ViewState
-              kind="empty"
-              title="No organization posts yet"
-              description={
-                organization.member
-                  ? 'Posts for this organization will appear here.'
-                  : 'Public posts for this organization will appear here.'
-              }
-            />
-          )}
-        </TabPanel>
-        <TabPanel id="events">
-          {events.length ? (
-            <Agenda>
-              {events.map((event) => (
-                <AgendaItem
-                  key={event.id}
-                  chip={event.date}
-                  lane="community"
-                  title={event.title}
-                  href={
-                    session.allowedPages.includes('P13')
-                      ? `/calendar?date=${encodeURIComponent(event.date)}`
-                      : undefined
-                  }
-                  linkLabel="See in calendar"
-                >
-                  {[
-                    event.start,
-                    event.location ?? event.place,
-                    event.description,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </AgendaItem>
-              ))}
-            </Agenda>
-          ) : (
-            <ViewState kind="empty" title="No organization events scheduled" />
-          )}
-        </TabPanel>
-        {organization.member && (
-          <TabPanel id="members">
-            <MemberTable members={organization.members ?? []} organization />
-          </TabPanel>
-        )}
-        <TabPanel id="about">
-          <div className="app-page">
-            <div className="ds-prose">
-              <p>{organization.description}</p>
-            </div>
-            <dl className="ds-record__facts">
-              <div>
-                <dt>Verified representative</dt>
-                <dd>
-                  {organization.representative?.name ?? 'Awaiting assignment'}
-                </dd>
-              </div>
-            </dl>
-            {/* TBD(D-06): member administration remains unavailable until representative powers are approved. */}
-            {representative && (
-              <Alert
-                tone="neutral"
-                title="Member management is awaiting approval"
-              >
-                Membership comes from the verified organization roster.
-              </Alert>
+          <div className="fx-tab">
+            {posts.length ? (
+              <ThreadList posts={posts} organizations={[organization]} />
+            ) : (
+              <Panel>
+                <Empty title="No organization posts yet">
+                  {organization.member
+                    ? 'Posts for this organization will appear here.'
+                    : 'Public posts for this organization will appear here.'}
+                </Empty>
+              </Panel>
             )}
           </div>
         </TabPanel>
+        <TabPanel id="events">
+          <div className="fx-tab">
+            {events.length ? (
+              <Panel flush>
+                <ul className="accs-rows" aria-label="Organization events">
+                  {events.map((event) => {
+                    const href = session.allowedPages.includes('P13')
+                      ? `/calendar?date=${encodeURIComponent(event.date)}`
+                      : undefined
+                    const body = (
+                      <>
+                        <DateTile value={event.date} />
+                        <div>
+                          <p className="accs-row__title">{event.title}</p>
+                          <p className="accs-row__sub">
+                            {[
+                              event.start,
+                              event.location ?? event.place,
+                              event.description,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </div>
+                        {href && (
+                          <span className="fx-row-cta">
+                            See in calendar
+                            <Icon name="arrow-right" size={16} />
+                          </span>
+                        )}
+                      </>
+                    )
+                    return (
+                      <li key={event.id}>
+                        {href ? (
+                          <Link variant="quiet" className="accs-row" href={href}>
+                            {body}
+                          </Link>
+                        ) : (
+                          <div className="accs-row">{body}</div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </Panel>
+            ) : (
+              <Panel>
+                <Empty title="No organization events scheduled" />
+              </Panel>
+            )}
+          </div>
+        </TabPanel>
+        {organization.member && (
+          <TabPanel id="members">
+            <div className="fx-tab">
+              <MemberList members={organization.members ?? []} organization />
+            </div>
+          </TabPanel>
+        )}
+        <TabPanel id="about">
+          <div className="fx-tab">
+            <Panel>
+              <p className="fx-about">{organization.description}</p>
+              <dl className="fx-facts">
+                <div>
+                  <dt>Verified representative</dt>
+                  <dd>
+                    {organization.representative?.name ?? 'Awaiting assignment'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Members</dt>
+                  <dd>{organization.memberCount ?? 0}</dd>
+                </div>
+              </dl>
+              {/* TBD(D-06): member administration remains unavailable until representative powers are approved. */}
+              {representative && (
+                <p className="fx-note">
+                  <Icon name="info" size={16} />
+                  Member management is awaiting approval. Membership comes from
+                  the verified organization roster.
+                </p>
+              )}
+            </Panel>
+          </div>
+        </TabPanel>
       </Tabs>
-    </>
+    </div>
   )
 }
 

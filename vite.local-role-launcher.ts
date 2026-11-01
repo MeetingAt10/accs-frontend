@@ -26,7 +26,7 @@ const launcherHtml = `<!doctype html>
     <main>
       <h1 id="title">ACCS local role launcher</h1>
       <p id="status" role="status" aria-live="polite">Loading…</p>
-      <section id="accounts" aria-label="Demo accounts"></section>
+      <section id="accounts"></section>
     </main>
     <script>
       const status = document.getElementById('status')
@@ -70,54 +70,12 @@ const launcherHtml = `<!doctype html>
         return slugs
       }
 
-      function roleUrl(account, slug) {
-        const url = new URL('/__role', window.location.origin)
-        url.hostname = slug + '.localhost'
-        url.searchParams.set('account', account.id)
-        return url.href
-      }
-
-      function addText(parent, tag, text, className) {
-        const element = document.createElement(tag)
-        element.textContent = text
-        if (className) element.className = className
-        parent.append(element)
-        return element
-      }
-
-      function renderAccounts(accounts) {
-        if (!Array.isArray(accounts)) throw new Error('The demo account response was invalid.')
-        if (!accounts.length) {
-          status.textContent = 'The API returned no demo accounts.'
-          return
-        }
-        const slugs = slugsFor(accounts)
-        accountsRoot.replaceChildren()
-        for (const account of accounts) {
-          const card = document.createElement('article')
-          addText(card, 'h2', String(account.name ?? account.id))
-          const details = document.createElement('p')
-          details.className = 'details'
-          const roles = Array.isArray(account.roles) ? account.roles.map(String).join(', ') : 'No roles listed'
-          details.textContent = [account.email, roles, account.description].filter(Boolean).join(' · ')
-          card.append(details)
-          const link = document.createElement('a')
-          link.href = roleUrl(account, slugs.get(account.id))
-          link.target = '_blank'
-          link.rel = 'noopener'
-          link.textContent = 'Open in a new tab'
-          card.append(link)
-          accountsRoot.append(card)
-        }
-        status.textContent = 'Choose an account to open an independent local session in a new tab.'
-      }
-
       function addBackLink() {
         const url = new URL('/__roles', window.location.origin)
         url.hostname = 'localhost'
         const link = document.createElement('a')
         link.href = url.href
-        link.textContent = 'Back to all demo accounts'
+        link.textContent = 'Back to the launcher'
         accountsRoot.replaceChildren(link)
       }
 
@@ -125,19 +83,14 @@ const launcherHtml = `<!doctype html>
         document.getElementById('title').textContent = 'Signing in to ACCS'
         const accountId = new URLSearchParams(window.location.search).get('account')
         if (!accountId) throw new Error('This role link is missing an account.')
-        const result = await request('/api/demo-accounts')
-        if (!Array.isArray(result?.accounts)) throw new Error('The demo account response was invalid.')
-        const slugs = slugsFor(result.accounts)
-        const account = result.accounts.find((item) => item.id === accountId)
-        if (!account) throw new Error('This demo account is no longer available.')
-        if (window.location.hostname !== slugs.get(account.id) + '.localhost') {
+        if (window.location.hostname !== slugsFor([{ id: accountId }]).get(accountId) + '.localhost') {
           throw new Error('This account does not match the current local host.')
         }
-        status.textContent = 'Signing in as ' + String(account.name ?? account.id) + '…'
+        status.textContent = 'Signing in as ' + accountId + '…'
         const session = await request('/api/auth/sign-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId: account.id }),
+          body: JSON.stringify({ emailOrId: accountId, password: 'Accs@Qcu2026!' }),
         })
         window.location.replace(session?.user?.roles?.includes('administrator') ? '/admin' : '/home')
       }
@@ -148,9 +101,7 @@ const launcherHtml = `<!doctype html>
           addBackLink()
         })
       } else {
-        request('/api/demo-accounts')
-          .then((result) => renderAccounts(result?.accounts))
-          .catch(showError)
+        status.textContent = 'Open /__role?account=<account ID> on <slug>.localhost, where the slug is the lowercased account ID, to start an independent local session.'
       }
     </script>
   </body>

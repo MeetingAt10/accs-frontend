@@ -1,70 +1,56 @@
 import {
-  Agenda,
-  AgendaItem,
   Alert,
-  Badge,
-  Breadcrumbs,
   Button,
-  CaseTimeline,
-  Cell,
   Checkbox,
-  Column,
-  ConsultationSlotPicker,
   DatePicker,
   Drawer,
-  EmptyState,
-  Grid,
+  Icon,
   IconButton,
   Link,
   Modal,
   ModalActions,
   ModalBody,
   Pagination,
-  Popover,
   PrivacyNotice,
   Radio,
   RadioGroup,
-  Row,
   Search,
-  SectionHeader,
-  Segment,
-  SegmentedControl,
   Select,
   SelectOption,
-  Tab,
-  TabList,
-  TabPanel,
-  Table,
-  TableBody,
-  TableHeader,
-  TableRow,
-  Tabs,
-  Tag,
-  TagGroup,
   TextArea,
   TextField,
-  TimeBlock,
-  Timetable,
   ViewState,
   toast,
-  type BadgeForm,
-  type BadgeTone,
-  type BlockForm,
-  type CaseEvent,
-  type TimetableDay,
-  type TimetableEvent,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useRouterState } from '@tanstack/react-router'
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+  type Variants,
+} from 'motion/react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 import { RestrictedView } from '@/components/app/guards'
 import {
+  Empty,
+  Kpi,
+  Kpis,
+  PageHeader,
+  Panel,
+  StatusChip,
+  toneFor,
+  DateTile,
+} from '@/components/app/page-shell'
+import {
   EventCalendar,
-  PersonCard,
-  ProfileHeader,
+  formatClock,
   type CalendarEvent,
-} from '@/components/ds-next'
+} from '@/components/ds-next/EventCalendar'
 import {
   ApiError,
   performPageAction,
@@ -72,6 +58,13 @@ import {
   type PageEnvelope,
   type Session,
 } from '@/lib/api'
+import {
+  dateParts,
+  formatDate,
+  formatDateTime,
+  initials,
+  relativeTime,
+} from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import './schedule.css'
 
@@ -96,6 +89,15 @@ interface Slot {
 
 type ConsultationStatus =
   'Requested' | 'Approved' | 'Booked' | 'Completed' | 'Declined' | 'Cancelled'
+
+const allStatuses: ConsultationStatus[] = [
+  'Requested',
+  'Approved',
+  'Booked',
+  'Completed',
+  'Declined',
+  'Cancelled',
+]
 
 interface Consultation {
   id: string
@@ -148,28 +150,21 @@ interface CalendarEntry extends CalendarEvent {
   contactId?: string
   contact?: string
   place?: string
-  form?: BlockForm
   slot?: Slot
   todo?: Todo
   consultation?: Consultation
 }
 
-const statusForms: Record<ConsultationStatus, BadgeForm> = {
-  Requested: 'pending',
-  Approved: 'pending',
-  Booked: 'solid',
-  Completed: 'solid',
-  Declined: 'closed',
-  Cancelled: 'closed',
-}
+const ease: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
-const statusTones: Record<ConsultationStatus, BadgeTone> = {
-  Requested: 'warning',
-  Approved: 'info',
-  Booked: 'info',
-  Completed: 'success',
-  Declined: 'neutral',
-  Cancelled: 'neutral',
+const layerTone: Record<string, string> = {
+  academic: 'academic',
+  campus: 'campus',
+  ccs: 'ccs',
+  faculty: 'open',
+  consultations: 'consult',
+  todos: 'todo',
+  organization: 'org',
 }
 
 function list<T>(value: unknown): T[] {
@@ -209,52 +204,20 @@ function weekStart(value: string) {
   return isoDate(date)
 }
 
-function weekDays(value: string): TimetableDay[] {
-  const start = weekStart(value)
-  return Array.from({ length: 7 }, (_, index) => {
-    const id = addDays(start, index)
-    const date = parseDate(id)
-    return {
-      id,
-      label: date.toLocaleDateString('en-PH', { weekday: 'short' }),
-      date: String(date.getDate()),
-      fullLabel: date.toLocaleDateString('en-PH', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      }),
-      isToday: id === today(),
-    }
-  })
+function weekLabel(start: string) {
+  return `${formatDate(start)} – ${formatDate(addDays(start, 6))}`
 }
 
-function decimalTime(value: string, fallback: number) {
-  if (!/^\d{2}:\d{2}$/.test(value)) return fallback
-  const [hour, minute] = value.split(':').map(Number)
-  return hour + minute / 60
-}
-
-function displayDate(value: string | undefined, withTime = false) {
-  if (!value) return '—'
-  const date = new Date(value.includes('T') ? value : `${value}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return withTime
-    ? date.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })
-    : date.toLocaleDateString('en-PH', { dateStyle: 'medium' })
+function slotRange(slot: { start: string; end: string }) {
+  return `${formatClock(slot.start)}–${formatClock(slot.end)}`
 }
 
 function slotTime(slot: Slot) {
-  return `${displayDate(slot.date)} · ${slot.start}–${slot.end}`
+  return `${formatDate(slot.date)} · ${slotRange(slot)}`
 }
 
-function slotForm(slot: Slot): BlockForm {
-  return slot.state === 'open'
-    ? 'open'
-    : slot.state === 'unavailable'
-      ? 'disabled'
-      : slot.state === 'requested'
-        ? 'pending'
-        : 'taken'
+function dayHeading(value: string) {
+  return `${dateParts(value)?.weekday ?? ''}, ${formatDate(value)}`
 }
 
 function useScheduleAction(pageId: string) {
@@ -284,39 +247,8 @@ function ActionError({
   ) : null
 }
 
-function Heading({
-  title,
-  description,
-  actions,
-}: {
-  title: string
-  description?: string
-  actions?: ReactNode
-}) {
-  return (
-    <SectionHeader
-      level={1}
-      split
-      title={title}
-      description={description}
-      actions={
-        <Row gap={8}>
-          <Badge outline marker={false}>
-            Sample data
-          </Badge>
-          {actions}
-        </Row>
-      }
-    />
-  )
-}
-
 function StatusBadge({ status }: { status: ConsultationStatus }) {
-  return (
-    <Badge form={statusForms[status]} tone={statusTones[status]}>
-      {status}
-    </Badge>
-  )
+  return <StatusChip tone={toneFor(status)}>{status}</StatusChip>
 }
 
 function useCalendarLocation() {
@@ -344,6 +276,80 @@ function useSmallScreen() {
     return () => query.removeEventListener('change', change)
   }, [])
   return small
+}
+
+/** Number that counts up to its value. */
+function CountUp({ value }: { value: number }) {
+  const reduce = useReducedMotion()
+  const motionValue = useMotionValue(reduce ? value : 0)
+  const text = useTransform(motionValue, (latest) => String(Math.round(latest)))
+  useEffect(() => {
+    const controls = animate(motionValue, value, {
+      duration: reduce ? 0 : 0.8,
+      ease,
+    })
+    return () => controls.stop()
+  }, [value, reduce, motionValue])
+  return <motion.span>{text}</motion.span>
+}
+
+/** Pill group with one thumb that slides to the active item. */
+function Segmented({
+  id,
+  label,
+  items,
+  value,
+  onChange,
+  variant = 'seg',
+}: {
+  id: string
+  label: string
+  items: Array<{ id: string; label: string; count?: number }>
+  value: string
+  onChange: (id: string) => void
+  variant?: 'seg' | 'chip'
+}) {
+  const reduce = useReducedMotion()
+  return (
+    <div className={`sc-seg sc-seg--${variant}`} role="group" aria-label={label}>
+      {items.map((item) => {
+        const active = item.id === value
+        return (
+          <button
+            type="button"
+            key={item.id}
+            className="sc-seg__btn"
+            aria-pressed={active}
+            onClick={() => onChange(item.id)}
+          >
+            {active && (
+              <motion.span
+                layoutId={`seg-${id}`}
+                className="sc-seg__thumb"
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { type: 'spring', stiffness: 520, damping: 40 }
+                }
+              />
+            )}
+            <span className="sc-seg__label">{item.label}</span>
+            {item.count !== undefined && (
+              <span className="sc-seg__count">{item.count}</span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function Avatar({ name, size }: { name: string; size?: 'lg' }) {
+  return (
+    <span className={`accs-avatar${size ? ' sc-avatar--lg' : ''}`} aria-hidden>
+      {initials(name)}
+    </span>
+  )
 }
 
 function CalendarPage({
@@ -391,30 +397,36 @@ function CalendarPage({
   const selectedLayers = params.has('layers')
     ? (params.get('layers') ?? '').split(',')
     : layers.map((layer) => layer.id)
+  const todos = [...list<Todo>(page.data.todos)].sort(
+    (a, b) => Number(a.done) - Number(b.done) || a.date.localeCompare(b.date),
+  )
   const entries: CalendarEntry[] = [
-    ...list<InstitutionalEvent>(page.data.events).map((event) => ({
-      id: `event:${event.id}`,
-      title: event.title,
-      date: event.date,
-      start: event.start,
-      end: event.end ?? event.start,
-      time: event.end ? `${event.start}–${event.end}` : event.start,
-      type: event.type,
-      layer: event.organizationId
+    ...list<InstitutionalEvent>(page.data.events).map((event) => {
+      const layer = event.organizationId
         ? 'organization'
         : event.type.toLowerCase().includes('academic')
           ? 'academic'
           : event.type.toLowerCase().includes('campus')
             ? 'campus'
-            : 'ccs',
-      lane: event.organizationId
-        ? ('community' as const)
-        : ('schedule' as const),
-      description: event.description,
-      contactId: event.contactId,
-      place: event.location ?? event.place ?? event.eventPlace,
-      contact: event.contact,
-    })),
+            : 'ccs'
+      return {
+        id: `event:${event.id}`,
+        title: event.title,
+        date: event.date,
+        start: event.start,
+        end: event.end ?? event.start,
+        time: event.end
+          ? `${formatClock(event.start)}–${formatClock(event.end)}`
+          : formatClock(event.start),
+        type: event.type,
+        tone: layerTone[layer],
+        layer,
+        description: event.description,
+        contactId: event.contactId,
+        place: event.location ?? event.place ?? event.eventPlace,
+        contact: event.contact,
+      }
+    }),
     ...list<Slot>(page.data.slots)
       .filter(
         (slot) =>
@@ -431,29 +443,34 @@ function CalendarPage({
         date: slot.date,
         start: slot.start,
         end: slot.end,
-        time: `${slot.start}–${slot.end}`,
+        time: slotRange(slot),
         type:
           slot.state === 'open'
             ? 'Open time'
             : slot.state === 'unavailable'
               ? 'Unavailable'
               : 'Requested or booked',
+        tone:
+          slot.state === 'open'
+            ? 'open'
+            : slot.state === 'unavailable'
+              ? 'unavailable'
+              : 'consult',
         layer: 'faculty',
-        lane: 'consult' as const,
-        form: slotForm(slot),
         contactId: slot.facultyId,
         slot,
       })),
-    ...list<Todo>(page.data.todos).map((todo) => ({
+    ...todos.map((todo) => ({
       id: `todo:${todo.id}`,
       title: todo.title,
       date: todo.date,
       start: '08:00',
       end: '09:00',
+      allDay: true,
       time: todo.done ? 'Completed' : 'Due today',
       type: 'Personal to-do',
+      tone: 'todo',
       layer: 'todos',
-      lane: 'schedule' as const,
       todo,
     })),
     ...activeConsultations.map((consultation) => ({
@@ -465,43 +482,27 @@ function CalendarPage({
       date: consultation.slot.date,
       start: consultation.slot.start,
       end: consultation.slot.end,
-      time: `${consultation.slot.start}–${consultation.slot.end}`,
+      time: slotRange(consultation.slot),
       type: consultation.status,
+      tone: 'consult',
       layer: professor ? 'consultations' : 'faculty',
-      lane: 'consult' as const,
-      form:
-        consultation.status === 'Booked'
-          ? ('taken' as const)
-          : ('pending' as const),
       consultation,
     })),
   ].filter((entry) => selectedLayers.includes(entry.layer))
-  const days = weekDays(selectedDate)
-  const weekEntries = entries
-    .filter((entry) => days.some((day) => day.id === entry.date))
+  const upcoming = entries
+    .filter(
+      (entry) =>
+        !entry.slot && entry.date >= today() && !(entry.todo && entry.todo.done),
+    )
     .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))
-  const weekEventDays = days
-    .map((day) => ({
-      day,
-      events: weekEntries.filter((entry) => entry.date === day.id),
-    }))
-    .filter(({ events }) => events.length)
-  const weekEvents: TimetableEvent[] = weekEntries
-    .map((entry) => ({
-      id: entry.id,
-      day: entry.date,
-      start: decimalTime(entry.start, 8),
-      end: Math.max(
-        decimalTime(entry.end, 9),
-        decimalTime(entry.start, 8) + 0.5,
-      ),
-      title: entry.title,
-      time: entry.time,
-      lane: entry.lane,
-      form: entry.form,
-      stateLabel: entry.type,
-      onPress: () => setSelectedEntry(entry),
-    }))
+    .slice(0, 6)
+  const periodLabel =
+    view === 'week'
+      ? weekLabel(weekStart(selectedDate))
+      : parseDate(selectedDate).toLocaleDateString('en-PH', {
+          month: 'long',
+          year: 'numeric',
+        })
 
   function shift(direction: number) {
     const date = parseDate(selectedDate)
@@ -511,6 +512,13 @@ function CalendarPage({
       date.setMonth(date.getMonth() + direction)
     }
     update({ date: isoDate(date) })
+  }
+
+  function toggleLayer(id: string) {
+    const next = selectedLayers.includes(id)
+      ? selectedLayers.filter((layer) => layer !== id)
+      : [...selectedLayers.filter((layer) => layer !== 'none'), id]
+    update({ layers: next.join(',') || 'none' })
   }
 
   async function saveTodo(event: FormEvent) {
@@ -533,18 +541,44 @@ function CalendarPage({
     }
   }
 
+  function deleteTodo(todo: Todo, close = false) {
+    action.mutate(
+      { action: 'deleteTodo', recordId: todo.id, payload: {} },
+      { onSuccess: () => close && setSelectedEntry(undefined) },
+    )
+  }
+
   function entryDetails(entry: CalendarEntry) {
     return (
-      <div className="app-page">
-        <Row gap={8}>
-          <Badge outline>{entry.type}</Badge>
-          <time dateTime={entry.date}>
-            {displayDate(entry.date)} · {entry.time}
-          </time>
-        </Row>
+      <div className="sc-detail">
+        <span className="ec-badge" data-etone={entry.tone}>
+          {entry.type}
+        </span>
+        <dl className="sc-facts sc-facts--stack">
+          <div>
+            <dt>Date</dt>
+            <dd>
+              <time dateTime={entry.date}>{formatDate(entry.date)}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Time</dt>
+            <dd>{entry.allDay ? 'All day' : entry.time}</dd>
+          </div>
+          {entry.place && (
+            <div>
+              <dt>Place</dt>
+              <dd>{entry.place}</dd>
+            </div>
+          )}
+          {entry.contact && (
+            <div>
+              <dt>Contact</dt>
+              <dd>{entry.contact}</dd>
+            </div>
+          )}
+        </dl>
         {entry.description && <p>{entry.description}</p>}
-        {entry.place && <p>Place: {entry.place}</p>}
-        {entry.contact && <p>Contact: {entry.contact}</p>}
         {entry.contactId && (
           <Link href={`/people/${encodeURIComponent(entry.contactId)}`}>
             View contact profile
@@ -572,7 +606,7 @@ function CalendarPage({
           </Link>
         )}
         {entry.todo && canTodo && (
-          <>
+          <div className="sc-detail__actions">
             <Checkbox
               isSelected={entry.todo.done}
               onChange={(done) =>
@@ -590,53 +624,40 @@ function CalendarPage({
             </Checkbox>
             <Button
               variant="destructive"
-              onPress={() =>
-                action.mutate(
-                  {
-                    action: 'deleteTodo',
-                    recordId: entry.todo!.id,
-                    payload: {},
-                  },
-                  { onSuccess: () => setSelectedEntry(undefined) },
-                )
-              }
+              onPress={() => deleteTodo(entry.todo!, true)}
             >
               Delete to-do
             </Button>
-          </>
+          </div>
         )}
         <ActionError error={action.error} />
       </div>
     )
   }
 
-  function renderCalendarEvent(event: CalendarEvent) {
-    const entry = entries.find((candidate) => candidate.id === event.id)!
-    const trigger = (
-      <Button
-        size="sm"
-        variant="tertiary"
-        className="schedule-calendar-event"
-        onPress={small ? () => setSelectedEntry(entry) : undefined}
-      >
-        {event.time && <span>{event.time}</span>}
-        <span>{event.title}</span>
-      </Button>
-    )
-    return small ? (
-      trigger
-    ) : (
-      <Popover trigger={trigger} title={entry.title}>
-        {entryDetails(entry)}
-      </Popover>
-    )
-  }
+  const layerPills = (
+    <div className="sc-layers" role="group" aria-label="Calendar layers">
+      {layers.map((layer) => (
+        <button
+          type="button"
+          key={layer.id}
+          className="sc-layer"
+          data-etone={layerTone[layer.id]}
+          aria-pressed={selectedLayers.includes(layer.id)}
+          onClick={() => toggleLayer(layer.id)}
+        >
+          <i aria-hidden />
+          {layer.label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <>
-      <Heading
+      <PageHeader
         title="Calendar"
-        description="Local campus time · events in your permitted calendars"
+        description="Campus events, faculty availability and your consultations, in local campus time."
         actions={
           <>
             {canTodo && (
@@ -652,133 +673,162 @@ function CalendarPage({
           </>
         }
       />
-      <Row justify="between">
-        <SegmentedControl
-          aria-label="Calendar view"
-          selectedKey={view}
-          onSelectionChange={(key) => update({ view: String(key) })}
-        >
-          <Segment id="month">Month</Segment>
-          <Segment id="week">Week</Segment>
-          <Segment id="list">List</Segment>
-        </SegmentedControl>
-        <Row gap={8}>
-          <IconButton
-            icon="caret-left"
-            label="Previous"
-            onPress={() => shift(-1)}
+      <div className="accs-stack accs-stagger">
+        <div className="sc-bar">
+          <div className="sc-bar__nav">
+            <IconButton
+              icon="caret-left"
+              label="Previous"
+              onPress={() => shift(-1)}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => update({ date: today() })}
+            >
+              Today
+            </Button>
+            <IconButton
+              icon="caret-right"
+              label="Next"
+              onPress={() => shift(1)}
+            />
+            <h2 className="sc-bar__label" aria-live="polite">
+              {periodLabel}
+            </h2>
+          </div>
+          <Segmented
+            id="calendar-view"
+            label="Calendar view"
+            value={view}
+            onChange={(id) => update({ view: id })}
+            items={[
+              { id: 'month', label: 'Month' },
+              { id: 'week', label: 'Week' },
+              { id: 'list', label: 'List' },
+            ]}
           />
-          <Button variant="tertiary" onPress={() => update({ date: today() })}>
-            Today
-          </Button>
-          <IconButton
-            icon="caret-right"
-            label="Next"
-            onPress={() => shift(1)}
-          />
-        </Row>
-      </Row>
-      <TagGroup
-        label="Show"
-        selectionMode="multiple"
-        selectedKeys={new Set(selectedLayers)}
-        onSelectionChange={(keys) =>
-          update({
-            layers:
-              keys === 'all'
-                ? layers.map((layer) => layer.id).join(',')
-                : [...keys].map(String).join(',') || 'none',
-          })
-        }
-      >
-        {layers.map((layer) => (
-          <Tag
-            id={layer.id}
-            key={layer.id}
-            lane={
-              layer.id === 'faculty' || layer.id === 'consultations'
-                ? 'consult'
-                : layer.id === 'organization'
-                  ? 'community'
-                  : undefined
-            }
-          >
-            {layer.label}
-          </Tag>
-        ))}
-      </TagGroup>
-      {view === 'week' ? (
-        <>
-          <SectionHeader
-            level={2}
-            title={`Week of ${displayDate(weekStart(selectedDate))}`}
-          />
-          {small ? (
-            weekEventDays.length ? (
-              <div
-                className="schedule-week-list"
-                role="region"
-                aria-label="Calendar week events"
-              >
-                {weekEventDays.map(({ day, events }) => (
-                  <section className="schedule-week-list__day" key={day.id}>
-                    <h3>
-                      <time dateTime={day.id}>
-                        {parseDate(day.id).toLocaleDateString('en-PH', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </time>
-                    </h3>
-                    <ul className="schedule-week-list__events">
-                      {events.map((entry) => (
-                        <li key={entry.id}>
-                          {renderCalendarEvent(entry)}
-                          {entry.type && <p>{entry.type}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-              </div>
-            ) : (
-              <ViewState
-                kind="empty"
-                title="No events in this week"
-                description="No events are substituted from a different date or layer."
+          <div className="sc-bar__layers">{layerPills}</div>
+        </div>
+        <div className="accs-split">
+          <div className="accs-stack">
+            <Panel flush aria-label="Calendar">
+              <EventCalendar
+                date={selectedDate}
+                view={view}
+                events={entries}
+                onDateChange={(date) => update({ date })}
+                onEventPress={(event) =>
+                  setSelectedEntry(
+                    entries.find((entry) => entry.id === event.id),
+                  )
+                }
               />
-            )
-          ) : (
-            <>
-              <Timetable
-                label="Calendar week, local campus time"
-                days={days}
-                events={weekEvents}
-                startHour={7}
-                endHour={19}
-              />
-              {!weekEvents.length && (
-                <ViewState
-                  kind="empty"
-                  title="No events in this week"
-                  description="No events are substituted from a different date or layer."
-                />
+            </Panel>
+            <ActionError error={action.error} />
+          </div>
+          <div className="accs-stack">
+            <Panel title="Calendar layers" className="sc-rail-layers">
+              {layerPills}
+            </Panel>
+            <Panel flush title="Upcoming">
+              {upcoming.length ? (
+                <ul className="accs-rows">
+                  {upcoming.map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        className="accs-row accs-row--link sc-up"
+                        onClick={() => setSelectedEntry(entry)}
+                      >
+                        <DateTile value={entry.date} />
+                        <span>
+                          <span className="accs-row__title">{entry.title}</span>
+                          <span className="accs-row__sub">
+                            {entry.allDay ? 'All day' : entry.time}
+                          </span>
+                        </span>
+                        <i
+                          className="ec-dot"
+                          data-etone={entry.tone}
+                          aria-hidden
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Empty title="Nothing coming up">
+                  Events in your selected layers appear here.
+                </Empty>
               )}
-            </>
-          )}
-        </>
-      ) : (
-        <EventCalendar
-          date={selectedDate}
-          view={view}
-          events={entries}
-          onDateChange={(date) => update({ date })}
-          renderEvent={renderCalendarEvent}
-        />
-      )}
-      <ActionError error={action.error} />
+            </Panel>
+            {canTodo && (
+              <Panel
+                title="My to-dos"
+                action={
+                  <button
+                    type="button"
+                    className="accs-panel__link sc-linkbtn"
+                    onClick={() => setTodoOpen(true)}
+                  >
+                    Add
+                  </button>
+                }
+              >
+                {todos.length ? (
+                  <ul className="sc-todos">
+                    <AnimatePresence initial={false}>
+                      {todos.map((todo) => (
+                        <motion.li
+                          key={todo.id}
+                          layout
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.24, ease }}
+                        >
+                          <div className="sc-todo">
+                            <Checkbox
+                              isSelected={todo.done}
+                              onChange={(done) =>
+                                action.mutate({
+                                  action: 'toggleTodo',
+                                  recordId: todo.id,
+                                  payload: { done },
+                                })
+                              }
+                            >
+                              <span className="sc-todo__t" data-done={todo.done}>
+                                {todo.title}
+                              </span>
+                            </Checkbox>
+                            <span className="accs-meta">
+                              {formatDate(todo.date)}
+                            </span>
+                            <button
+                              type="button"
+                              className="accs-icon-btn"
+                              aria-label={`Delete ${todo.title}`}
+                              onClick={() => deleteTodo(todo)}
+                            >
+                              <Icon name="x" size={16} />
+                            </button>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ul>
+                ) : (
+                  <Empty title="No to-dos yet">
+                    Add a personal reminder. Only you can see it.
+                  </Empty>
+                )}
+              </Panel>
+            )}
+          </div>
+        </div>
+      </div>
       <Drawer
         title={selectedEntry?.title ?? 'Event details'}
         side={small ? 'bottom' : 'end'}
@@ -830,116 +880,102 @@ function CalendarPage({
   )
 }
 
-function ConsultationTable({
+function FacultyCard({
+  person,
+  selected,
+  nextSlot,
+}: {
+  person: Person
+  selected?: boolean
+  nextSlot?: Slot
+}) {
+  const next = nextSlot ?? person.nextSlot
+  return (
+    <a
+      className="sc-fac"
+      href={`/consultations/faculty/${encodeURIComponent(person.id)}`}
+      aria-current={selected ? 'true' : undefined}
+    >
+      <Avatar name={person.name} size="lg" />
+      <span className="sc-fac__body">
+        <strong>{person.name}</strong>
+        <span className="sc-fac__meta">
+          {[person.title ?? 'Faculty', person.office].filter(Boolean).join(' · ')}
+        </span>
+        <span className="sc-fac__next" data-open={Boolean(next) || undefined}>
+          {next
+            ? `Next open · ${formatDate(next.date)}, ${formatClock(next.start)}`
+            : 'No open time posted'}
+        </span>
+      </span>
+      {selected && (
+        <span className="sc-fac__check" aria-label="Selected">
+          <Icon name="check" size={16} />
+        </span>
+      )}
+    </a>
+  )
+}
+
+function ConsultationList({
   consultations,
-  facultyView = false,
+  facultyView,
+  emptyTitle,
+  emptyHint,
+  emptyAction,
 }: {
   consultations: Consultation[]
-  facultyView?: boolean
+  facultyView: boolean
+  emptyTitle: string
+  emptyHint: string
+  emptyAction?: ReactNode
 }) {
   const [page, setPage] = useState(1)
   const pageCount = Math.max(1, Math.ceil(consultations.length / 20))
   const current = Math.min(page, pageCount)
-  return consultations.length ? (
-    <div className="app-page">
-      <div className="schedule-consultation-table">
-        <Table
-          aria-label={
-            facultyView
-              ? 'Consultation requests from students'
-              : 'Your consultation requests'
-          }
-        >
-          <TableHeader>
-            <Column id="person" isRowHeader>
-              {facultyView ? 'Student' : 'Professor'}
-            </Column>
-            <Column id="time">Date and time</Column>
-            <Column id="status">Status</Column>
-            <Column id="updated">Updated</Column>
-            {facultyView && <Column id="topic">Topic</Column>}
-          </TableHeader>
-          <TableBody>
-            {consultations
-              .slice((current - 1) * 20, current * 20)
-              .map((consultation) => (
-                <TableRow
-                  id={consultation.id}
-                  key={consultation.id}
-                  href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
+  if (!consultations.length)
+    return (
+      <Panel flush>
+        <Empty title={emptyTitle} action={emptyAction}>
+          {emptyHint}
+        </Empty>
+      </Panel>
+    )
+  return (
+    <div className="accs-stack accs-stack--tight">
+      <Panel flush aria-label={facultyView ? 'Requests from students' : 'Your requests'}>
+        <ul className="accs-rows">
+          {consultations.slice((current - 1) * 20, current * 20).map((item) => {
+            const person = facultyView ? item.student : item.faculty
+            return (
+              <li key={item.id}>
+                <a
+                  className="accs-row accs-row--link sc-crow"
+                  href={`/consultations/requests/${encodeURIComponent(item.id)}`}
                 >
-                  <Cell>
-                    {facultyView
-                      ? consultation.student.name
-                      : consultation.faculty.name}
-                  </Cell>
-                  <Cell>{slotTime(consultation.slot)}</Cell>
-                  <Cell>
-                    <StatusBadge status={consultation.status} />
-                  </Cell>
-                  <Cell>{displayDate(consultation.updatedAt, true)}</Cell>
-                  {facultyView && <Cell>{consultation.purpose}</Cell>}
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
-      </div>
-      <ul
-        className="schedule-consultation-cards"
-        aria-label={
-          facultyView
-            ? 'Consultation requests from students'
-            : 'Your consultation requests'
-        }
-      >
-        {consultations
-          .slice((current - 1) * 20, current * 20)
-          .map((consultation) => (
-            <li key={consultation.id}>
-              <article className="schedule-consultation-card">
-                <h3>
-                  <Link
-                    href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
-                  >
-                    {facultyView
-                      ? consultation.student.name
-                      : consultation.faculty.name}
-                  </Link>
-                </h3>
-                <p className="schedule-consultation-card__time">
-                  <span>Date and time</span>
-                  <time
-                    dateTime={`${consultation.slot.date}T${consultation.slot.start}`}
-                  >
-                    {slotTime(consultation.slot)}
-                  </time>
-                </p>
-                <dl className="schedule-consultation-card__details">
-                  <div>
-                    <dt>Status</dt>
-                    <dd>
-                      <StatusBadge status={consultation.status} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Updated</dt>
-                    <dd>
-                      <time dateTime={consultation.updatedAt}>
-                        {displayDate(consultation.updatedAt, true)}
-                      </time>
-                    </dd>
-                  </div>
-                  {facultyView && (
-                    <div>
-                      <dt>Topic</dt>
-                      <dd>{consultation.purpose}</dd>
-                    </div>
-                  )}
-                </dl>
-              </article>
-            </li>
-          ))}
-      </ul>
+                  <Avatar name={person.name} />
+                  <span className="sc-crow__who">
+                    <span className="accs-row__title">{person.name}</span>
+                    <span className="accs-row__sub">{item.purpose}</span>
+                  </span>
+                  <span className="sc-crow__when">
+                    <time dateTime={item.slot.date}>
+                      {formatDate(item.slot.date)}
+                    </time>
+                    <span>{slotRange(item.slot)}</span>
+                  </span>
+                  <span className="sc-crow__status">
+                    <StatusBadge status={item.status} />
+                    <span className="accs-meta">
+                      Updated {relativeTime(item.updatedAt)}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </Panel>
       <Pagination
         page={current}
         pageCount={pageCount}
@@ -947,15 +983,6 @@ function ConsultationTable({
         summary={`${consultations.length} requests`}
       />
     </div>
-  ) : (
-    <EmptyState
-      title={facultyView ? 'No requests to show' : 'No requests yet'}
-      description={
-        facultyView
-          ? 'Requests in this view will appear here.'
-          : 'Choose a professor and request an open time.'
-      }
-    />
   )
 }
 
@@ -967,11 +994,15 @@ function ConsultationsPage({
   session: Session
 }) {
   const [query, setQuery] = useState('')
-  const [studentTab, setStudentTab] = useState('requests')
+  const [mode, setMode] = useState('requests')
+  const dual =
+    session.user.roles.includes('student') &&
+    session.user.roles.includes('professor')
   const [roleView, setRoleView] = useState(
     session.user.roles.includes('professor') ? 'faculty' : 'student',
   )
   const professor = roleView === 'faculty'
+  const [status, setStatus] = useState<string>(professor ? 'Requested' : 'All')
   const consultations = list<Consultation>(page.data.consultations).filter(
     (consultation) =>
       professor
@@ -981,187 +1012,196 @@ function ConsultationsPage({
   const faculty = list<Person>(page.data.faculty).filter((person) =>
     person.name.toLowerCase().includes(query.toLowerCase()),
   )
-  const pending = consultations.filter(
-    (consultation) => consultation.status === 'Requested',
-  )
-  const upcoming = consultations.filter((consultation) =>
-    ['Approved', 'Booked'].includes(consultation.status),
-  )
-  const history = consultations.filter((consultation) =>
-    ['Completed', 'Declined', 'Cancelled'].includes(consultation.status),
-  )
+  const visible =
+    status === 'All'
+      ? consultations
+      : consultations.filter((consultation) => consultation.status === status)
+  const showRequests = professor || mode === 'requests'
 
   return (
     <>
-      <Heading
+      <PageHeader
         title={professor ? 'Consultation requests' : 'Consultations'}
+        description={
+          professor
+            ? 'Decide on student requests and manage the times you offer.'
+            : 'Track your requests and book time with a professor.'
+        }
         actions={
-          professor && (
+          professor ? (
             <Button variant="secondary" href="/consultations/availability">
               Manage availability
+            </Button>
+          ) : (
+            <Button icon="plus" onPress={() => setMode('faculty')}>
+              Book a consultation
             </Button>
           )
         }
       />
-      {session.user.roles.includes('student') &&
-        session.user.roles.includes('professor') && (
-          <SegmentedControl
-            aria-label="Consultation role view"
-            selectedKey={roleView}
-            onSelectionChange={(key) => setRoleView(String(key))}
-          >
-            <Segment id="faculty">As faculty</Segment>
-            <Segment id="student">As student</Segment>
-          </SegmentedControl>
-        )}
-      {professor ? (
-        <Tabs defaultSelectedKey="pending">
-          <TabList aria-label="Faculty consultation views">
-            <Tab id="pending" count={pending.length}>
-              To decide
-            </Tab>
-            <Tab id="upcoming">Upcoming</Tab>
-            <Tab id="history">History</Tab>
-          </TabList>
-          <TabPanel id="pending">
-            {pending.length ? (
-              <ConsultationTable consultations={pending} facultyView />
-            ) : (
-              <EmptyState title="No requests to decide" />
-            )}
-          </TabPanel>
-          <TabPanel id="upcoming">
-            {upcoming.length ? (
-              <Agenda>
-                {upcoming.map((consultation) => (
-                  <AgendaItem
-                    key={consultation.id}
-                    chip={`${consultation.slot.date} · ${consultation.slot.start}`}
-                    lane="consult"
-                    title={`Consultation with ${consultation.student.name}`}
-                    href={`/consultations/requests/${encodeURIComponent(consultation.id)}`}
-                    linkLabel="Open request"
-                  >
-                    {consultation.purpose} · {consultation.status}
-                  </AgendaItem>
+      <div className="accs-stack accs-stagger">
+        <div className="sc-controls">
+          {dual && (
+            <Segmented
+              id="consult-role"
+              label="Consultation role view"
+              value={roleView}
+              onChange={(id) => {
+                setRoleView(id)
+                setStatus(id === 'faculty' ? 'Requested' : 'All')
+              }}
+              items={[
+                { id: 'faculty', label: 'As faculty' },
+                { id: 'student', label: 'As student' },
+              ]}
+            />
+          )}
+          {!professor && (
+            <Segmented
+              id="consult-mode"
+              label="Consultation sections"
+              value={mode}
+              onChange={setMode}
+              items={[
+                { id: 'requests', label: 'My requests' },
+                { id: 'faculty', label: 'Find faculty' },
+              ]}
+            />
+          )}
+        </div>
+        {showRequests ? (
+          <>
+            <Segmented
+              id="consult-status"
+              variant="chip"
+              label="Filter by status"
+              value={status}
+              onChange={setStatus}
+              items={[
+                { id: 'All', label: 'All', count: consultations.length },
+                ...allStatuses.map((item) => ({
+                  id: item,
+                  label: item,
+                  count: consultations.filter(
+                    (consultation) => consultation.status === item,
+                  ).length,
+                })),
+              ]}
+            />
+            <ConsultationList
+              key={`${roleView}:${status}`}
+              consultations={visible}
+              facultyView={professor}
+              emptyTitle={
+                professor ? 'No requests to show' : 'No requests yet'
+              }
+              emptyHint={
+                professor
+                  ? 'Requests in this view will appear here.'
+                  : status === 'All'
+                    ? 'Request an open time with a professor assigned to you.'
+                    : `You have no ${status.toLowerCase()} requests.`
+              }
+              emptyAction={
+                !professor &&
+                status === 'All' && (
+                  <Button onPress={() => setMode('faculty')}>Find a time</Button>
+                )
+              }
+            />
+          </>
+        ) : (
+          <>
+            <Search
+              label="Find a professor"
+              showLabel
+              value={query}
+              onChange={setQuery}
+            />
+            {faculty.length ? (
+              <div className="accs-grid">
+                {faculty.map((person) => (
+                  <FacultyCard key={person.id} person={person} />
                 ))}
-              </Agenda>
+              </div>
             ) : (
-              <EmptyState title="No upcoming consultations" />
-            )}
-          </TabPanel>
-          <TabPanel id="history">
-            <ConsultationTable consultations={history} facultyView />
-          </TabPanel>
-        </Tabs>
-      ) : (
-        <Tabs
-          selectedKey={studentTab}
-          onSelectionChange={(key) => setStudentTab(String(key))}
-        >
-          <TabList aria-label="Student consultation views">
-            <Tab id="requests">My requests</Tab>
-            <Tab id="faculty">Find faculty</Tab>
-          </TabList>
-          <TabPanel id="requests">
-            {consultations.length ? (
-              <ConsultationTable consultations={consultations} />
-            ) : (
-              <EmptyState
-                title="No requests yet"
-                description="Request an open time with a professor assigned to you."
-                action={
-                  <Button onPress={() => setStudentTab('faculty')}>
-                    Find a time
-                  </Button>
+              <ViewState
+                kind="empty"
+                title={
+                  query
+                    ? 'No professors match this search'
+                    : 'No faculty linked for consultations'
                 }
+                description="Only professors you may consult appear here."
               />
             )}
-          </TabPanel>
-          <TabPanel id="faculty">
-            <div className="app-page">
-              <Search
-                label="Find a professor"
-                showLabel
-                value={query}
-                onChange={setQuery}
-              />
-              {faculty.length ? (
-                <Grid columns={3}>
-                  {faculty.map((person) => (
-                    <PersonCard
-                      key={person.id}
-                      name={person.name}
-                      role="Faculty"
-                      office={person.office}
-                      description={person.title}
-                      href={`/consultations/faculty/${encodeURIComponent(person.id)}`}
-                      meta={
-                        person.nextSlot
-                          ? `Next open time: ${slotTime(person.nextSlot)}`
-                          : 'No open time posted'
-                      }
-                    />
-                  ))}
-                </Grid>
-              ) : (
-                <ViewState
-                  kind="empty"
-                  title={
-                    query
-                      ? 'No professors match this search'
-                      : 'No faculty linked for consultations'
-                  }
-                  description="Only professors you may consult appear here."
-                />
-              )}
-            </div>
-          </TabPanel>
-        </Tabs>
-      )}
+          </>
+        )}
+      </div>
     </>
   )
 }
+
+const bookingSteps = ['Faculty', 'Time', 'Purpose', 'Confirm']
 
 function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const faculty = record<Person>(page.data.record)
   const action = useScheduleAction('P15')
   const queryClient = useQueryClient()
   const router = useRouter()
-  const [week, setWeek] = useState(weekStart(today()))
+  const reduce = useReducedMotion()
+  const directory = useQuery(pageQuery('P14'))
   const slots = list<Slot>(page.data.slots)
-  const [selectedDay, setSelectedDay] = useState(
-    () =>
-      slots.find(
-        (slot) =>
-          slot.state === 'open' &&
-          slot.date >= weekStart(today()) &&
-          slot.date < addDays(weekStart(today()), 7),
-      )?.date ?? today(),
-  )
+  const firstOpen = slots
+    .filter((slot) => slot.state === 'open' && slot.date >= today())
+    .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))[0]
+  const [step, setStep] = useState({ n: 1, dir: 1 })
+  const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
   const [purpose, setPurpose] = useState('')
   const [purposeError, setPurposeError] = useState('')
-  const days = weekDays(week)
-  const weekSlots = slots.filter((slot) =>
-    days.some((day) => day.id === slot.date),
-  )
-  const daySlots = weekSlots
-    .filter((slot) => slot.date === selectedDay)
-    .sort((a, b) => a.start.localeCompare(b.start))
+  const end = addDays(week, 7)
+  const weekSlots = slots.filter((slot) => slot.date >= week && slot.date < end)
   const openCount = weekSlots.filter((slot) => slot.state === 'open').length
+  const groups = [...new Set(weekSlots.map((slot) => slot.date))]
+    .sort()
+    .map((date) => ({
+      date,
+      slots: weekSlots
+        .filter((slot) => slot.date === date)
+        .sort((a, b) => a.start.localeCompare(b.start)),
+    }))
+  const chosen = slots.find((slot) => slot.id === selectedSlot)
+  const conflict =
+    action.error instanceof ApiError && action.error.status === 409
 
   if (!faculty) return <RestrictedView record />
 
+  const others = list<Person>(directory.data?.data.faculty).filter(
+    (person) => person.id !== faculty.id,
+  )
+
+  function go(n: number) {
+    setStep((current) => ({ n, dir: n >= current.n ? 1 : -1 }))
+  }
+
   function changeWeek(direction: number) {
-    const next = addDays(week, direction * 7)
-    setWeek(next)
-    setSelectedDay(next)
+    setWeek(addDays(week, direction * 7))
     setSelectedSlot(undefined)
+  }
+
+  function next() {
+    if (step.n === 3 && !purpose.trim()) {
+      setPurposeError('Enter a short topic for your professor.')
+      return
+    }
+    setPurposeError('')
+    go(step.n + 1)
   }
 
   async function requestTime(event: FormEvent) {
     event.preventDefault()
+    if (step.n !== 4) return
     if (!selectedSlot || !purpose.trim()) {
       setPurposeError('Choose an open time and enter a short topic.')
       return
@@ -1179,122 +1219,315 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         setSelectedSlot(undefined)
+        go(2)
         await queryClient.invalidateQueries({ queryKey: ['page', 'P15'] })
       }
     }
   }
 
+  const dist = reduce ? 0 : 36
+  const slide: Variants = {
+    enter: (dir: number) => ({ opacity: 0, x: dir * dist }),
+    center: { opacity: 1, x: 0 },
+    exit: (dir: number) => ({ opacity: 0, x: -dir * dist }),
+  }
+
   return (
     <>
-      <Breadcrumbs
-        items={[
+      <PageHeader
+        crumbs={[
           { label: 'Consultations', href: '/consultations' },
           { label: faculty.name },
         ]}
+        title={`Book ${faculty.name}`}
+        description="Pick an open time and tell the professor what you want to discuss."
       />
-      <ProfileHeader
-        compact
-        name={faculty.name}
-        role="Faculty"
-        title={faculty.title}
-        office={faculty.office}
-        email={faculty.email}
-      />
-      <Row justify="between">
-        <SectionHeader level={2} title={`Week of ${displayDate(week)}`} />
-        <Row gap={8}>
-          <IconButton
-            icon="caret-left"
-            label="Previous week"
-            onPress={() => changeWeek(-1)}
-          />
-          <IconButton
-            icon="caret-right"
-            label="Next week"
-            onPress={() => changeWeek(1)}
-          />
-        </Row>
-      </Row>
-      {!openCount && (
-        <EmptyState
-          title="No open times this week"
-          description="Try another week, or send a permitted message to the professor."
-          action={
-            <Button
-              variant="secondary"
-              href={`/messages?recipient=${encodeURIComponent(faculty.id)}`}
-            >
-              Message professor
-            </Button>
-          }
-        />
-      )}
-      <form className="app-page" onSubmit={requestTime}>
-        <ConsultationSlotPicker
-          days={days.map((day) => ({
-            id: day.id,
-            weekday: day.label,
-            day: day.date ?? '',
-            label: day.fullLabel ?? day.label,
-            openCount: weekSlots.filter(
-              (slot) => slot.date === day.id && slot.state === 'open',
-            ).length,
-            isToday: day.isToday,
-          }))}
-          selectedDay={selectedDay}
-          onDayChange={(day) => {
-            setSelectedDay(day)
-            setSelectedSlot(undefined)
-          }}
-          slots={daySlots.map((slot) => ({
-            id: slot.id,
-            time: `${slot.start}–${slot.end}`,
-            state:
-              slot.state === 'open'
-                ? 'open'
-                : slot.state === 'unavailable'
-                  ? 'unavailable'
-                  : 'booked',
-          }))}
-          value={selectedSlot}
-          onChange={setSelectedSlot}
-          timeZoneNote="Local campus time"
-          errorMessage={
-            action.error instanceof ApiError && action.error.status === 409
-              ? 'That time was just taken. Pick another time.'
-              : undefined
-          }
-        />
-        {!daySlots.length && (
-          <ViewState kind="empty" title="No times posted for this day" />
-        )}
-        <TextArea
-          label="What do you want to discuss?"
-          value={purpose}
-          onChange={setPurpose}
-          maxLength={300}
-          showCount
-          isRequired
-          isInvalid={Boolean(purposeError)}
-          errorMessage={purposeError}
-        />
-        <Alert
-          tone="neutral"
-          title="Nothing is booked until your professor confirms"
-        >
-          A request starts as Requested. Check its status before attending.
-        </Alert>
-        <ActionError error={action.error} />
-        <Row>
-          <Button
-            type="submit"
-            loading={action.isPending}
-            isDisabled={!selectedSlot}
-          >
-            Request this time
-          </Button>
-        </Row>
-      </form>
+      <div className="accs-stack accs-stagger">
+        <div className="bk-stepper">
+          <div className="bk-steps__track" aria-hidden>
+            <motion.span
+              className="bk-steps__fill"
+              initial={false}
+              animate={{ scaleX: (step.n - 1) / (bookingSteps.length - 1) }}
+              transition={{ duration: reduce ? 0 : 0.5, ease }}
+            />
+          </div>
+          <ol className="bk-steps" aria-label="Booking steps">
+            {bookingSteps.map((label, index) => {
+              const n = index + 1
+              const state =
+                n < step.n ? 'done' : n === step.n ? 'current' : 'todo'
+              return (
+                <li key={label} data-state={state}>
+                  <button
+                    type="button"
+                    className="bk-step"
+                    disabled={n >= step.n}
+                    aria-current={n === step.n ? 'step' : undefined}
+                    onClick={() => go(n)}
+                  >
+                    <span className="bk-step__dot">
+                      {state === 'current' && (
+                        <motion.span
+                          layoutId="bk-ring"
+                          className="bk-step__ring"
+                          transition={
+                            reduce
+                              ? { duration: 0 }
+                              : { type: 'spring', stiffness: 420, damping: 32 }
+                          }
+                        />
+                      )}
+                      {state === 'done' ? <Icon name="check" size={16} /> : n}
+                    </span>
+                    <span className="bk-step__label">{label}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+        <div className="accs-split">
+          <form className="bk-main" onSubmit={requestTime}>
+            <AnimatePresence mode="wait" initial={false} custom={step.dir}>
+              <motion.div
+                key={step.n}
+                custom={step.dir}
+                variants={slide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: reduce ? 0 : 0.24, ease }}
+              >
+                {step.n === 1 && (
+                  <section>
+                    <h2 className="bk-title">Choose a professor</h2>
+                    <div className="sc-faclist">
+                      <FacultyCard
+                        person={faculty}
+                        selected
+                        nextSlot={firstOpen}
+                      />
+                      {others.map((person) => (
+                        <FacultyCard key={person.id} person={person} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {step.n === 2 && (
+                  <Panel
+                    title="Pick a time"
+                    action={
+                      <span className="bk-week">
+                        <IconButton
+                          icon="caret-left"
+                          label="Previous week"
+                          onPress={() => changeWeek(-1)}
+                        />
+                        <span className="bk-week__label">{weekLabel(week)}</span>
+                        <IconButton
+                          icon="caret-right"
+                          label="Next week"
+                          onPress={() => changeWeek(1)}
+                        />
+                      </span>
+                    }
+                  >
+                    {conflict && (
+                      <Alert tone="danger" title="That time was just taken">
+                        Pick another time.
+                      </Alert>
+                    )}
+                    {!openCount && (
+                      <Empty
+                        title="No open times this week"
+                        action={
+                          <Button
+                            variant="secondary"
+                            href={`/messages?recipient=${encodeURIComponent(faculty.id)}`}
+                          >
+                            Message professor
+                          </Button>
+                        }
+                      >
+                        Try another week, or send a permitted message to the
+                        professor.
+                      </Empty>
+                    )}
+                    <div className="bk-days">
+                      {groups.map((group) => (
+                        <section className="bk-day" key={group.date}>
+                          <h3 className="bk-day__title">
+                            {dayHeading(group.date)}
+                          </h3>
+                          <div
+                            className="bk-slots"
+                            role="group"
+                            aria-label={`Times on ${formatDate(group.date)}`}
+                          >
+                            {group.slots.map((slot) => {
+                              const open = slot.state === 'open'
+                              const active = selectedSlot === slot.id
+                              return (
+                                <motion.button
+                                  type="button"
+                                  key={slot.id}
+                                  className="bk-slot"
+                                  data-state={slot.state}
+                                  disabled={!open}
+                                  aria-pressed={active}
+                                  whileTap={open ? { scale: 0.95 } : undefined}
+                                  onClick={() => setSelectedSlot(slot.id)}
+                                >
+                                  {active && (
+                                    <motion.span
+                                      layoutId="bk-thumb"
+                                      className="bk-slot__thumb"
+                                      transition={
+                                        reduce
+                                          ? { duration: 0 }
+                                          : {
+                                              type: 'spring',
+                                              stiffness: 520,
+                                              damping: 30,
+                                            }
+                                      }
+                                    />
+                                  )}
+                                  <span className="bk-slot__time">
+                                    {formatClock(slot.start)}
+                                  </span>
+                                  {!open && (
+                                    <span className="bk-slot__label">
+                                      {slot.state === 'unavailable'
+                                        ? 'Unavailable'
+                                        : slot.state === 'requested'
+                                          ? 'Requested'
+                                          : 'Booked'}
+                                    </span>
+                                  )}
+                                </motion.button>
+                              )
+                            })}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                    <p className="accs-meta">Local campus time. Each slot runs 30 minutes unless noted.</p>
+                  </Panel>
+                )}
+                {step.n === 3 && (
+                  <Panel title="What do you want to discuss?">
+                    {chosen && (
+                      <p className="bk-recap">
+                        <Icon name="clock" size={16} />
+                        {slotTime(chosen)}
+                      </p>
+                    )}
+                    <TextArea
+                      label="Topic"
+                      value={purpose}
+                      onChange={(value) => {
+                        setPurpose(value)
+                        setPurposeError('')
+                      }}
+                      maxLength={300}
+                      showCount
+                      isRequired
+                      isInvalid={Boolean(purposeError)}
+                      errorMessage={purposeError}
+                    />
+                  </Panel>
+                )}
+                {step.n === 4 && (
+                  <Panel title="Confirm your request">
+                    <dl className="sc-facts">
+                      <div>
+                        <dt>Professor</dt>
+                        <dd>{faculty.name}</dd>
+                      </div>
+                      <div>
+                        <dt>Date and time</dt>
+                        <dd>{chosen ? slotTime(chosen) : '—'}</dd>
+                      </div>
+                      <div className="sc-facts__wide">
+                        <dt>Topic</dt>
+                        <dd>{purpose.trim() || '—'}</dd>
+                      </div>
+                    </dl>
+                    <Alert
+                      tone="neutral"
+                      title="Nothing is booked until your professor confirms"
+                    >
+                      A request starts as Requested. Check its status before
+                      attending.
+                    </Alert>
+                    {purposeError && (
+                      <Alert tone="danger" title="Check your request">
+                        {purposeError}
+                      </Alert>
+                    )}
+                    {!conflict && <ActionError error={action.error} />}
+                  </Panel>
+                )}
+              </motion.div>
+            </AnimatePresence>
+            <div className="bk-actions">
+              {step.n > 1 ? (
+                <Button variant="secondary" onPress={() => go(step.n - 1)}>
+                  Back
+                </Button>
+              ) : (
+                <span />
+              )}
+              {step.n < 4 ? (
+                <Button
+                  iconEnd="arrow-right"
+                  isDisabled={step.n === 2 && !selectedSlot}
+                  onPress={next}
+                >
+                  Continue
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  loading={action.isPending}
+                  isDisabled={!selectedSlot}
+                >
+                  Request this time
+                </Button>
+              )}
+            </div>
+          </form>
+          <Panel title="Professor">
+            <div className="sc-profile">
+              <Avatar name={faculty.name} size="lg" />
+              <div>
+                <strong>{faculty.name}</strong>
+                <p className="accs-meta">{faculty.title ?? 'Faculty'}</p>
+              </div>
+            </div>
+            <dl className="sc-facts sc-facts--stack">
+              {faculty.office && (
+                <div>
+                  <dt>Office</dt>
+                  <dd>{faculty.office}</dd>
+                </div>
+              )}
+              {faculty.email && (
+                <div>
+                  <dt>Email</dt>
+                  <dd>{faculty.email}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Open times this week</dt>
+                <dd>{openCount}</dd>
+              </div>
+            </dl>
+          </Panel>
+        </div>
+      </div>
     </>
   )
 }
@@ -1325,17 +1558,6 @@ function RequestPage({
     (status) => faculty || status === 'Cancelled',
   )
   const latest = consultation.history.at(-1)
-  const events: CaseEvent[] = consultation.history.map((entry, index) => ({
-    title: entry.status,
-    actor:
-      entry.actorId === consultation.facultyId
-        ? 'Professor'
-        : 'Requesting student',
-    body: entry.note,
-    date: displayDate(entry.at, true),
-    dateTime: entry.at,
-    state: index === consultation.history.length - 1 ? 'current' : 'done',
-  }))
   const labels: Partial<Record<ConsultationStatus, string>> = {
     Approved: 'Approve',
     Booked: 'Book',
@@ -1377,83 +1599,138 @@ function RequestPage({
 
   return (
     <>
-      <Breadcrumbs
-        items={[
+      <PageHeader
+        crumbs={[
           { label: 'Consultations', href: '/consultations' },
-          { label: displayDate(consultation.slot.date) },
+          { label: formatDate(consultation.slot.date) },
         ]}
-      />
-      <Heading
         title={
           faculty
             ? `Request from ${consultation.student.name}`
             : `Consultation with ${consultation.faculty.name}`
         }
+        description={slotTime(consultation.slot)}
         actions={<StatusBadge status={consultation.status} />}
       />
-      <dl className="ds-record__facts">
-        <div>
-          <dt>Date and time</dt>
-          <dd>{slotTime(consultation.slot)}</dd>
-        </div>
-        <div>
-          <dt>Requested at</dt>
-          <dd>{displayDate(consultation.createdAt, true)}</dd>
-        </div>
-        <div>
-          <dt>Topic</dt>
-          <dd>{consultation.purpose}</dd>
-        </div>
-        <div>
-          <dt>Last decision</dt>
-          <dd>
-            {consultation.history.length > 1
-              ? displayDate(latest?.at, true)
-              : 'Awaiting decision'}
-          </dd>
-        </div>
-        <div>
-          <dt>Reason or update</dt>
-          <dd>{latest?.note ?? '—'}</dd>
-        </div>
-      </dl>
-      <SectionHeader level={2} title="Request history" />
-      <CaseTimeline events={events} label="Consultation request history" />
-      <ActionError
-        error={action.error}
-        title={
-          action.error instanceof ApiError && action.error.status === 409
-            ? 'This time could not be changed'
-            : undefined
-        }
-      />
-      <Row>
-        {next.map((status) => (
-          <Button
-            key={status}
-            variant={
-              status === 'Cancelled'
-                ? faculty
-                  ? 'destructive'
-                  : 'secondary'
-                : status === 'Declined'
-                  ? 'secondary'
-                  : 'primary'
-            }
-            loading={action.isPending}
-            onPress={() => chooseDecision(status)}
+      <div className="accs-stack accs-stagger">
+        {next.length > 0 && (
+          <Panel
+            className="sc-actionbar"
+            title={faculty ? 'Respond to this request' : 'Manage this request'}
           >
-            {labels[status]}
-          </Button>
-        ))}
-      </Row>
-      {/* TBD(D-04): cancellation notice periods and rescheduling rules are not approved. */}
-      {next.includes('Cancelled') && (
-        <Alert tone="neutral" title="Cancellation policy is under review">
-          A cancellation needs a reason and stays in the request history.
-          Rescheduling requires a new open time.
-        </Alert>
-      )}
+            <ActionError
+              error={action.error}
+              title={
+                action.error instanceof ApiError && action.error.status === 409
+                  ? 'This time could not be changed'
+                  : undefined
+              }
+            />
+            <div className="sc-actionbar__buttons">
+              {next.map((status) => (
+                <Button
+                  key={status}
+                  variant={
+                    status === 'Cancelled'
+                      ? faculty
+                        ? 'destructive'
+                        : 'secondary'
+                      : status === 'Declined'
+                        ? 'secondary'
+                        : 'primary'
+                  }
+                  loading={action.isPending}
+                  onPress={() => chooseDecision(status)}
+                >
+                  {labels[status]}
+                </Button>
+              ))}
+            </div>
+            {/* TBD(D-04): cancellation notice periods and rescheduling rules are not approved. */}
+            {next.includes('Cancelled') && (
+              <p className="accs-meta">
+                A cancellation needs a reason and stays in the request history.
+                Rescheduling requires a new open time. Cancellation policy is
+                under review.
+              </p>
+            )}
+          </Panel>
+        )}
+        <div className="accs-split">
+          <div className="accs-stack">
+            <Panel title="Details">
+              <dl className="sc-facts">
+                <div>
+                  <dt>Date and time</dt>
+                  <dd>{slotTime(consultation.slot)}</dd>
+                </div>
+                <div>
+                  <dt>Requested at</dt>
+                  <dd>{formatDateTime(consultation.createdAt)}</dd>
+                </div>
+                <div className="sc-facts__wide">
+                  <dt>Topic</dt>
+                  <dd>{consultation.purpose}</dd>
+                </div>
+                <div>
+                  <dt>Last decision</dt>
+                  <dd>
+                    {consultation.history.length > 1
+                      ? formatDateTime(latest?.at)
+                      : 'Awaiting decision'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Reason or update</dt>
+                  <dd>{latest?.note || '—'}</dd>
+                </div>
+              </dl>
+            </Panel>
+            <Panel title="Request history">
+              <ol
+                className="accs-timeline sc-tl"
+                aria-label="Consultation request history"
+              >
+                {consultation.history.map((entry, index) => (
+                  <li key={`${entry.at}-${index}`}>
+                    <div className="sc-tl__head">
+                      <StatusBadge status={entry.status} />
+                      <span className="accs-timeline__time">
+                        {formatDateTime(entry.at)} ·{' '}
+                        {entry.actorId === consultation.facultyId
+                          ? 'Professor'
+                          : 'Requesting student'}
+                      </span>
+                    </div>
+                    {entry.note && <p className="sc-tl__note">{entry.note}</p>}
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          </div>
+          <Panel flush title="People">
+            <ul className="accs-rows">
+              {[
+                { person: consultation.student, role: 'Student' },
+                { person: consultation.faculty, role: 'Professor' },
+              ].map(({ person, role }) => (
+                <li key={role}>
+                  <div className="accs-row accs-row--people">
+                    <Avatar name={person.name} />
+                    <span>
+                      <span className="accs-row__title">{person.name}</span>
+                      <span className="accs-row__sub">
+                        {role}
+                        {person.title ? ` · ${person.title}` : ''}
+                      </span>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </div>
+      </div>
       <Modal
         title={
           decision === 'Declined'
@@ -1500,8 +1777,16 @@ function RequestPage({
   )
 }
 
+const slotStateLabel: Record<Slot['state'], string> = {
+  open: 'Available',
+  unavailable: 'Unavailable',
+  requested: 'Requested',
+  booked: 'Booked',
+}
+
 function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const action = useScheduleAction('P17')
+  const reduce = useReducedMotion()
   const consultationsQuery = useQuery(pageQuery('P14'))
   const slots = list<Slot>(page.data.slots)
   const consultations = list<Consultation>(
@@ -1521,10 +1806,12 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
     (_, index) =>
       `${String(6 + Math.floor(index / 2)).padStart(2, '0')}:${index % 2 ? '30' : '00'}`,
   )
-  const days = weekDays(week)
-  const weekSlots = slots.filter((slot) =>
-    days.some((day) => day.id === slot.date),
-  )
+  const weekEnd = addDays(week, 7)
+  const weekSlots = slots
+    .filter((slot) => slot.date >= week && slot.date < weekEnd)
+    .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))
+  const count = (...states: Slot['state'][]) =>
+    weekSlots.filter((slot) => states.includes(slot.state)).length
   const booked =
     selectedSlot && ['booked', 'requested'].includes(selectedSlot.state)
   const selectedRequest = consultations.find(
@@ -1532,21 +1819,25 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       consultation.slotId === selectedSlot?.id &&
       !['Completed', 'Declined', 'Cancelled'].includes(consultation.status),
   )
-  const events: TimetableEvent[] = weekSlots.map((slot) => ({
+  const events: CalendarEvent[] = weekSlots.map((slot) => ({
     id: slot.id,
-    day: slot.date,
-    start: decimalTime(slot.start, 8),
-    end: decimalTime(slot.end, 9),
+    date: slot.date,
+    start: slot.start,
+    end: slot.end,
+    time: slotRange(slot),
     title:
       slot.state === 'open'
-        ? 'Available for consultation'
+        ? 'Available'
         : slot.state === 'unavailable'
           ? 'Unavailable'
           : 'Consultation request',
-    lane: 'consult',
-    form: slotForm(slot),
-    time: `${slot.start}–${slot.end}`,
-    onPress: () => setSelectedSlot(slot),
+    type: slotStateLabel[slot.state],
+    tone:
+      slot.state === 'open'
+        ? 'open'
+        : slot.state === 'unavailable'
+          ? 'unavailable'
+          : 'consult',
   }))
 
   async function saveTimes(event: FormEvent) {
@@ -1559,7 +1850,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       (slot) => slot.date === date && slot.start < end && slot.end > start,
     )
     if (overlap) {
-      setFieldError(`Overlaps ${overlap.start}–${overlap.end}.`)
+      setFieldError(`Overlaps ${slotRange(overlap)}.`)
       return
     }
     try {
@@ -1601,7 +1892,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 
   function slotActions(slot: Slot) {
     return (
-      <div className="app-page">
+      <div className="sc-detail">
         <p>{slotTime(slot)}</p>
         <Button
           variant="secondary"
@@ -1624,9 +1915,9 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 
   return (
     <>
-      <Heading
+      <PageHeader
         title="My availability"
-        description="Your own consultation schedule · local campus time"
+        description="Your own consultation schedule, in local campus time."
         actions={
           <Button
             icon="plus"
@@ -1639,84 +1930,158 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
           </Button>
         }
       />
-      <Row justify="between">
-        <SegmentedControl
-          aria-label="Availability view"
-          selectedKey={view}
-          onSelectionChange={(key) => setView(String(key))}
-        >
-          <Segment id="week">Week</Segment>
-          <Segment id="list">List</Segment>
-        </SegmentedControl>
-        <Row gap={8}>
-          <IconButton
-            icon="caret-left"
-            label="Previous week"
-            onPress={() => setWeek(addDays(week, -7))}
+      <div className="accs-stack accs-stagger">
+        <Kpis label="This week">
+          <Kpi label="Open" value={<CountUp value={count('open')} />} note="Students can request" />
+          <Kpi
+            label="Requested or booked"
+            value={<CountUp value={count('requested', 'booked')} />}
+            note="Need your attention"
           />
-          <Button
-            variant="tertiary"
-            onPress={() => setWeek(weekStart(today()))}
-          >
-            This week
-          </Button>
-          <IconButton
-            icon="caret-right"
-            label="Next week"
-            onPress={() => setWeek(addDays(week, 7))}
+          <Kpi
+            label="Unavailable"
+            value={<CountUp value={count('unavailable')} />}
+            note="Blocked out"
           />
-        </Row>
-      </Row>
-      <SectionHeader level={2} title={`Week of ${displayDate(week)}`} />
-      {view === 'week' ? (
-        <Timetable
-          label="My consultation availability"
-          days={days}
-          events={events}
-          startHour={6}
-          endHour={20}
-        />
-      ) : (
-        <div className="app-card-list">
-          {weekSlots.map((slot) =>
-            ['booked', 'requested'].includes(slot.state) ? (
-              <TimeBlock
-                key={slot.id}
-                title="Consultation request"
-                time={slotTime(slot)}
-                lane="consult"
-                form={slotForm(slot)}
-                onPress={() => setSelectedSlot(slot)}
-              />
-            ) : (
-              <Popover
-                key={slot.id}
-                trigger={
-                  <Button variant="secondary">
-                    {slotTime(slot)} ·{' '}
-                    {slot.state === 'open' ? 'Available' : 'Unavailable'}
-                  </Button>
-                }
-                title="Availability options"
-              >
-                {slotActions(slot)}
-              </Popover>
-            ),
-          )}
+        </Kpis>
+        <div className="sc-bar">
+          <div className="sc-bar__nav">
+            <IconButton
+              icon="caret-left"
+              label="Previous week"
+              onPress={() => setWeek(addDays(week, -7))}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => setWeek(weekStart(today()))}
+            >
+              This week
+            </Button>
+            <IconButton
+              icon="caret-right"
+              label="Next week"
+              onPress={() => setWeek(addDays(week, 7))}
+            />
+            <h2 className="sc-bar__label" aria-live="polite">
+              {weekLabel(week)}
+            </h2>
+          </div>
+          <Segmented
+            id="availability-view"
+            label="Availability view"
+            value={view}
+            onChange={setView}
+            items={[
+              { id: 'week', label: 'Week' },
+              { id: 'list', label: 'List' },
+            ]}
+          />
         </div>
-      )}
-      {!weekSlots.length && (
-        <EmptyState
-          title="No availability posted this week"
-          description="Add an open or unavailable time to your own schedule."
-        />
-      )}
-      <ActionError error={action.error} />
-      {/* TBD(D-04): external calendar sync, recurrence and booking-change policy are not approved. */}
-      <Alert tone="neutral" title="Calendar sync is under review">
-        Changes here update ACCS availability. External calendar synchronization
-        and recurring times are not configured.
-      </Alert>
+        <Panel flush aria-label="Availability">
+          {view === 'week' ? (
+            <>
+              <EventCalendar
+                date={week}
+                view="week"
+                label="My consultation availability"
+                events={events}
+                startHour={6}
+                endHour={20}
+                onEventPress={(event) =>
+                  setSelectedSlot(slots.find((slot) => slot.id === event.id))
+                }
+              />
+              {!weekSlots.length && (
+                <Empty title="No availability posted this week">
+                  Add an open or unavailable time to your own schedule.
+                </Empty>
+              )}
+            </>
+          ) : weekSlots.length ? (
+            <ul className="sc-rows">
+              <AnimatePresence initial={false}>
+                {weekSlots.map((slot) => {
+                  const locked = ['booked', 'requested'].includes(slot.state)
+                  return (
+                    <motion.li
+                      key={slot.id}
+                      layout={!reduce}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.24, ease }}
+                    >
+                      <div className="accs-row sc-slotrow">
+                        <DateTile value={slot.date} />
+                        <span>
+                          <span className="accs-row__title">
+                            {slotRange(slot)}
+                          </span>
+                          <span className="accs-row__sub">
+                            {dayHeading(slot.date)}
+                          </span>
+                        </span>
+                        <span className="sc-slotrow__actions">
+                          <span
+                            className="ec-badge"
+                            data-etone={
+                              slot.state === 'open'
+                                ? 'open'
+                                : slot.state === 'unavailable'
+                                  ? 'unavailable'
+                                  : 'consult'
+                            }
+                          >
+                            {slotStateLabel[slot.state]}
+                          </span>
+                          {locked ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onPress={() => setSelectedSlot(slot)}
+                            >
+                              View
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                isDisabled={action.isPending}
+                                onPress={() => void changeSlot(slot)}
+                              >
+                                {slot.state === 'open'
+                                  ? 'Mark unavailable'
+                                  : 'Mark available'}
+                              </Button>
+                              <IconButton
+                                icon="x"
+                                label={`Delete ${slotTime(slot)}`}
+                                onPress={() => void changeSlot(slot, true)}
+                              />
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </motion.li>
+                  )
+                })}
+              </AnimatePresence>
+            </ul>
+          ) : (
+            <Empty title="No availability posted this week">
+              Add an open or unavailable time to your own schedule.
+            </Empty>
+          )}
+        </Panel>
+        <ActionError error={action.error} />
+        {/* TBD(D-04): external calendar sync, recurrence and booking-change policy are not approved. */}
+        <p className="accs-meta">
+          Changes here update ACCS availability. External calendar sync and
+          recurring times are not configured yet.
+        </p>
+      </div>
       <Modal title="Add times" isOpen={addOpen} onOpenChange={setAddOpen}>
         <form onSubmit={saveTimes}>
           <ModalBody>
@@ -1726,7 +2091,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 isRequired
                 onChange={(value) => setDate(value?.toString() ?? '')}
               />
-              <Row>
+              <div className="sc-timepair">
                 <Select
                   label="Start"
                   selectedKey={start}
@@ -1734,7 +2099,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 >
                   {times.map((time) => (
                     <SelectOption key={time} id={time}>
-                      {time}
+                      {formatClock(time)}
                     </SelectOption>
                   ))}
                 </Select>
@@ -1745,11 +2110,11 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 >
                   {times.map((time) => (
                     <SelectOption key={time} id={time}>
-                      {time}
+                      {formatClock(time)}
                     </SelectOption>
                   ))}
                 </Select>
-              </Row>
+              </div>
               <RadioGroup
                 label="Availability"
                 row
@@ -1806,7 +2171,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         <ModalBody>
           {selectedSlot &&
             (booked ? (
-              <div className="app-page">
+              <div className="sc-detail">
                 <p>{slotTime(selectedSlot)}</p>
                 <p>
                   The consultation remains on both calendars until a

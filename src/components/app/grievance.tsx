@@ -1,19 +1,18 @@
 import {
-  Alert, Badge, Breadcrumbs, Button, CaseTimeline, Cell, Checkbox, Column, DatePicker,
-  Drawer, EmptyState, FileUpload, Grid, Link, MenuButton, MenuItem, Modal, ModalActions,
-  ModalBody, Pagination, PrivacyNotice, Radio, RadioGroup, ReportRecord, ReportsTable,
-  Row, SectionHeader, Segment, SegmentedControl, Select, SelectOption, Severity,
-  Stepper, Tab, TabList, TabPanel, Table, TableBody, TableHeader, TableRow, Tabs,
-  TextArea, TextField, ViewState, toast,
-  type BadgeForm, type BadgeTone, type CaseEvent, type SortDescriptor,
+  Alert, Button, Checkbox, DatePicker, Drawer, Grid, Icon, Link, MenuButton, MenuItem, Modal,
+  ModalActions, ModalBody, Pagination, PrivacyNotice, Radio, RadioGroup, Search, Select,
+  SelectOption, TextArea, TextField, ViewState, toast,
+  type SortDescriptor,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, LayoutGroup, MotionConfig, animate, motion, useMotionValue, useTransform, type Variants } from 'motion/react'
 import { useEffect, useState } from 'react'
 
 import { performPageAction, type PageAction, type PageEnvelope } from '@/lib/api'
 import { sessionQuery } from '@/lib/queries'
-import { FilterBar } from '@/components/ds-next'
+import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
 import { RestrictedView } from '@/components/app/guards'
+import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import './grievance.css'
 
 type Item = Record<string, unknown>
@@ -21,20 +20,30 @@ type Identity = 'named' | 'anonymous'
 type SeverityLevel = 'low' | 'medium' | 'high'
 type Report = Item & { id: string; category: string; severity: SeverityLevel; status: string; stage: string; office: string }
 
+const ease = [0.16, 1, 0.3, 1] as const
+const spring = { type: 'spring', stiffness: 420, damping: 38 } as const
+
 const object = (value: unknown): Item => value && typeof value === 'object' && !Array.isArray(value) ? value as Item : {}
 const items = (value: unknown): Item[] => Array.isArray(value) ? value.map(object) : []
 const words = (value: unknown, fallback = '') => typeof value === 'string' || typeof value === 'number' ? String(value) : fallback
-const date = (value: unknown) => {
-  const raw = words(value)
-  const parsed = new Date(raw)
-  return raw && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
-}
+const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const isClosed = (report: Item) => ['Resolved', 'Closed'].includes(words(report.status))
 const reportReference = (report: Item) => words(report.caseFileId, words(report.id))
-const reportForm = (report: Item): BadgeForm => isClosed(report) ? report.status === 'Closed' ? 'closed' : 'solid' : 'pending'
-const reportTone = (report: Item): BadgeTone => report.status === 'Resolved' ? 'success' : report.caseFileId ? 'info' : 'neutral'
 const severity = (report: Item): SeverityLevel => ['low', 'medium', 'high'].includes(words(report.severity)) ? report.severity as SeverityLevel : 'medium'
+const severityTone: Record<SeverityLevel, Tone> = { high: 'danger', medium: 'warn', low: 'neutral' }
 const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new Date(words(report.updatedAt, words(report.createdAt))).getTime()) / 86400000)) || 0
+const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
+const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
+
+// Pipeline: the six handling stages plus Resolved, mapped from stage and status.
+const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
+const stageOf = (report: Item): string => isClosed(report) ? 'resolved'
+  : report.stage === 'executive' ? 'osas'
+    : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
+      : words(report.stage, 'adviser')
+const stageIndex = (report: Item) => Math.max(0, stages.findIndex(([key]) => key === stageOf(report)))
+const stageStep = (report: Item) => Math.max(1, stageIndex(report))
+const stageLabel = (report: Item) => report.stage === 'executive' && !isClosed(report) ? "President's office" : stages[stageIndex(report)][1]
 
 function useAction(pageId: string) {
   const queryClient = useQueryClient()
@@ -54,30 +63,97 @@ function ActionError({ error }: { error: unknown }) {
   return error ? <Alert tone="danger" title="The change couldn't be saved">{error instanceof Error ? error.message : 'Try again. Your entered text is kept.'}</Alert> : null
 }
 
-function Heading({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
-  return <SectionHeader level={1} split title={title} description={description} actions={<Row gap={8}><Badge outline marker={false}>Sample data</Badge>{actions}</Row>} />
+/** Quiet one-line privacy explanation. */
+function Note({ children }: { children: React.ReactNode }) {
+  return <p className="gv-note"><Icon name="lock" size={16} /><span>{children}</span></p>
 }
 
 function Facts({ values }: { values: Array<[string, React.ReactNode]> }) {
-  return <dl className="ds-record__facts">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+  return <dl className="gv-facts">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
 }
 
-function ReportStatus({ report }: { report: Item }) {
-  return <Row gap={8}><Badge form={reportForm(report)} tone={reportTone(report)}>{words(report.status, 'Submitted')}</Badge><Severity level={severity(report)} /></Row>
+function Count({ value }: { value: number }) {
+  const motionValue = useMotionValue(0)
+  const rounded = useTransform(motionValue, (latest) => Math.round(latest))
+  useEffect(() => {
+    const controls = animate(motionValue, value, { duration: 0.7, ease })
+    return () => controls.stop()
+  }, [motionValue, value])
+  return <motion.span>{rounded}</motion.span>
+}
+
+function SeverityChip({ report }: { report: Item }) {
+  return <StatusChip tone={severityTone[severity(report)]}>{cap(severity(report))}</StatusChip>
+}
+
+/** Segmented pills with a sliding current indicator. */
+function PillGroup({ id, label, value, options, onChange }: { id: string; label: string; value: string; options: Array<{ id: string; label: string }>; onChange: (value: string) => void }) {
+  return (
+    <LayoutGroup id={id}>
+      <div className="gv-pills" role="group" aria-label={label}>
+        {options.map((option) => (
+          <button key={option.id} type="button" className="gv-pill" aria-pressed={value === option.id} onClick={() => onChange(option.id)}>
+            {value === option.id && <motion.span layoutId="gv-pill-bg" className="gv-pill__bg" transition={spring} />}
+            <span className="gv-pill__text">{option.label}</span>
+          </button>
+        ))}
+      </div>
+    </LayoutGroup>
+  )
+}
+
+/** Horizontal stage strip with counts. Segments filter when `onSelect` is given. */
+function Pipeline({ records, active = '', onSelect }: { records: Item[]; active?: string; onSelect?: (key: string) => void }) {
+  return (
+    <nav className="gv-pipe" aria-label="Reports by stage">
+      <LayoutGroup id="gv-pipe">
+        <ol>
+          {stages.map(([key, name]) => {
+            const on = active === key
+            const count = records.filter((report) => stageOf(report) === key).length
+            const inner = <>
+              {on && <motion.span layoutId="gv-pipe-ind" className="gv-pipe__ind" transition={spring} />}
+              <span className="gv-pipe__name">{name}</span>
+              <span className="gv-pipe__count"><Count value={count} /></span>
+            </>
+            return (
+              <li key={key} data-empty={count === 0 || undefined} data-last={key === 'resolved' || undefined}>
+                {onSelect
+                  ? <button type="button" className="gv-pipe__seg" aria-pressed={on} onClick={() => onSelect(on ? '' : key)}>{inner}</button>
+                  : <div className="gv-pipe__seg">{inner}</div>}
+              </li>
+            )
+          })}
+        </ol>
+      </LayoutGroup>
+    </nav>
+  )
 }
 
 function Timeline({ report, handler = false }: { report: Item; handler?: boolean }) {
   const history = items(report.history)
-  if (!history.length) return <ViewState kind="empty" title="No milestones yet" description="Updates recorded by the responsible office will appear here." />
-  const events: CaseEvent[] = history.map((entry) => ({
-    title: <>{words(entry.action, 'Update recorded')} {handler && entry.public === true && <Badge outline marker={false}>Shown to reporter</Badge>}</>,
-    actor: handler ? entry.actorRole === 'student' ? 'Verified reporter' : words(entry.actorRole, words(entry.office, 'Handling office')) : words(entry.office),
-    body: handler ? [words(entry.reason), words(entry.update)].filter(Boolean).join(' · ') : words(entry.update),
-    date: date(entry.at),
-    dateTime: words(entry.at),
-    state: entry.state === 'current' ? 'current' : 'done',
-  }))
-  return <CaseTimeline events={events} label={handler ? 'Case history' : 'Report progress'} />
+  if (!history.length) return <Empty title="No updates yet">Updates recorded by the responsible office will appear here.</Empty>
+  const hasCurrent = history.some((entry) => entry.state === 'current')
+  return (
+    <ol className="accs-timeline gv-timeline" aria-label={handler ? 'Case history' : 'Report progress'}>
+      {history.map((entry, index) => {
+        const actor = handler ? entry.actorRole === 'student' ? 'Verified reporter' : words(entry.actorRole, words(entry.office, 'Handling office')) : words(entry.office)
+        const body = handler ? [words(entry.reason), words(entry.update)].filter(Boolean).join(' · ') : words(entry.update)
+        const current = entry.state === 'current' || (!hasCurrent && index === history.length - 1)
+        return (
+          <motion.li key={words(entry.id, String(index))} data-current={current || undefined} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, ease, delay: 0.1 + index * 0.07 }}>
+            <p className="gv-ev__head">
+              <strong>{words(entry.action, 'Update recorded')}</strong>
+              {actor && <span className="accs-tag gv-cap">{actor}</span>}
+              {handler && entry.public === true && <span className="accs-tag">Shown to reporter</span>}
+            </p>
+            {body && <p className="gv-ev__body">{body}</p>}
+            <time className="accs-timeline__time" dateTime={words(entry.at)}>{formatDateTime(entry.at)}</time>
+          </motion.li>
+        )
+      })}
+    </ol>
+  )
 }
 
 export function IdentityChoice({
@@ -116,15 +192,13 @@ export function IdentityChoice({
     )
   }
   return (
-    <div className="app-page">
+    <div className="gv-stack">
       <RadioGroup label="How should handlers see you?" value={value} onChange={(next) => onChange(next as Identity)} isRequired>
         <Radio value="named" card description="The responsible office sees your verified name.">Use my name</Radio>
         {allowAnonymous && <Radio value="anonymous" card description="The responsible office sees an alias until you share your name with that office.">Stay anonymous for now</Radio>}
       </RadioGroup>
       {!allowAnonymous && <Alert tone="neutral" title="Anonymous reporting is paused">You can still submit a report under your name. <Link href="/standing">View account standing</Link>.</Alert>}
-      <PrivacyNotice title="Identity and access are separate">
-        Anonymous means the people handling your report see an alias. The report is still tied to your verified account. You can share your name later.
-      </PrivacyNotice>
+      <Note>Anonymous means the people handling your report see an alias. The report is still tied to your verified account. You can share your name later.</Note>
     </div>
   )
 }
@@ -153,8 +227,8 @@ function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: stri
   const reply = words(object(action.data?.record).reply)
   return (
     <Drawer title="Help with your draft" isOpen={isOpen} onOpenChange={onOpenChange}>
-      <div className="app-page">
-        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. This prototype provides approved writing guidance.</Alert>
+      <div className="gv-stack">
+        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. It offers approved writing guidance only.</Alert>
         <Button variant="secondary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Show writing guidance</Button>
         <ActionError error={action.error} />
         {reply && <p className="ds-prose">{reply}</p>}
@@ -167,6 +241,28 @@ function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: stri
 
 type Draft = { narrative: string; category: string; severity: SeverityLevel | ''; identity: Identity; location: string; occurredOn: string; conflictedAdviser: boolean }
 const blankDraft: Draft = { narrative: '', category: '', severity: '', identity: 'named', location: '', occurredOn: '', conflictedAdviser: false }
+
+const stepNames = ['Describe', 'Classify', 'Identity', 'Review']
+const stepMotion: Variants = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 28 }),
+  center: { opacity: 1, x: 0 },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -28 }),
+}
+
+/** Numbered sequence with a connector that fills as steps complete. */
+function StepIndicator({ current }: { current: number }) {
+  return (
+    <ol className="gv-steps" aria-label="Report steps">
+      {stepNames.map((name, index) => (
+        <li key={name} className="gv-steps__item" data-state={index < current ? 'done' : index === current ? 'current' : 'todo'} aria-current={index === current ? 'step' : undefined}>
+          <span className="gv-steps__dot">{index < current ? <Icon name="check" size={16} /> : index + 1}</span>
+          <span className="gv-steps__name">{name}</span>
+          {index < stepNames.length - 1 && <span className="gv-steps__line" aria-hidden><motion.span initial={false} animate={{ scaleX: index < current ? 1 : 0 }} transition={{ duration: 0.4, ease }} /></span>}
+        </li>
+      ))}
+    </ol>
+  )
+}
 
 export function ReportWizard({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
@@ -184,6 +280,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
     }
   })
   const [step, setStep] = useState(0)
+  const [dir, setDir] = useState(1)
   const [error, setError] = useState('')
   const [discardOpen, setDiscardOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -192,6 +289,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
   const source = object(page.data.sourcePost)
   const categories = Array.isArray(page.data.categories) ? page.data.categories.map(String) : []
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }))
+  const go = (next: number) => { setDir(next > step ? 1 : -1); setStep(next) }
 
   useEffect(() => {
     if (submitted) return
@@ -224,73 +322,106 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
 
   if (submitted) {
     return (
-      <div className="app-page">
-        <Heading title="Report submitted" />
-        <Alert tone="success" title="Report submitted">
-          Your reference is <span className="ds-table__ref">{words(submitted.id)}</span>. {words(submitted.status, 'The responsible office has received it.')}
-        </Alert>
-        <Button href={'/reports/' + encodeURIComponent(words(submitted.id))}>View report</Button>
-      </div>
+      <MotionConfig reducedMotion="user">
+        <div className="gv-wizard gv-page">
+          <PageHeader title="Report submitted" crumbs={[{ label: 'My reports', href: '/reports' }, { label: 'New report' }]} />
+          <Panel className="gv-done">
+            <motion.span className="gv-done__mark" initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ ...spring, delay: 0.15 }}><Icon name="check" size={24} /></motion.span>
+            <p className="gv-done__ref">Your reference <span className="accs-mono">{words(submitted.id)}</span></p>
+            <p className="gv-done__text">{words(submitted.status, 'The responsible office has received it.')}</p>
+            <div><Button href={reportPath(submitted)}>View report</Button></div>
+          </Panel>
+        </div>
+      </MotionConfig>
     )
   }
   return (
-    <div className="app-page grievance-reading">
-      <Breadcrumbs items={[{ label: 'My reports', href: '/reports' }, { label: 'New report' }]} />
-      <Heading title="New report" actions={<MenuButton label="Draft" onAction={(key) => key === 'save' ? saveDraft() : setDiscardOpen(true)}><MenuItem id="save">Save draft</MenuItem><MenuItem id="discard" danger>Discard draft</MenuItem></MenuButton>} />
-      <Stepper label="Report steps" steps={['Describe', 'Classify', 'Identity', 'Review']} current={step} />
-      {words(source.id) && <Alert tone="info" title={'Linked to your discussion "' + words(source.title) + '"'}>The link is kept only if you choose to submit this report.</Alert>}
-      {error && <Alert tone="danger" title="Check this step">{error}</Alert>}
-      {action.error && action.variables?.action === 'saveDraft' ? <Alert tone="danger" title="Couldn't save your draft">Your text is kept on this device. Try saving again.</Alert> : <ActionError error={action.error} />}
-      {step === 0 && (
-        <div className="app-page">
-          <TextArea label="What happened" isRequired showCount maxLength={4000} value={draft.narrative} onChange={(value) => update('narrative', value)} description="Say what happened, when, and where. Leave out names you don't need to share." isInvalid={Boolean(error && !draft.narrative.trim())} errorMessage={error && !draft.narrative.trim() ? error : undefined} />
-          <Grid columns={2}>
-            <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + draft.occurredOn : 'Optional'} />
-            <TextField label="Where" value={draft.location} onChange={(value) => update('location', value)} maxLength={200} description="Optional" />
-          </Grid>
-          {/* TBD(D-08): attachment access and retention policy is not approved. */}
-          <FileUpload label="Attachments" isDisabled description="Attachments are not enabled while access and retention rules are being defined." />
-          <Button variant="secondary" onPress={() => setHelpOpen(true)}>Help me write this</Button>
-          <Alert tone="neutral" title="You review every submission">The assistant helps you write. It doesn't decide what happened or what happens next.</Alert>
+    <MotionConfig reducedMotion="user">
+      <div className="gv-wizard gv-page">
+        <PageHeader
+          title="New report"
+          description="Tell the right office what happened. You review everything before it is sent."
+          crumbs={[{ label: 'My reports', href: '/reports' }, { label: 'New report' }]}
+          actions={<MenuButton label="Draft" onAction={(key) => key === 'save' ? saveDraft() : setDiscardOpen(true)}><MenuItem id="save">Save draft</MenuItem><MenuItem id="discard" danger>Discard draft</MenuItem></MenuButton>}
+        />
+        <div className="gv-stack accs-reveal">
+          <StepIndicator current={step} />
+          {words(source.id) && <Alert tone="info" title={'Linked to your discussion "' + words(source.title) + '"'}>The link is kept only if you choose to submit this report.</Alert>}
+          {error && <Alert tone="danger" title="Check this step">{error}</Alert>}
+          {action.error && action.variables?.action === 'saveDraft' ? <Alert tone="danger" title="Couldn't save your draft">Your text is kept on this device. Try saving again.</Alert> : <ActionError error={action.error} />}
+          <Panel className="gv-form">
+            <AnimatePresence mode="wait" initial={false} custom={dir}>
+              <motion.div key={step} custom={dir} variants={stepMotion} initial="enter" animate="center" exit="exit" transition={{ duration: 0.26, ease }} className="gv-stack">
+                {step === 0 && <>
+                  <TextArea label="What happened" isRequired showCount maxLength={4000} value={draft.narrative} onChange={(value) => update('narrative', value)} description="Say what happened, when, and where. Leave out names you don't need to share." isInvalid={Boolean(error && !draft.narrative.trim())} errorMessage={error && !draft.narrative.trim() ? error : undefined} />
+                  <Grid columns={2}>
+                    <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + formatDate(draft.occurredOn) : 'Optional'} />
+                    <TextField label="Where" value={draft.location} onChange={(value) => update('location', value)} maxLength={200} description="Optional" />
+                  </Grid>
+                  {/* TBD(D-08): attachment access and retention policy is not approved. */}
+                  <p className="gv-hint">Attachments are not enabled while access and retention rules are being defined.</p>
+                  <div><Button variant="secondary" onPress={() => setHelpOpen(true)}>Help me write this</Button></div>
+                  <Note>The assistant helps you write. It doesn't decide what happened or what happens next.</Note>
+                </>}
+                {step === 1 && <>
+                  <Select label="Category" selectedKey={draft.category || null} onSelectionChange={(key) => update('category', String(key ?? ''))} isRequired>
+                    {categories.map((category) => <SelectOption id={category} key={category}>{category}</SelectOption>)}
+                  </Select>
+                  <RadioGroup label="How serious is it?" value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)} isRequired>
+                    <Radio value="low" card description="A concern with limited immediate impact.">Low</Radio>
+                    <Radio value="medium" card description="A concern affecting ongoing activities or support.">Medium</Radio>
+                    <Radio value="high" card description="A concern that needs prompt human review.">High</Radio>
+                  </RadioGroup>
+                  <Checkbox isSelected={draft.conflictedAdviser} onChange={(value) => update('conflictedAdviser', value)} description="This routes the report for independent review. It is not a finding.">The assigned adviser may be involved</Checkbox>
+                </>}
+                {step === 2 && <IdentityChoice value={draft.identity} onChange={(value) => update('identity', value)} allowAnonymous={page.data.anonymityAllowed !== false} />}
+                {step === 3 && <>
+                  <Facts values={[
+                    ['Category', draft.category], ['Severity', cap(draft.severity)], ['Identity', draft.identity === 'anonymous' ? 'Alias to handlers' : 'Use my name'],
+                    ['When', draft.occurredOn ? formatDate(draft.occurredOn) : 'Not specified'], ['Where', draft.location || 'Not specified'],
+                    ['Linked discussion', words(source.title, 'None')],
+                  ]} />
+                  <section className="gv-narrative"><h2 className="gv-sub">Your description</h2><p>{draft.narrative}</p></section>
+                  <div className="gv-edit-links"><Button variant="tertiary" onPress={() => go(0)}>Edit description</Button><Button variant="tertiary" onPress={() => go(1)}>Edit classification</Button><Button variant="tertiary" onPress={() => go(2)}>Edit identity choice</Button></div>
+                  <Note>Your report stays linked to your verified account. The responsible office reviews it and decides the next steps.</Note>
+                </>}
+              </motion.div>
+            </AnimatePresence>
+          </Panel>
+          <div className="gv-foot">
+            <Button variant="secondary" isDisabled={step === 0 || action.isPending} onPress={() => { setError(''); go(step - 1) }}>Back</Button>
+            {step < 3 ? <Button onPress={() => { if (validate(step)) go(step + 1) }}>Next</Button> : <Button loading={action.isPending} onPress={submit}>Submit report</Button>}
+          </div>
         </div>
-      )}
-      {step === 1 && (
-        <div className="app-page">
-          <Alert tone="neutral" title="Sample categories">These categories are provisional while the reporting policy is being defined.</Alert>
-          <Select label="Category" selectedKey={draft.category || null} onSelectionChange={(key) => update('category', String(key ?? ''))} isRequired>
-            {categories.map((category) => <SelectOption id={category} key={category}>{category}</SelectOption>)}
-          </Select>
-          <RadioGroup label="How serious is it?" value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)} isRequired>
-            <Radio value="low" card description="A concern with limited immediate impact."><Severity level="low" /></Radio>
-            <Radio value="medium" card description="A concern affecting ongoing activities or support."><Severity level="medium" /></Radio>
-            <Radio value="high" card description="A concern that needs prompt human review."><Severity level="high" /></Radio>
-          </RadioGroup>
-          <Checkbox isSelected={draft.conflictedAdviser} onChange={(value) => update('conflictedAdviser', value)} description="This routes the report for independent review. It is not a finding.">The assigned adviser may be involved</Checkbox>
-        </div>
-      )}
-      {step === 2 && <IdentityChoice value={draft.identity} onChange={(value) => update('identity', value)} allowAnonymous={page.data.anonymityAllowed !== false} />}
-      {step === 3 && (
-        <div className="app-page">
-          <Facts values={[
-            ['Category', draft.category], ['Severity', draft.severity], ['Identity', draft.identity === 'anonymous' ? 'Alias to handlers' : 'Use my name'],
-            ['When', draft.occurredOn || 'Not specified'], ['Where', draft.location || 'Not specified'],
-            ['Linked discussion', words(source.title, 'None')],
-          ]} />
-          <section className="ds-prose grievance-narrative"><h2>Your description</h2><p>{draft.narrative}</p></section>
-          <Row><Button variant="tertiary" onPress={() => setStep(0)}>Edit description</Button><Button variant="tertiary" onPress={() => setStep(1)}>Edit classification</Button><Button variant="tertiary" onPress={() => setStep(2)}>Edit identity choice</Button></Row>
-          <PrivacyNotice title="Before you submit">Your report stays linked to your verified account. The responsible office reviews it and decides the next steps.</PrivacyNotice>
-        </div>
-      )}
-      <Row justify="between">
-        <Button variant="secondary" isDisabled={step === 0 || action.isPending} onPress={() => { setError(''); setStep((current) => current - 1) }}>Back</Button>
-        {step < 3 ? <Button onPress={() => { if (validate(step)) setStep((current) => current + 1) }}>Next</Button> : <Button loading={action.isPending} onPress={submit}>Submit report</Button>}
-      </Row>
-      <DraftHelp key={helpOpen ? 'open' : 'closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
-      <Modal role="alertdialog" title="Discard this draft?" isOpen={discardOpen} onOpenChange={setDiscardOpen}>
-        <ModalBody><p>The description and choices in this draft will be cleared.</p></ModalBody>
-        <ModalActions><Button variant="secondary" onPress={() => setDiscardOpen(false)}>Keep draft</Button><Button variant="destructive" onPress={() => { setDraft({ ...blankDraft }); setStep(0); setError(''); setDiscardOpen(false); action.mutate({ action: 'saveDraft', payload: { narrative: '' } }); try { localStorage.removeItem(storageKey) } catch { /* No stored draft to remove. */ } }}>Discard draft</Button></ModalActions>
-      </Modal>
-    </div>
+        <DraftHelp key={helpOpen ? 'open' : 'closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
+        <Modal role="alertdialog" title="Discard this draft?" isOpen={discardOpen} onOpenChange={setDiscardOpen}>
+          <ModalBody><p>The description and choices in this draft will be cleared.</p></ModalBody>
+          <ModalActions><Button variant="secondary" onPress={() => setDiscardOpen(false)}>Keep draft</Button><Button variant="destructive" onPress={() => { setDraft({ ...blankDraft }); setStep(0); setError(''); setDiscardOpen(false); action.mutate({ action: 'saveDraft', payload: { narrative: '' } }); try { localStorage.removeItem(storageKey) } catch { /* No stored draft to remove. */ } }}>Discard draft</Button></ModalActions>
+        </Modal>
+      </div>
+    </MotionConfig>
+  )
+}
+
+/** Message or note list. New entries slide in. */
+function Thread({ entries, label, internal = false }: { entries: Item[]; label: string; internal?: boolean }) {
+  return (
+    <ol className="gv-thread" aria-label={label}>
+      <AnimatePresence initial={false}>
+        {entries.map((entry) => {
+          const name = words(object(entry.author).name, 'Handling office')
+          return (
+            <motion.li key={words(entry.id)} layout="position" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease }}>
+              <span className="accs-avatar" aria-hidden>{initials(name)}</span>
+              <div className="gv-thread__body">
+                <p className="gv-thread__head"><strong>{name}</strong>{internal && <span className="accs-tag">Internal</span>}<time dateTime={words(entry.at)}>{formatDateTime(entry.at)}</time></p>
+                <p className="gv-thread__text">{words(entry.body)}</p>
+              </div>
+            </motion.li>
+          )
+        })}
+      </AnimatePresence>
+    </ol>
   )
 }
 
@@ -300,15 +431,13 @@ function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22
   const messages = items(report.messages)
   const closed = isClosed(report)
   return (
-    <div className="app-page">
-      <PrivacyNotice title={pageId === 'P20' ? 'Conversation with the handling office' : 'Messages shown to the reporter'}>
-        {pageId === 'P20' ? report.identity === 'anonymous' ? 'You appear as ' + words(report.alias) + ' unless you share your name with this office.' : 'The handling office sees your verified name.' : 'The reporter sees messages you send here. Keep internal coordination in Notes.'}
-      </PrivacyNotice>
-      {messages.length ? <ol className="grievance-messages" aria-label="Report messages">{messages.map((message) => <li key={words(message.id)}><header><strong>{words(object(message.author).name, 'Handling office')}</strong><time dateTime={words(message.at)}>{date(message.at)}</time></header><p>{words(message.body)}</p></li>)}</ol> : <EmptyState title="No messages yet" description="Use this conversation to share information with the responsible office." />}
+    <div className="gv-stack">
+      <Note>{pageId === 'P20' ? report.identity === 'anonymous' ? 'You appear as ' + words(report.alias) + ' unless you share your name with this office.' : 'The handling office sees your verified name.' : 'The reporter sees messages you send here. Keep internal coordination in Notes.'}</Note>
+      {messages.length ? <Thread entries={messages} label="Report messages" /> : <Empty title="No messages yet">Use this conversation to share information with the responsible office.</Empty>}
       <ActionError error={action.error} />
-      {closed ? <Alert tone="neutral" title="This conversation is closed">The report is resolved or closed.</Alert> : <form className="app-page" onSubmit={(event) => { event.preventDefault(); if (body.trim()) action.mutate({ action: 'sendReportMessage', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) }}>
+      {closed ? <Alert tone="neutral" title="This conversation is closed">The report is resolved or closed.</Alert> : <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); if (body.trim()) action.mutate({ action: 'sendReportMessage', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) }}>
         <TextArea label={pageId === 'P20' ? 'Message to the handling office' : 'Message to the reporter'} value={body} onChange={setBody} isRequired maxLength={4000} showCount />
-        <Button type="submit" loading={action.isPending} isDisabled={!body.trim()}>Send message</Button>
+        <div><Button type="submit" loading={action.isPending} isDisabled={!body.trim()}>Send message</Button></div>
       </form>}
     </div>
   )
@@ -316,17 +445,75 @@ function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22
 
 function ReportList({ page }: { page: PageEnvelope }) {
   const [view, setView] = useState('active')
-  const records = items(page.data.reports).filter((report) => view === 'closed' ? isClosed(report) : !isClosed(report))
+  const all = items(page.data.reports)
+  const records = all.filter((report) => view === 'closed' ? isClosed(report) : !isClosed(report))
   return (
-    <div className="app-page">
-      <Heading title="My reports" actions={<Button icon="plus" href="/reports/new">New report</Button>} />
-      <PrivacyNotice title="Who can open these">Only you and the office handling each report can open it. Reporting under your name or anonymously is your choice on each report.</PrivacyNotice>
-      <SegmentedControl aria-label="Report view" selectedKey={view} onSelectionChange={(key) => setView(String(key))}><Segment id="active">Active</Segment><Segment id="closed">Closed</Segment></SegmentedControl>
-      {records.length ? <>
-        <div className="grievance-desktop"><ReportsTable caption="Your reports" rows={records.map((report) => ({ id: words(report.id), reference: reportReference(report), category: words(report.category, 'General concern'), status: words(report.status), statusForm: reportForm(report), statusTone: reportTone(report), updated: date(report.updatedAt), href: '/reports/' + encodeURIComponent(words(report.id)), actionLabel: 'View' }))} /></div>
-        <div className="grievance-mobile ds-record-list">{records.map((report) => <ReportRecord key={words(report.id)} reference={reportReference(report)} title={words(report.category, 'General concern')} status={words(report.status)} statusForm={reportForm(report)} statusTone={reportTone(report)} facts={[{ label: 'Office', value: words(report.office) }, { label: 'Updated', value: date(report.updatedAt) }]} href={'/reports/' + encodeURIComponent(words(report.id))} />)}</div>
-      </> : <EmptyState title={view === 'closed' ? 'No closed reports' : 'No reports yet'} description="If something is wrong, you can tell the right office here." action={view === 'active' ? <Button href="/reports/new">New report</Button> : undefined} />}
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="gv-page">
+        <PageHeader title="My reports" description="Follow each report from the office that has it now through to resolution." actions={<Button icon="plus" href="/reports/new">New report</Button>} />
+        <div className="gv-page accs-stagger">
+          <Pipeline records={all} />
+          <div className="gv-listbar">
+            <PillGroup id="view" label="Report view" value={view} onChange={setView} options={[{ id: 'active', label: 'Active' }, { id: 'closed', label: 'Closed' }]} />
+            <Note>Only you and the office handling each report can open it.</Note>
+          </div>
+          {records.length ? (
+            <Panel flush>
+              <ul className="accs-rows">
+                {records.map((report) => {
+                  const step = stageStep(report)
+                  return (
+                    <li key={words(report.id)}>
+                      <a className="accs-row gv-row" href={reportPath(report)}>
+                        <span className="accs-mono gv-row__ref">{reportReference(report)}</span>
+                        <span className="gv-row__main">
+                          <span className="accs-row__title">{words(report.category, 'General concern')}</span>
+                          <span className="accs-row__sub">{words(report.office, '—')}</span>
+                        </span>
+                        <span className="gv-row__progress">
+                          <span className="accs-progress" role="progressbar" aria-label={'Stage ' + step + ' of 6'} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step}><span style={{ width: (step / 6) * 100 + '%' }} /></span>
+                          <span className="gv-row__stage">Stage {step} of 6 · {stageLabel(report)}</span>
+                        </span>
+                        <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
+                        <span className="gv-row__time">{relativeTime(report.updatedAt) || '—'}</span>
+                        <span className="gv-row__go" aria-hidden><Icon name="caret-right" size={16} /></span>
+                      </a>
+                    </li>
+                  )
+                })}
+              </ul>
+            </Panel>
+          ) : <Panel><Empty title={view === 'closed' ? 'No closed reports' : 'No reports yet'} action={view === 'active' ? <Button href="/reports/new">New report</Button> : undefined}>If something is wrong, you can tell the right office here.</Empty></Panel>}
+        </div>
+      </div>
+    </MotionConfig>
+  )
+}
+
+/** Reference, category, status and confidentiality at the top of every case view. */
+function CaseHeader({ report, crumbs, children }: { report: Report; crumbs: Array<{ label: string; href?: string }>; children?: React.ReactNode }) {
+  return (
+    <PageHeader
+      crumbs={crumbs}
+      title={report.category || 'General concern'}
+      description={<><span className="accs-mono">{reportReference(report)}</span>{report.caseFileId ? <> · from report <span className="accs-mono">{report.id}</span></> : null} · filed {formatDate(report.createdAt)}</>}
+      actions={<div className="gv-chips">
+        <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
+        <SeverityChip report={report} />
+        <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>
+        {children}
+      </div>}
+    />
+  )
+}
+
+function Narrative({ report, title }: { report: Report; title: string }) {
+  const text = words(report.narrative)
+  return (
+    <Panel title={title}>
+      {text ? <p className="gv-narrative">{text}</p> : <p className="gv-hint">No description was recorded.</p>}
+      {words(report.sourcePostId) && <p><Link href={'/feed/' + encodeURIComponent(words(report.sourcePostId))}>Linked discussion</Link></p>}
+    </Panel>
   )
 }
 
@@ -339,27 +526,37 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
   const disclosed = Array.isArray(report.disclosedTo) && report.disclosedTo.includes(report.stage)
   // TBD(D-03): use Report until Guidance opens a linked Case File.
   return (
-    <div className="app-page">
-      <Breadcrumbs items={[{ label: 'My reports', href: '/reports' }, { label: reportReference(report) }]} />
-      <Heading title={report.category || 'General concern'} description={report.caseFileId ? 'Case File ' + words(report.caseFileId) + ' (from report ' + report.id + ')' : 'Report ' + report.id} actions={<ReportStatus report={report} />} />
-      <Facts values={[
-        ['Reference', reportReference(report)], ['Type', words(report.type, 'Report')], ['Current office', report.office],
-        ['Submitted', date(report.createdAt)], ['Identity', report.identity === 'anonymous' ? disclosed ? 'Name shared with this office' : 'Alias to this office' : 'Named'],
-      ]} />
-      <PrivacyNotice title="Who can open this">You and the office handling it. Internal notes stay with the office.</PrivacyNotice>
-      <Tabs defaultSelectedKey="progress">
-        <TabList aria-label="Report views"><Tab id="progress">Progress</Tab><Tab id="messages">Messages</Tab></TabList>
-        <TabPanel id="progress"><Timeline report={report} /></TabPanel>
-        <TabPanel id="messages"><Conversation report={report} pageId="P20" /></TabPanel>
-      </Tabs>
-      <Row>
-        {report.identity === 'anonymous' && !disclosed && <Button variant="secondary" onPress={() => setDiscloseOpen(true)}>Share my name</Button>}
-        {words(report.sourcePostId) && <Link href={'/feed/' + encodeURIComponent(words(report.sourcePostId))}>Started from your discussion</Link>}
-        <Button variant="tertiary" onPress={() => { setHelpOpen(true); assistant.mutate({ action: 'assistantAsk', payload: { question: 'Explain my report milestones for ' + report.id } }) }}>What does this stage mean?</Button>
-      </Row>
-      <DiscloseIdentityDialog report={report} isOpen={discloseOpen} onOpenChange={setDiscloseOpen} />
-      <Drawer title="About this stage" isOpen={helpOpen} onOpenChange={setHelpOpen}><div className="app-page"><Alert tone="neutral" title="People decide the next steps">The assistant explains approved process information.</Alert><ActionError error={assistant.error} />{assistant.isPending ? <ViewState kind="loading" title="Loading explanation" /> : <p className="ds-prose">{words(object(assistant.data?.record).reply)}</p>}<Link href="/assistant">Open assistant</Link></div></Drawer>
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="gv-page">
+        <CaseHeader report={report} crumbs={[{ label: 'My reports', href: '/reports' }, { label: reportReference(report) }]} />
+        <div className="accs-split">
+          <div className="accs-stack accs-stagger">
+            {words(report.narrative) && <Narrative report={report} title="What you reported" />}
+            <Panel title="Progress"><Timeline report={report} /></Panel>
+            <Panel title="Messages"><Conversation report={report} pageId="P20" /></Panel>
+          </div>
+          <aside className="accs-stack accs-stagger" aria-label="Report details">
+            <Panel title="Details">
+              <Facts values={[
+                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, 'General concern')], ['Program', words(report.program, '—')],
+                ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
+                ['Identity', report.identity === 'anonymous' ? disclosed ? 'Name shared with this office' : 'Alias to this office' : 'Named'],
+              ]} />
+              <Note>You and the office handling it can open this. Internal notes stay with the office.</Note>
+            </Panel>
+            <Panel title="Your options">
+              <div className="gv-actions">
+                {report.identity === 'anonymous' && !disclosed && <Button variant="secondary" onPress={() => setDiscloseOpen(true)}>Share my name</Button>}
+                <Button variant="tertiary" onPress={() => { setHelpOpen(true); assistant.mutate({ action: 'assistantAsk', payload: { question: 'Explain my report milestones for ' + report.id } }) }}>What does this stage mean?</Button>
+                {words(report.sourcePostId) && <Link href={'/feed/' + encodeURIComponent(words(report.sourcePostId))}>Started from your discussion</Link>}
+              </div>
+            </Panel>
+          </aside>
+        </div>
+        <DiscloseIdentityDialog report={report} isOpen={discloseOpen} onOpenChange={setDiscloseOpen} />
+        <Drawer title="About this stage" isOpen={helpOpen} onOpenChange={setHelpOpen}><div className="gv-stack"><Alert tone="neutral" title="People decide the next steps">The assistant explains approved process information.</Alert><ActionError error={assistant.error} />{assistant.isPending ? <ViewState kind="loading" title="Loading explanation" /> : <p className="ds-prose">{words(object(assistant.data?.record).reply)}</p>}<Link href="/assistant">Open assistant</Link></div></Drawer>
+      </div>
+    </MotionConfig>
   )
 }
 
@@ -370,16 +567,17 @@ export function ConflictNotice() {
 export function CaseNotes({ report }: { report: Report }) {
   const [body, setBody] = useState('')
   const action = useAction('P22')
+  const notes = items(report.notes)
   return (
-    <div className="app-page">
-      <PrivacyNotice title="Internal notes">Internal notes never appear in the reporter's timeline.</PrivacyNotice>
-      {items(report.notes).length ? <ol className="grievance-messages" aria-label="Internal case notes">{items(report.notes).map((note) => <li key={words(note.id)}><header><Badge form="restricted">Internal</Badge><strong>{words(object(note.author).name, 'Handling office')}</strong><time dateTime={words(note.at)}>{date(note.at)}</time></header><p>{words(note.body)}</p></li>)}</ol> : <ViewState kind="empty" title="No internal notes yet" />}
+    <Panel title="Internal notes">
+      <Note>Internal notes never appear in the reporter's timeline.</Note>
+      {notes.length ? <Thread entries={notes} label="Internal case notes" internal /> : <p className="gv-hint">No internal notes yet.</p>}
       <ActionError error={action.error} />
-      <form className="app-page" onSubmit={(event) => { event.preventDefault(); if (body.trim()) action.mutate({ action: 'addNote', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) }}>
+      <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); if (body.trim()) action.mutate({ action: 'addNote', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) }}>
         <TextArea label="Add a note" value={body} onChange={setBody} isRequired maxLength={4000} showCount />
-        <Button type="submit" loading={action.isPending} isDisabled={!body.trim() || isClosed(report)}>Save note</Button>
+        <div><Button type="submit" loading={action.isPending} isDisabled={!body.trim() || isClosed(report)}>Save note</Button></div>
       </form>
-    </div>
+    </Panel>
   )
 }
 
@@ -398,20 +596,21 @@ export function CaseActionBar({ report }: { report: Report }) {
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
   // TBD(D-04): offer only server-approved chain transitions; no undefined bypass or executive power.
-  if (!allowed.length) return <Alert tone="neutral" title="No actions available">This view is read only at the current stage.</Alert>
+  if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions are available. This view is read only at the current stage.</p></Panel>
   const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
-    <section className="app-region">
-      <SectionHeader level={2} title="Next action" />
-      {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
-      {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
+    <Panel title="Next action">
+      <div className="gv-actions">
+        {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
+        {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
+      </div>
       <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'return', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
         <ModalBody>
-          <div className="app-page">
+          <div className="gv-stack">
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
             <TextArea label="Reason" value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
             <TextArea label="Update shown to the reporter" value={update} onChange={setUpdate} isRequired maxLength={4000} showCount />
-            <PrivacyNotice title="This action is recorded">The reason stays in the handler history. The reporter receives the update you write above.</PrivacyNotice>
+            <Note>The reason stays in the handler history. The reporter receives the update you write above.</Note>
             {error && <Alert tone="danger" title="Complete the action">{error}</Alert>}
             <ActionError error={action.error} />
           </div>
@@ -424,36 +623,59 @@ export function CaseActionBar({ report }: { report: Report }) {
           }}>{label(selected) || 'Save action'}</Button>
         </ModalActions>
       </Modal>
-    </section>
+    </Panel>
   )
 }
 
 function CaseWorkspace({ page }: { page: PageEnvelope }) {
   const report = object(page.data.record) as Report
   if (!report.id) return <RestrictedView record />
+  const crumbs = [{ label: 'Cases', href: '/cases' }, { label: reportReference(report) }]
   // TBD(D-04) / TBD(D-08): previous handlers retain only the API's own-entry summary.
-  if (report.historyOnly) return <div className="app-page"><Breadcrumbs items={[{ label: 'Cases', href: '/cases' }, { label: reportReference(report) }]} /><Heading title="Handled by me" description={reportReference(report)} /><Alert tone="neutral" title="Earlier handling history">{words(report.historyNotice)}</Alert><Timeline report={report} handler /></div>
+  if (report.historyOnly) {
+    return (
+      <MotionConfig reducedMotion="user">
+        <div className="gv-page">
+          <PageHeader crumbs={crumbs} title="Handled by me" description={<span className="accs-mono">{reportReference(report)}</span>} />
+          <div className="gv-page accs-stagger">
+            <Alert tone="neutral" title="Earlier handling history">{words(report.historyNotice)}</Alert>
+            <Panel title="History"><Timeline report={report} handler /></Panel>
+          </div>
+        </div>
+      </MotionConfig>
+    )
+  }
   return (
-    <div className="app-page">
-      <Breadcrumbs items={[{ label: 'Cases', href: '/cases' }, { label: reportReference(report) }]} />
-      <Heading title={report.category || 'General concern'} description={(report.caseFileId ? 'Case File ' + words(report.caseFileId) + ' · Report ' : 'Report ') + report.id + ' · received ' + date(report.createdAt)} actions={<ReportStatus report={report} />} />
-      {report.bypassed === true && <ConflictNotice />}
-      <Grid columns="main">
-        <Tabs defaultSelectedKey="report">
-          <TabList aria-label="Case workspace views"><Tab id="report">Report</Tab><Tab id="messages">Messages</Tab><Tab id="notes">Notes</Tab><Tab id="history">History</Tab></TabList>
-          <TabPanel id="report"><div className="app-page"><Facts values={[
-            ['Reference', reportReference(report)], ['Category', report.category], ['Severity', report.severity], ['Program', words(report.program)],
-            ['Submitted', date(report.createdAt)], ['Reporter', words(object(report.reporter).name, words(report.alias))], ['Identity', report.identity === 'anonymous' ? 'Alias unless disclosed to this office' : 'Named'],
-          ]} /><section className="ds-prose grievance-narrative"><h2>Report description</h2><p>{words(report.narrative)}</p></section>{words(report.sourcePostId) && <Link href={'/feed/' + encodeURIComponent(words(report.sourcePostId))}>Linked discussion</Link>}<PrivacyNotice title="Restricted record">Only authorized handlers may open this record. Every action is recorded.</PrivacyNotice></div></TabPanel>
-          <TabPanel id="messages"><Conversation report={report} pageId="P22" /></TabPanel>
-          <TabPanel id="notes"><CaseNotes report={report} /></TabPanel>
-          <TabPanel id="history"><Timeline report={report} handler /></TabPanel>
-        </Tabs>
-        <aside className="app-page grievance-action-rail"><CaseActionBar report={report} /><Facts values={[['Current office', report.office], ['Type', words(report.type, 'Report')], ['Updated', date(report.updatedAt)]]} /></aside>
-      </Grid>
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="gv-page">
+        <CaseHeader report={report} crumbs={crumbs} />
+        {report.bypassed === true && <ConflictNotice />}
+        <div className="accs-split">
+          <div className="accs-stack accs-stagger">
+            <Narrative report={report} title="Report description" />
+            <Panel title="History"><Timeline report={report} handler /></Panel>
+            <Panel title="Messages"><Conversation report={report} pageId="P22" /></Panel>
+          </div>
+          <aside className="accs-stack accs-stagger" aria-label="Case details">
+            <Panel title="Details">
+              <Facts values={[
+                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, '—')], ['Program', words(report.program, '—')],
+                ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
+                ['Reporter', words(object(report.reporter).name, words(report.alias, '—'))],
+                ['Identity', report.identity === 'anonymous' ? 'Alias unless disclosed to this office' : 'Named'],
+              ]} />
+              <Note>Only authorized handlers may open this record. Every action is recorded.</Note>
+            </Panel>
+            <CaseActionBar report={report} />
+            <CaseNotes report={report} />
+          </aside>
+        </div>
+      </div>
+    </MotionConfig>
   )
 }
+
+const sortColumns: Array<[string, string]> = [['id', 'Reference'], ['category', 'Case'], ['severity', 'Severity'], ['updatedAt', 'Updated']]
 
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
@@ -464,6 +686,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [level, setLevel] = useState(initial.get('severity') ?? '')
   const [category, setCategory] = useState(initial.get('category') ?? '')
   const [status, setStatus] = useState(initial.get('status') ?? '')
+  const [stage, setStage] = useState(initial.get('stage') ?? '')
   const [received, setReceived] = useState('term')
   const [tab, setTab] = useState(initial.get('tab') ?? 'open')
   const [currentPage, setCurrentPage] = useState(1)
@@ -485,53 +708,100 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
           : selected === 'intake' ? report.stage === 'guidance' && !report.caseFileId && !report.historyOnly && !isClosed(report)
             : selected === 'active' ? !report.historyOnly && !isClosed(report) && items(report.history).length > 1
               : !report.historyOnly && !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
-  const filtered = records.filter((report) => inTab(report, validTab) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
+  const inQueue = records.filter((report) => inTab(report, validTab))
+  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
   const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : role === 'president' ? 'Executive cases' : 'Assigned reports'
+  const toggleSort = (column: string) => setSort((current) => ({ column, direction: current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   return (
-    <div className="app-page">
-      <Heading title={title} description={page.scope} />
-      <PrivacyNotice title="Reports routed to you">You see only reports routed to you. Every action is recorded.</PrivacyNotice>
-      <Tabs selectedKey={validTab} onSelectionChange={(key) => reset(() => setTab(String(key)))}>
-        <TabList aria-label="Case queues">{tabDefs.map(([id, label]) => <Tab id={id} key={id} count={records.filter((report) => inTab(report, id)).length}>{label}</Tab>)}</TabList>
-        <TabPanel id={validTab}><div className="app-page">
-      <FilterBar query={query} onQueryChange={(value) => reset(() => setQuery(value))} searchLabel="Search by reference" searchPlaceholder="RPT-0241">
-        <Select label="Severity" selectedKey={level} onSelectionChange={(key) => reset(() => setLevel(String(key ?? '')))}><SelectOption id="">All severities</SelectOption><SelectOption id="low">Low</SelectOption><SelectOption id="medium">Medium</SelectOption><SelectOption id="high">High</SelectOption></Select>
-        <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
-        <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
-        <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>
-      </FilterBar>
-      {filtered.length ? <>
-        <Grid columns={2} className="grievance-queue-sort">
-          <Select label="Sort by" selectedKey={String(sort.column)} onSelectionChange={(key) => setSort((current) => ({ ...current, column: String(key) }))}>
-            <SelectOption id="id">Reference</SelectOption>
-            <SelectOption id="category">Category</SelectOption>
-            <SelectOption id="severity">Severity</SelectOption>
-            <SelectOption id="status">Status</SelectOption>
-            <SelectOption id="createdAt">Received</SelectOption>
-            <SelectOption id="updatedAt">Last action</SelectOption>
-            <SelectOption id="waiting">Waiting (days)</SelectOption>
-          </Select>
-          <Select label="Sort direction" selectedKey={sort.direction} onSelectionChange={(key) => setSort((current) => ({ ...current, direction: String(key) as SortDescriptor['direction'] }))}>
-            <SelectOption id="ascending">Ascending</SelectOption>
-            <SelectOption id="descending">Descending</SelectOption>
-          </Select>
-        </Grid>
-        <div className="grievance-queue-desktop">
-          <Table aria-label="Reports in this queue" sortDescriptor={sort} onSortChange={setSort}>
-            <TableHeader><Column id="id" isRowHeader allowsSorting>Reference</Column><Column id="category" allowsSorting>Category</Column><Column id="severity" allowsSorting>Severity</Column><Column id="status" allowsSorting>Status</Column><Column id="createdAt" allowsSorting>Received</Column><Column id="updatedAt" allowsSorting>Last action</Column><Column id="waiting" allowsSorting>Waiting (days)</Column><Column>Open</Column></TableHeader>
-            <TableBody>{shown.map((report) => <TableRow key={words(report.id)} id={words(report.id)}><Cell reference>{reportReference(report)}</Cell><Cell>{words(report.category, 'General concern')}{report.bypassed === true && <Badge form="restricted">Adviser bypassed</Badge>}</Cell><Cell><Severity level={severity(report)} /></Cell><Cell><Badge tone={reportTone(report)} form={reportForm(report)}>{words(report.status)}</Badge></Cell><Cell>{date(report.createdAt)}</Cell><Cell>{date(report.updatedAt)}</Cell><Cell>{waitingDays(report)}</Cell><Cell><Link href={'/cases/' + encodeURIComponent(words(report.id))}>Open</Link></Cell></TableRow>)}</TableBody>
-          </Table>
+    <MotionConfig reducedMotion="user">
+      <div className="gv-page">
+        <PageHeader title={title} description={page.scope} actions={<Note>You see only reports routed to you. Every action is recorded.</Note>} />
+        <div className="gv-page accs-stagger">
+          <Pipeline records={inQueue} active={stage} onSelect={(key) => reset(() => setStage(key))} />
+          <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabDefs} records={records} inTab={inTab} />
+          <div className="accs-toolbar gv-toolbar">
+            <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
+            <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
+            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>
+            <div className="gv-sortbar">
+              <Select label="Sort by" selectedKey={String(sort.column)} onSelectionChange={(key) => setSort((current) => ({ ...current, column: String(key) }))}>
+                <SelectOption id="id">Reference</SelectOption>
+                <SelectOption id="category">Category</SelectOption>
+                <SelectOption id="severity">Severity</SelectOption>
+                <SelectOption id="status">Status</SelectOption>
+                <SelectOption id="createdAt">Received</SelectOption>
+                <SelectOption id="updatedAt">Last action</SelectOption>
+                <SelectOption id="waiting">Waiting (days)</SelectOption>
+              </Select>
+              <Select label="Sort direction" selectedKey={sort.direction} onSelectionChange={(key) => setSort((current) => ({ ...current, direction: String(key) as SortDescriptor['direction'] }))}>
+                <SelectOption id="ascending">Ascending</SelectOption>
+                <SelectOption id="descending">Descending</SelectOption>
+              </Select>
+            </div>
+          </div>
+          {filtered.length ? <>
+            <div className="accs-table-wrap">
+              <table className="accs-table gv-table" aria-label="Reports in this queue">
+                <thead>
+                  <tr>
+                    {sortColumns.map(([id, name]) => (
+                      <th key={id} aria-sort={sort.column === id ? sort.direction : 'none'} className={id === 'category' ? 'gv-c-title' : undefined}>
+                        <button type="button" className="gv-sort" onClick={() => toggleSort(id)}>{name}{sort.column === id && <span aria-hidden>{sort.direction === 'ascending' ? '↑' : '↓'}</span>}</button>
+                      </th>
+                    ))}
+                    <th>Program</th>
+                    <th>Stage</th>
+                    <th><span className="gv-visually-hidden">Open</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((report) => (
+                    <tr key={words(report.id)}>
+                      <td className="gv-c-ref"><a className="accs-mono gv-ref-link" href={casePath(report)}>{reportReference(report)}</a></td>
+                      <td className="gv-c-title">
+                        <span className="gv-title">{words(report.category, 'General concern')}</span>
+                        {report.bypassed === true && <span className="accs-tag gv-bypass">Adviser bypassed</span>}
+                      </td>
+                      <td><SeverityChip report={report} /></td>
+                      <td className="gv-c-time"><span title={formatDateTime(report.updatedAt)}>{relativeTime(report.updatedAt) || '—'}</span></td>
+                      <td>{words(report.program) ? <span className="accs-tag">{words(report.program)}</span> : '—'}</td>
+                      <td className="gv-c-stage"><span className="gv-stage">{stageLabel(report)}</span><span className="gv-stage-sub">{words(report.status)}</span></td>
+                      <td className="gv-c-go"><a className="gv-open" href={casePath(report)} aria-label={'Open ' + reportReference(report)}>Open<Icon name="caret-right" size={16} /></a></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={Math.min(currentPage, pageCount)} pageCount={pageCount} onPageChange={setCurrentPage} summary={'Showing ' + shown.length + ' of ' + filtered.length + ' reports'} />
+          </> : <Panel>{query || level || category || status || stage
+            ? <Empty title="No reports match these filters">Change or clear a filter to see other reports within your access.</Empty>
+            : <Empty title="No reports in this queue">Reports routed to your role and stage will appear here.</Empty>}</Panel>}
         </div>
-        <div className="grievance-queue-cards ds-record-list">{shown.map((report) => <ReportRecord key={words(report.id)} reference={reportReference(report)} title={words(report.category, 'General concern')} status={words(report.status)} statusForm={reportForm(report)} statusTone={reportTone(report)} facts={[{ label: 'Severity', value: severity(report) }, { label: 'Received', value: date(report.createdAt) }, { label: 'Last action', value: date(report.updatedAt) }, { label: 'Waiting (days)', value: String(waitingDays(report)) }, { label: 'Office', value: words(report.office, '—') }, ...(report.bypassed === true ? [{ label: 'Routing', value: 'Adviser bypassed' }] : [])]} href={'/cases/' + encodeURIComponent(words(report.id))} actionLabel="Open" />)}</div>
-        <Pagination page={Math.min(currentPage, pageCount)} pageCount={pageCount} onPageChange={setCurrentPage} summary={'Showing ' + shown.length + ' of ' + filtered.length + ' reports'} />
-      </> : query || level || category || status ? <ViewState kind="empty" title="No reports match these filters" description="Change or clear a filter to see other reports within your access." /> : <EmptyState title="No reports in this queue" description="Reports routed to your role and stage will appear here." />}
-        </div></TabPanel>
-      </Tabs>
-    </div>
+      </div>
+    </MotionConfig>
+  )
+}
+
+/** Queue tabs with counts and a sliding current marker. */
+function QueueTabs({ validTab, onChange, defs, records, inTab }: { validTab: string; onChange: (key: string) => void; defs: string[][]; records: Item[]; inTab: (report: Item, selected: string) => boolean }) {
+  return (
+    <LayoutGroup id="gv-tabs">
+      <nav className="gv-tabs" aria-label="Case queues">
+        {defs.map(([id, label]) => (
+          <button key={id} type="button" className="gv-tab" aria-current={validTab === id ? 'page' : undefined} onClick={() => onChange(id)}>
+            <span>{label}</span>
+            <span className="gv-tab__count accs-mono">{records.filter((report) => inTab(report, id)).length}</span>
+            {validTab === id && <motion.span layoutId="gv-tab-ind" className="gv-tab__ind" transition={spring} />}
+          </button>
+        ))}
+      </nav>
+    </LayoutGroup>
   )
 }
 

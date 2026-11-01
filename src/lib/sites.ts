@@ -1,4 +1,5 @@
 import { pageIdForPath } from '@/lib/page-catalog'
+import type { Role } from '@/lib/api'
 
 // ACCS module sites (docs/deltas/2026-11-01-subdomain-sites.md). A site is a host and navigation boundary only;
 // route permissions and API checks are unchanged.
@@ -102,7 +103,7 @@ export function siteForPath(path: string): SiteId {
 }
 
 /** Paths served on every host. */
-export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in')
+export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in') || matches(path, '/register')
 
 function configuredOrigins(): Partial<Record<SiteId, string>> {
   try {
@@ -157,11 +158,47 @@ export function siteLanding(site: SiteId, allowedHref: (href: string) => boolean
   return siteById[site].landings.find(allowedHref)
 }
 
-export const siteArt = (site: SiteId) => `/brand/sites/${site}.webp`
+type Access = { allowedPages: string[]; user: { roles: string[] } }
+
+/** Roles that may open each site (docs/deltas/2026-11-01-real-auth-and-visual-refactor.md section 3). */
+export const siteRoles: Record<SiteId, Role[] | 'all'> = {
+  portal: 'all',
+  forums: 'all',
+  schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas'],
+  cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas', 'president'],
+  evaluations: ['student', 'professor', 'chair', 'dean'],
+  records: ['chair', 'dean', 'guidance', 'osas', 'president', 'administrator'],
+  admin: ['administrator'],
+}
+
+const allowsPath = (session: Access, href: string) => session.allowedPages.includes(pageIdForPath(href) ?? '')
+
+/** A site is open when the role is listed for it and at least one of its landing pages is allowed. */
+export function canOpenSite(session: Access, site: SiteId) {
+  const roles = siteRoles[site]
+  return (
+    (roles === 'all' || session.user.roles.some((role) => (roles as string[]).includes(role))) &&
+    siteById[site].landings.some((href) => allowsPath(session, href))
+  )
+}
+
+/** A path is open when its page is allowed and the role may open both the path's site and this host's site. */
+export function canOpenPath(session: Access, path: string) {
+  const host = currentSite()
+  return allowsPath(session, path) && canOpenSite(session, siteForPath(path)) && (!host || canOpenSite(session, host))
+}
+
+const roleLabels: Partial<Record<string, string>> = {
+  professor: 'Faculty',
+  staff: 'CCS staff',
+  osas: 'OSAS',
+  president: "President's Office",
+}
+
+export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)
 
 /** Where a signed-in person lands on this host: the current site's first allowed landing, else Home (Admin for administrators). */
-export function landingFor(session: { allowedPages: string[]; user: { roles: string[] } }, site = currentSite()) {
-  const allowed = (href: string) => session.allowedPages.includes(pageIdForPath(href) ?? '')
-  const landing = site && site !== 'portal' ? siteLanding(site, allowed) : undefined
+export function landingFor(session: Access, site = currentSite()) {
+  const landing = site && site !== 'portal' && canOpenSite(session, site) ? siteLanding(site, (href) => allowsPath(session, href)) : undefined
   return landing ?? (session.user.roles.includes('administrator') ? '/admin' : '/home')
 }

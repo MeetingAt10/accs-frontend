@@ -1,20 +1,18 @@
 import {
-  Avatar,
-  Badge,
-  EmptyState,
   IconButton,
   Kbd,
   Link,
-  RoleBadge,
-  Row,
-  Stack,
   TextArea,
 } from "@meetingat10/design-system/react";
-import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { Children, useEffect, useRef, type ReactNode } from "react";
 
+import { formatDateTime, initials, relativeTime } from "@/lib/format";
 import "./chat.css";
 
 type Item = Record<string, unknown>;
+
+const ease = [0.16, 1, 0.3, 1] as const;
 
 function object(value: unknown): Item {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -38,15 +36,24 @@ function roleNames(value: unknown): string[] {
     : [];
 }
 
-function when(value: unknown): string {
-  const raw = words(value);
-  const parsed = new Date(raw);
-  return raw && !Number.isNaN(parsed.getTime())
-    ? parsed.toLocaleString("en-PH", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "No messages yet";
+/** "2:05 PM" in Manila time. */
+function clock(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? ""
+    : parsed.toLocaleTimeString("en-PH", {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "Asia/Manila",
+      });
+}
+
+function Mark({ name }: { name: string }) {
+  return (
+    <span className="accs-avatar ds-next-chat-avatar" aria-hidden>
+      {initials(name) || "?"}
+    </span>
+  );
 }
 
 export function ConversationList({
@@ -58,10 +65,10 @@ export function ConversationList({
 }) {
   if (!conversations.length) {
     return (
-      <EmptyState
-        title="No messages yet"
-        description="Start a conversation with someone in your permitted scope."
-      />
+      <div className="accs-empty">
+        <strong>No messages yet</strong>
+        <span>Start a conversation with someone in your permitted scope.</span>
+      </div>
     );
   }
 
@@ -90,35 +97,60 @@ function ConversationRow({
       items(conversation.members).flatMap((member) => roleNames(member.roles)),
     ),
   ];
+  const unread = Number(conversation.unread) || 0;
+  const title = words(conversation.title, "Conversation");
+  const updated = words(conversation.updatedAt);
 
   return (
     <li className="ds-next-conversation-list__item">
-      <Row gap={12}>
-        <Avatar name={words(conversation.title)} size={36} />
-        <Stack gap={4} className="ds-next-conversation-list__content">
-          <Link
-            href={"/messages/" + encodeURIComponent(words(conversation.id))}
-            aria-current={currentId === conversation.id ? "page" : undefined}
-          >
-            {words(conversation.title, "Conversation")}
-          </Link>
-          <Row gap={8}>
-            <Badge outline marker={false}>
+      <Link
+        variant="quiet"
+        className="ds-next-conversation"
+        href={"/messages/" + encodeURIComponent(words(conversation.id))}
+        aria-current={currentId === conversation.id ? "page" : undefined}
+      >
+        <Mark name={title} />
+        <span className="ds-next-conversation__text">
+          <span className="ds-next-conversation__top">
+            <span
+              className={
+                unread > 0
+                  ? "ds-next-conversation__title ds-next-conversation__title--unread"
+                  : "ds-next-conversation__title"
+              }
+            >
+              {title}
+            </span>
+            {updated && (
+              <time className="ds-next-conversation__time" dateTime={updated}>
+                {relativeTime(updated)}
+              </time>
+            )}
+          </span>
+          <span className="ds-next-conversation__bottom">
+            <span className="ds-next-conversation-list__preview">
+              {words(conversation.lastMessage, "No messages yet")}
+            </span>
+            {unread > 0 && (
+              <span className="ds-next-unread">
+                <span className="ds-next-unread__dot" aria-hidden />
+                <span className="ds-next-unread__count">{unread}</span>
+                <span className="ds-next-sr"> unread</span>
+              </span>
+            )}
+          </span>
+          <span className="ds-next-conversation__tags">
+            <span className="accs-tag">
               {conversation.kind === "group" ? "Class group" : "Direct"}
-            </Badge>
+            </span>
             {memberRoles.length > 0 && (
-              <RoleBadge>{memberRoles.join(" · ")}</RoleBadge>
+              <span className="ds-next-conversation__roles">
+                {memberRoles.join(" · ")}
+              </span>
             )}
-            {Number(conversation.unread) > 0 && (
-              <Badge tone="info">{Number(conversation.unread)} unread</Badge>
-            )}
-          </Row>
-          <p className="ds-next-conversation-list__preview">
-            {words(conversation.lastMessage, "No messages yet")}
-          </p>
-          <small>{when(conversation.updatedAt)}</small>
-        </Stack>
-      </Row>
+          </span>
+        </span>
+      </Link>
     </li>
   );
 }
@@ -130,8 +162,18 @@ export function MessageList({
   children: ReactNode;
   label?: string;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const count = Children.count(children);
+
+  // Keep the newest message in view.
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [count]);
+
   return (
     <div
+      ref={ref}
       className="ds-next-message-list"
       role="log"
       aria-label={label}
@@ -160,30 +202,45 @@ export function MessageBubble({
   actions?: ReactNode;
   children?: ReactNode;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <article
+    <motion.article
       className={[
         "ds-next-message-bubble",
         own && "ds-next-message-bubble--own",
       ]
         .filter(Boolean)
         .join(" ")}
+      initial={reduce ? false : { opacity: 0, y: 12, x: own ? 12 : -12 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={{ duration: 0.36, ease }}
     >
-      <Row justify="between" gap={8}>
-        <Row gap={8}>
-          <strong>{sender}</strong>
-          {role && <RoleBadge>{role}</RoleBadge>}
-        </Row>
-        {actions}
-      </Row>
-      <p>{body}</p>
-      {children}
-      {at && (
-        <small>
-          <time dateTime={at}>{when(at)}</time>
-        </small>
-      )}
-    </article>
+      {!own && <Mark name={sender} />}
+      <div className="ds-next-message-bubble__col">
+        {!own && (
+          <header className="ds-next-message-bubble__who">
+            <strong>{sender}</strong>
+            {role && <span className="accs-tag">{role}</span>}
+          </header>
+        )}
+        <div className="ds-next-message-bubble__line">
+          <div className="ds-next-message-bubble__text">
+            <p>{body}</p>
+            {children}
+          </div>
+          {actions && (
+            <div className="ds-next-message-bubble__actions">{actions}</div>
+          )}
+        </div>
+        {at && (
+          <small>
+            <time dateTime={at} title={formatDateTime(at)}>
+              {clock(at)}
+            </time>
+          </small>
+        )}
+      </div>
+    </motion.article>
   );
 }
 
@@ -206,55 +263,55 @@ export function MessageComposer({
 }) {
   return (
     <form
+      className="ds-next-composer"
       onSubmit={(event) => {
         event.preventDefault();
         onSend();
       }}
     >
-      <Stack gap={12}>
-        <TextArea
-          label={label}
-          value={value}
-          onChange={onChange}
-          maxLength={maxLength}
-          showCount
-          isRequired
-          isDisabled={isPending}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              onSend();
-            }
-          }}
-        />
-        <Row justify="between">
-          <small>
-            <Kbd keys="Enter" /> sends · <Kbd keys={["Shift", "Enter"]} /> adds
-            a line
-          </small>
-          <Row gap={8}>
-            {/* TBD(D-08): attachments require approved access and retention rules. */}
-            {attachments && (
-              <IconButton
-                icon="paperclip"
-                label="Attachments are not enabled while access rules are being defined"
-                isDisabled
-              />
-            )}
+      <TextArea
+        label={label}
+        placeholder="Write a message…"
+        value={value}
+        onChange={onChange}
+        maxLength={maxLength}
+        showCount
+        isRequired
+        isDisabled={isPending}
+        onKeyDown={(event) => {
+          if (
+            event.key === "Enter" &&
+            !event.shiftKey &&
+            !event.nativeEvent.isComposing
+          ) {
+            event.preventDefault();
+            onSend();
+          }
+        }}
+      />
+      <div className="ds-next-composer__bar">
+        <small className="ds-next-composer__hint">
+          <Kbd keys="Enter" /> sends · <Kbd keys={["Shift", "Enter"]} /> adds a
+          line
+        </small>
+        <div className="ds-next-composer__buttons">
+          {/* TBD(D-08): attachments require approved access and retention rules. */}
+          {attachments && (
             <IconButton
-              type="submit"
-              variant="solid"
-              icon="arrow-right"
-              label={isPending ? "Sending message" : "Send"}
-              isDisabled={!value.trim() || isPending}
+              icon="paperclip"
+              label="Attachments are not enabled while access rules are being defined"
+              isDisabled
             />
-          </Row>
-        </Row>
-      </Stack>
+          )}
+          <IconButton
+            type="submit"
+            variant="solid"
+            icon="arrow-right"
+            label={isPending ? "Sending message" : "Send"}
+            isDisabled={!value.trim() || isPending}
+          />
+        </div>
+      </div>
     </form>
   );
 }

@@ -1,21 +1,8 @@
 import {
-  Avatar,
-  AppShell,
   Badge,
-  Button,
-  DoorPlate,
   Drawer,
-  Link,
-  MenuButton,
-  MenuItem,
-  MenuSeparator,
-  NavItem,
-  RoleBadge,
-  Sidebar,
-  SidebarNote,
-  SidebarSection,
-  TopBar,
   IconButton,
+  Link,
   Popover,
   Search,
   Stack,
@@ -28,6 +15,14 @@ import {
   AssistantPanel,
   notificationHref,
 } from "@/components/app/communications";
+import {
+  DrawerNav,
+  SiteRail,
+  SiteSidebar,
+  type Destination,
+  type NavEntry,
+  type NavGroup,
+} from "@/components/app/site-chrome";
 import { NotificationItem, NotificationList } from "@/components/ds-next";
 import {
   ApiError,
@@ -39,6 +34,7 @@ import {
 import { pageQuery } from "@/lib/queries";
 import { pageIdForPath } from "@/lib/page-catalog";
 import {
+  canOpenSite,
   siteById,
   siteForPath,
   siteHref,
@@ -46,10 +42,9 @@ import {
   sites,
   type SiteId,
 } from "@/lib/sites";
-import { SiteDirectory, SiteHero, SiteSwitcher } from "@/components/app/site-chrome";
 
-type NavEntry = { label: string; href: string; pageId?: string; icon?: string };
-type NavGroup = { label: string; entries: NavEntry[] };
+type RoleEntry = NavEntry & { pageId?: string };
+type RoleGroup = { label: string; entries: RoleEntry[] };
 
 function navigationGroups(session: Session) {
   return [
@@ -73,11 +68,12 @@ function visibleEntries(session: Session, site?: SiteId) {
   );
 }
 
-/** Sites the session can open, each with its landing route. */
-export function siteDestinations(session: Session) {
+/** Sites the session can open (role listed for the site and a page allowed), each with its landing route. */
+export function siteDestinations(session: Session): Destination[] {
   // /home redirects administrators to /admin, so their Home destination skips it.
   const isAdmin = session.user.roles.includes("administrator");
   return sites.flatMap((site) => {
+    if (!canOpenSite(session, site.id)) return [];
     const entries = visibleEntries(session, site.id);
     const href =
       siteLanding(
@@ -90,7 +86,28 @@ export function siteDestinations(session: Session) {
   });
 }
 
-const roleNavigation: Record<Role, NavGroup[]> = {
+/** Nav groups for one site, with the deepest matching entry marked current (so /cases/clusters does not also mark /cases). */
+function siteNav(session: Session, path: string, site: SiteId) {
+  const allowed = new Set(session.allowedPages);
+  const seen = new Set<string>();
+  const groups = navigationGroups(session).flatMap((group) => {
+    const entries = group.entries.filter((entry) => {
+      const ok =
+        !seen.has(entry.href) &&
+        (!entry.pageId || allowed.has(entry.pageId)) &&
+        siteForPath(entry.href) === site;
+      if (ok) seen.add(entry.href);
+      return ok;
+    });
+    return entries.length ? [{ ...group, entries }] : [];
+  });
+  const current = [...seen]
+    .filter((href) => path === href || path.startsWith(href + "/"))
+    .sort((x, y) => y.length - x.length)[0];
+  return { groups: groups as NavGroup[], current };
+}
+
+const roleNavigation: Record<Role, RoleGroup[]> = {
   student: [
     {
       label: "Workspace",
@@ -512,7 +529,7 @@ const roleNavigation: Record<Role, NavGroup[]> = {
   ],
 };
 
-export const accountNavigation: NavGroup[] = [
+export const accountNavigation: RoleGroup[] = [
   {
     label: "Account",
     entries: [
@@ -526,96 +543,25 @@ export const accountNavigation: NavGroup[] = [
   },
 ];
 
-export function RoleNavigation({
-  session,
-  path,
-  site,
-}: {
-  session: Session;
-  path: string;
-  site: SiteId;
-}) {
-  const allowed = new Set(session.allowedPages);
-  const seen = new Set<string>();
-  const groups = navigationGroups(session).flatMap((group) => {
-    const entries = group.entries.filter((entry) => {
-      const ok =
-        !seen.has(entry.href) &&
-        (!entry.pageId || allowed.has(entry.pageId)) &&
-        siteForPath(entry.href) === site;
-      if (ok) seen.add(entry.href);
-      return ok;
-    });
-    return entries.length ? [{ ...group, entries }] : [];
-  });
-  // The deepest matching entry is current, so /cases/clusters does not also mark /cases.
-  const current = [...seen]
-    .filter((href) => path === href || path.startsWith(href + "/"))
-    .sort((x, y) => y.length - x.length)[0];
-  return (
-    <>
-      {groups.map((group, groupIndex) => (
-        <SidebarSection
-          label={group.label === "Workspace" ? siteById[site].label : group.label}
-          key={group.label + groupIndex}
-        >
-          {group.entries.map((entry) => (
-            <NavItem
-              key={entry.href + entry.label}
-              href={entry.href}
-              icon={entry.icon as never}
-              isCurrent={entry.href === current}
-            >
-              {entry.label}
-            </NavItem>
-          ))}
-        </SidebarSection>
-      ))}
-    </>
-  );
+
+function useSignOut() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  return async () => {
+    await signOut().catch(() => undefined);
+    queryClient.removeQueries();
+    router.history.push("/sign-in");
+  };
 }
 
-export function RoleSidebar({
-  session,
-  path,
-  site,
-}: {
-  session: Session;
-  path: string;
-  site: SiteId;
-}) {
-  return (
-    <Sidebar
-      label={`ACCS ${siteById[site].label}`}
-      brand={<SiteBrand site={site} />}
-      footer={
-        <div className="app-sidebar-person">
-          <Avatar name={session.user.name} size={32} />
-          <div>
-            <p>{session.user.name}</p>
-            <RoleBadge>
-              {session.user.roles
-                .map((role) => role[0].toUpperCase() + role.slice(1))
-                .join(" · ")}
-            </RoleBadge>
-          </div>
-        </div>
-      }
-    >
-      <RoleNavigation session={session} path={path} site={site} />
-      <SidebarNote>
-        Sample data. Access follows your assigned role and scope.
-      </SidebarNote>
-    </Sidebar>
-  );
-}
-
-export function AppTopBar({
-  session,
+function Topbar({
   title,
+  site,
+  onMenu,
 }: {
-  session: Session;
   title: string;
+  site: SiteId;
+  onMenu: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -663,101 +609,97 @@ export function AppTopBar({
   const unreadCount = recentNotifications.filter(
     (notice) => notice.read !== true,
   ).length;
+  const siteLabel = siteById[site].label;
 
   return (
     <>
-      <TopBar
-        title={title}
-        tools={
-          <>
-            <form
-              className="app-topbar-search"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (search.trim())
-                  window.location.assign(
-                    siteHref("/feed?q=" + encodeURIComponent(search.trim())),
-                  );
-              }}
-            >
-              <Search
-                label="Search posts and spaces"
-                placeholder="Search posts and spaces"
-                size="sm"
-                value={search}
-                onChange={setSearch}
-              />
-            </form>
-            <Button variant="tertiary" onPress={() => setAssistantOpen(true)}>
-              Assistant
-            </Button>
-            <Popover
-              trigger={
-                <IconButton
-                  icon="bell"
-                  label={
-                    unreadCount
-                      ? `Notifications, ${unreadCount} unread`
-                      : "Notifications"
-                  }
-                />
-              }
-              title="Notifications"
-              placement="bottom end"
-            >
-              {recentNotifications.length ? (
-                <Stack gap={12}>
-                  <NotificationList>
-                    {recentNotifications.map((notification) => (
-                      <NotificationItem
-                        key={String(notification.id)}
-                        notification={notification}
-                        onOpen={() => void openNotification(notification)}
-                        onRead={() =>
-                          notificationAction.mutate({
-                            action: "markNotification",
-                            recordId: String(notification.id),
-                            payload: { read: notification.read !== true },
-                          })
-                        }
-                        isPending={notificationAction.isPending}
-                      />
-                    ))}
-                  </NotificationList>
-                  <Link href="/notifications">View all notifications</Link>
-                </Stack>
-              ) : (
-                <Stack gap={12}>
-                  <p>No new notifications.</p>
-                  <Link href="/notifications">Open notifications</Link>
-                </Stack>
-              )}
-            </Popover>
-            <MenuButton
-              label={session.user.name}
-              icon="user"
-              iconOnly
-              placement="bottom end"
-              onAction={async (key) => {
-                if (key === "profile") router.history.push("/profile");
-                if (key === "settings") router.history.push("/settings");
-                if (key === "help") router.history.push("/help");
-                if (key === "sign-out") {
-                  await signOut().catch(() => undefined);
-                  queryClient.removeQueries();
-                  router.history.push("/sign-in");
+      <header className="shell-top">
+        <IconButton
+          className="shell-top__menu"
+          icon="list"
+          label="Open menu"
+          tooltip={false}
+          onPress={onMenu}
+        />
+        <nav className="shell-top__crumb" aria-label="Breadcrumb">
+          {title !== siteLabel && (
+            <>
+              <span className="shell-top__site">{siteLabel}</span>
+              <span aria-hidden>/</span>
+            </>
+          )}
+          <strong>{title}</strong>
+        </nav>
+        <div className="shell-top__tools">
+          <form
+            className="shell-top__search"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (search.trim())
+                window.location.assign(
+                  siteHref("/feed?q=" + encodeURIComponent(search.trim())),
+                );
+            }}
+          >
+            <Search
+              label="Search posts and spaces"
+              placeholder="Search posts and spaces"
+              size="sm"
+              value={search}
+              onChange={setSearch}
+            />
+          </form>
+          <IconButton
+            icon="chat"
+            label="Assistant"
+            onPress={() => setAssistantOpen(true)}
+          />
+          <Popover
+            trigger={
+              <IconButton
+                icon="bell"
+                dot={unreadCount > 0}
+                label={
+                  unreadCount
+                    ? `Notifications, ${unreadCount} unread`
+                    : "Notifications"
                 }
-              }}
-            >
-              <MenuItem id="profile">Profile</MenuItem>
-              <MenuItem id="settings">Settings</MenuItem>
-              <MenuItem id="help">Help</MenuItem>
-              <MenuSeparator />
-              <MenuItem id="sign-out">Sign out</MenuItem>
-            </MenuButton>
-          </>
-        }
-      />
+              />
+            }
+            title="Notifications"
+            placement="bottom end"
+          >
+            {recentNotifications.length ? (
+              <Stack gap={12}>
+                <NotificationList>
+                  {recentNotifications.map((notification) => (
+                    <NotificationItem
+                      key={String(notification.id)}
+                      notification={notification}
+                      onOpen={() => void openNotification(notification)}
+                      onRead={() =>
+                        notificationAction.mutate({
+                          action: "markNotification",
+                          recordId: String(notification.id),
+                          payload: { read: notification.read !== true },
+                        })
+                      }
+                      isPending={notificationAction.isPending}
+                    />
+                  ))}
+                </NotificationList>
+                <Link href="/notifications">View all notifications</Link>
+              </Stack>
+            ) : (
+              <Stack gap={12}>
+                <p>No new notifications.</p>
+                <Link href="/notifications">Open notifications</Link>
+              </Stack>
+            )}
+          </Popover>
+        </div>
+      </header>
       <Drawer
         title="Assistant"
         side="end"
@@ -773,67 +715,6 @@ export function AppTopBar({
   );
 }
 
-function MobileAccountMenu({ session }: { session: Session }) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const allowed = new Set(session.allowedPages);
-  const canViewNotifications = allowed.has("P40");
-  const notifications = useQuery({
-    ...pageQuery("P40"),
-    enabled: canViewNotifications,
-  });
-  const notificationItems = notifications.data?.data.notifications;
-  const unreadCount = Array.isArray(notificationItems)
-    ? notificationItems.filter(
-        (notice) => (notice as Record<string, unknown>).read !== true,
-      ).length
-    : 0;
-
-  return (
-    <MenuButton
-      label={session.user.name}
-      icon="user"
-      iconOnly
-      placement="bottom end"
-      onAction={async (key) => {
-        if (key === "profile") router.history.push("/profile");
-        if (key === "notifications") router.history.push("/notifications");
-        if (key === "assistant") router.history.push("/assistant");
-        if (key === "settings") router.history.push("/settings");
-        if (key === "help") router.history.push("/help");
-        if (key === "sign-out") {
-          await signOut().catch(() => undefined);
-          queryClient.removeQueries();
-          router.history.push("/sign-in");
-        }
-      }}
-    >
-      {allowed.has("P39") && <MenuItem id="profile">Profile</MenuItem>}
-      {canViewNotifications && (
-        <MenuItem id="notifications">
-          {unreadCount
-            ? `Notifications, ${unreadCount} unread`
-            : "Notifications"}
-        </MenuItem>
-      )}
-      {allowed.has("P41") && <MenuItem id="assistant">Assistant</MenuItem>}
-      {allowed.has("P43") && <MenuItem id="settings">Settings</MenuItem>}
-      {allowed.has("P42") && <MenuItem id="help">Help</MenuItem>}
-      <MenuSeparator />
-      <MenuItem id="sign-out">Sign out</MenuItem>
-    </MenuButton>
-  );
-}
-
-function SiteBrand({ site }: { site: SiteId }) {
-  return (
-    <span className="app-site-brand">
-      <DoorPlate size="sm" code="ACCS" />
-      <span className="app-site-brand__name">{siteById[site].label}</span>
-    </span>
-  );
-}
-
 export function AppChrome({
   session,
   title,
@@ -846,24 +727,16 @@ export function AppChrome({
   const path = useRouterState({ select: (state) => state.location.pathname });
   const site = siteForPath(path);
   const destinations = siteDestinations(session);
-  const hasSidebar = visibleEntries(session, site).length > 0;
-  const navigation = (
-    <>
-      <SidebarSection label="Sites">
-        {destinations.map(({ site: entry, href }) => (
-          <NavItem
-            key={entry.id}
-            href={href}
-            icon={entry.icon as never}
-            isCurrent={entry.id === site}
-          >
-            {entry.label}
-          </NavItem>
-        ))}
-      </SidebarSection>
-      <RoleNavigation session={session} path={path} site={site} />
-    </>
-  );
+  const { groups, current } = siteNav(session, path, site);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const onSignOut = useSignOut();
+  const allowed = new Set(session.allowedPages);
+  const accountLinks = [
+    { label: "Profile", href: "/profile", pageId: "P39", icon: "user" },
+    { label: "Notifications", href: "/notifications", pageId: "P40", icon: "bell" },
+    { label: "Settings", href: "/settings", pageId: "P43", icon: "gear" },
+    { label: "Help", href: "/help", pageId: "P42", icon: "question" },
+  ].filter((link) => allowed.has(link.pageId));
   const restricted =
     session.user.restrictions.length > 0 &&
     session.user.roles.includes("student");
@@ -905,10 +778,24 @@ export function AppChrome({
       document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // The drawer is a mobile-only surface; any route change closes it.
+  useEffect(() => setMenuOpen(false), [path]);
+
   return (
-    <div className="app-chrome" data-site={site} data-lane={siteById[site].lane}>
+    <div
+      className="app-chrome shell"
+      data-site={site}
+      data-density={
+        savedDensity === "compact" || savedDensity === "comfortable"
+          ? savedDensity
+          : defaultDensity
+      }
+    >
+      <a className="shell-skip" href="#main-content">
+        Skip to main content
+      </a>
       {restricted && (
-        <div className="app-restricted-banner">
+        <div className="shell-banner" role="status">
           <Badge tone="warning" form="pending">
             Some features paused
           </Badge>
@@ -928,37 +815,44 @@ export function AppChrome({
           <a href={siteHref("/standing")}>View account standing</a>
         </div>
       )}
-      <AppShell
-        className={hasSidebar ? undefined : "app-shell--no-sidebar"}
-        contentId="main-content"
-        density={
-          savedDensity === "compact" || savedDensity === "comfortable"
-            ? savedDensity
-            : defaultDensity
-        }
-        sidebar={
-          hasSidebar ? (
-            <RoleSidebar session={session} path={path} site={site} />
-          ) : undefined
-        }
-        mobileBrand={<SiteBrand site={site} />}
-        mobileNav={navigation}
-        mobileActions={<MobileAccountMenu session={session} />}
-        topBar={
-          <>
-            <AppTopBar session={session} title={title} />
-            <SiteSwitcher destinations={destinations} current={site} />
-          </>
-        }
-      >
-        <div className="app-shell__content" data-site={site}>
-          {destinations.some((entry) => entry.href === path) && (
-            <SiteHero site={site} session={session} />
-          )}
-          {path === "/home" && <SiteDirectory destinations={destinations} />}
-          {children}
+      <div className="shell-frame" data-sidebar={groups.length > 0}>
+        <SiteRail
+          destinations={destinations}
+          current={site}
+          session={session}
+          accountLinks={accountLinks}
+          onSignOut={() => void onSignOut()}
+        />
+        {groups.length > 0 && (
+          <SiteSidebar
+            site={site}
+            groups={groups}
+            current={current}
+            session={session}
+            profileHref={allowed.has("P39") ? "/profile" : undefined}
+            onSignOut={() => void onSignOut()}
+          />
+        )}
+        <div className="shell-main">
+          <Topbar title={title} site={site} onMenu={() => setMenuOpen(true)} />
+          <main className="shell-content" id="main-content" tabIndex={-1}>
+            <div className="shell-content__inner">
+              <div className="shell-page">{children}</div>
+            </div>
+          </main>
         </div>
-      </AppShell>
+      </div>
+      <Drawer title="Menu" side="start" isOpen={menuOpen} onOpenChange={setMenuOpen}>
+        <DrawerNav
+          destinations={destinations}
+          current={site}
+          groups={groups}
+          currentHref={current}
+          accountLinks={accountLinks}
+          onNavigate={() => setMenuOpen(false)}
+          onSignOut={() => void onSignOut()}
+        />
+      </Drawer>
     </div>
   );
 }

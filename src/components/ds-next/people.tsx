@@ -1,15 +1,7 @@
-import {
-  Avatar,
-  Card,
-  CardBody,
-  CardHeader,
-  CardMeta,
-  CardTitle,
-  Link,
-  RoleBadge,
-  Row,
-} from '@meetingat10/design-system/react'
+import { Icon, Link } from '@meetingat10/design-system/react'
 import type { ReactNode } from 'react'
+
+import { initials } from '@/lib/format'
 
 import './people.css'
 
@@ -23,6 +15,7 @@ export interface PersonCardProps {
   actions?: ReactNode
 }
 
+/** Compact person card: initials avatar, name (the whole card links when `href` is set), role tags, office. */
 export function PersonCard({
   name,
   role,
@@ -33,21 +26,36 @@ export function PersonCard({
   actions,
 }: PersonCardProps) {
   return (
-    <Card link={Boolean(href)} className="ds-next-person-card">
-      <CardHeader>
-        <Avatar name={name} size={48} />
-        {role && <RoleBadge>{role}</RoleBadge>}
-      </CardHeader>
-      <CardTitle href={href}>{name}</CardTitle>
-      {office && <CardBody>{office}</CardBody>}
-      {description && <CardBody>{description}</CardBody>}
+    <article className="ds-next-person-card" data-link={href ? '' : undefined}>
+      <span className="accs-avatar ds-next-person-card__avatar" aria-hidden>
+        {initials(name)}
+      </span>
+      <div className="ds-next-person-card__body">
+        <h3 className="ds-next-person-card__name">
+          {href ? (
+            <Link href={href} className="ds-next-person-card__link">
+              {name}
+            </Link>
+          ) : (
+            name
+          )}
+        </h3>
+        {role && <div className="ds-next-person-card__roles">{role}</div>}
+        {office && <p className="ds-next-person-card__line">{office}</p>}
+        {description && <p className="ds-next-person-card__line">{description}</p>}
+      </div>
       {(meta || actions) && (
-        <CardMeta>
+        <div className="ds-next-person-card__meta">
           {meta}
           {actions}
-        </CardMeta>
+        </div>
       )}
-    </Card>
+      {href && (
+        <span className="ds-next-person-card__go" aria-hidden>
+          <Icon name="arrow-right" size={16} />
+        </span>
+      )}
+    </article>
   )
 }
 
@@ -79,17 +87,33 @@ export function ProfileHeader({
         .filter(Boolean)
         .join(' ')}
     >
-      <Avatar name={name} size={compact ? 48 : 64} />
+      <span className="ds-next-profile-header__avatar" aria-hidden>
+        {initials(name)}
+      </span>
       <div className="ds-next-profile-header__body">
-        <h1 className="ds-section-header__title">{name}</h1>
-        <Row gap={8}>
-          {role && <RoleBadge>{role}</RoleBadge>}
-          {title && <span>{title}</span>}
-        </Row>
-        <Row gap={8}>
-          {office && <span>{office}</span>}
-          {email && <Link href={`mailto:${email}`}>{email}</Link>}
-        </Row>
+        <h1 className="accs-page-title">{name}</h1>
+        {(role || title) && (
+          <div className="ds-next-profile-header__roles">
+            {role}
+            {title && <span>{title}</span>}
+          </div>
+        )}
+        {(office || email) && (
+          <div className="ds-next-profile-header__contact">
+            {office && (
+              <span>
+                <Icon name="map-pin" size={16} />
+                {office}
+              </span>
+            )}
+            {email && (
+              <Link href={`mailto:${email}`}>
+                <Icon name="envelope" size={16} />
+                {email}
+              </Link>
+            )}
+          </div>
+        )}
       </div>
       {actions && (
         <div className="ds-next-profile-header__actions">{actions}</div>

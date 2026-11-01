@@ -1,11 +1,10 @@
 import {
   Alert,
   Avatar,
-  Badge,
-  Breadcrumbs,
   Button,
   ComboBox,
   Divider,
+  Icon,
   Drawer,
   EmptyState,
   Grid,
@@ -21,25 +20,21 @@ import {
   RoleBadge,
   Row,
   Search,
-  SectionHeader,
   SelectOption,
-  Skeleton,
-  Spinner,
   Stack,
   Switch,
   Tab,
   TabList,
   TabPanel,
   Tabs,
-  Tag,
-  TagGroup,
   TextArea,
   ViewState,
   toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   RequirePermission,
@@ -61,6 +56,9 @@ import {
   NotificationItem,
   NotificationList,
 } from "@/components/ds-next";
+import { NotificationGroup } from "@/components/ds-next/notifications";
+import { Empty, PageHeader, Panel } from "@/components/app/page-shell";
+import { SlidePills, ease } from "@/components/app/portal-motion";
 import "./communications.css";
 
 type Item = Record<string, unknown>;
@@ -113,25 +111,19 @@ function Heading({
   title,
   description,
   actions,
+  crumbs,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
+  crumbs?: { label: string; href?: string }[];
 }) {
   return (
-    <SectionHeader
-      level={1}
-      split
+    <PageHeader
       title={title}
       description={description}
-      actions={
-        <Row gap={8}>
-          <Badge outline marker={false}>
-            Sample data
-          </Badge>
-          {actions}
-        </Row>
-      }
+      actions={actions}
+      crumbs={crumbs}
     />
   );
 }
@@ -623,27 +615,64 @@ export function notificationHref(pageId: string, recordId: string) {
   return path.endsWith("/") ? path + encodeURIComponent(recordId) : path;
 }
 
+const dayOf = (value: unknown) => {
+  const date = new Date(words(value));
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+};
+
 function NotificationsPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
-  const [tab, setTab] = useState("all");
+  const [filter, setFilter] = useState("all");
   const [shown, setShown] = useState(10);
   const [restrictedSource, setRestrictedSource] = useState(false);
   const action = useCommunicationAction("P40", false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dayOf(new Date().toISOString());
   const notices = items(page.data.notifications).sort(
     (left, right) =>
-      Number(words(right.at).slice(0, 10) === today) -
-        Number(words(left.at).slice(0, 10) === today) ||
+      Number(dayOf(right.at) === today) - Number(dayOf(left.at) === today) ||
       Number(right.priority === "high") - Number(left.priority === "high") ||
       words(right.at).localeCompare(words(left.at)),
   );
+  const unreadCount = notices.filter((notice) => notice.read !== true).length;
+  const kinds = [...new Set(notices.map((notice) => words(notice.kind)).filter(Boolean))];
   const filtered = notices.filter(
     (notice) =>
-      tab === "all" ||
-      (tab === "priority" && notice.priority === "high") ||
-      (tab === "unread" && notice.read !== true),
+      filter === "all" ||
+      (filter === "priority" && notice.priority === "high") ||
+      (filter === "unread" && notice.read !== true) ||
+      filter === "kind:" + words(notice.kind),
   );
   const visible = filtered.slice(0, shown);
+  const rows: ReactNode[] = [];
+  visible.forEach((notice, index) => {
+    const group = dayOf(notice.at) === today ? "Today" : "Earlier";
+    const previous =
+      index > 0
+        ? dayOf(visible[index - 1].at) === today
+          ? "Today"
+          : "Earlier"
+        : undefined;
+    if (group !== previous)
+      rows.push(<NotificationGroup key={"group-" + group} label={group} />);
+    rows.push(
+      <NotificationItem
+        key={words(notice.id)}
+        index={index}
+        notification={notice}
+        onOpen={() => void openNotice(notice)}
+        onRead={() =>
+          action.mutate({
+            action: "markNotification",
+            recordId: words(notice.id),
+            payload: { read: notice.read !== true },
+          })
+        }
+        isPending={action.isPending}
+      />,
+    );
+  });
 
   async function openNotice(notice: Item) {
     setRestrictedSource(false);
@@ -664,13 +693,17 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
   }
 
   return (
-    <Stack gap={24}>
+    <div className="accs-stack">
       <Heading
         title="Notifications"
+        description={
+          unreadCount ? unreadCount + " unread" : "You're all caught up"
+        }
         actions={
           <>
             <Button
-              variant="tertiary"
+              variant="secondary"
+              icon="check"
               onPress={() =>
                 action.mutate({ action: "markAllNotifications", payload: {} })
               }
@@ -678,7 +711,13 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
             >
               Mark all read
             </Button>
-            <Link href="/settings/notifications">Settings</Link>
+            <Button
+              variant="tertiary"
+              icon="gear"
+              href="/settings/notifications"
+            >
+              Settings
+            </Button>
           </>
         }
       />
@@ -687,78 +726,43 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
       ) : (
         <ActionError error={action.error} />
       )}
-      <Tabs
-        selectedKey={tab}
-        onSelectionChange={(key) => {
-          setTab(String(key));
+      <SlidePills
+        label="Notification filters"
+        value={filter}
+        onChange={(next) => {
+          setFilter(next);
           setShown(10);
         }}
-      >
-        <TabList aria-label="Notification filters">
-          <Tab id="all">All</Tab>
-          <Tab id="priority">Priority</Tab>
-          <Tab
-            id="unread"
-            count={notices.filter((notice) => notice.read !== true).length}
-          >
-            Unread
-          </Tab>
-        </TabList>
-        {["all", "priority", "unread"].map((key) => (
-          <TabPanel id={key} key={key}>
-            {visible.length ? (
-              <NotificationList>
-                {visible.map((notice, index) => {
-                  const group =
-                    words(notice.at).slice(0, 10) === today
-                      ? "Today"
-                      : "Earlier";
-                  const previousGroup =
-                    index > 0 &&
-                    words(visible[index - 1].at).slice(0, 10) === today
-                      ? "Today"
-                      : "Earlier";
-                  return (
-                    <Fragment key={words(notice.id)}>
-                      {(index === 0 || group !== previousGroup) && (
-                        <li>
-                          <Divider label={group} />
-                        </li>
-                      )}
-                      <NotificationItem
-                        notification={notice}
-                        onOpen={() => void openNotice(notice)}
-                        onRead={() =>
-                          action.mutate({
-                            action: "markNotification",
-                            recordId: words(notice.id),
-                            payload: { read: notice.read !== true },
-                          })
-                        }
-                        isPending={action.isPending}
-                      />
-                    </Fragment>
-                  );
-                })}
-              </NotificationList>
-            ) : (
-              <EmptyState
-                title="You're all caught up"
-                description="Updates for your account appear here when they are available."
-              />
-            )}
-          </TabPanel>
-        ))}
-      </Tabs>
+        options={[
+          { id: "all", label: "All" },
+          { id: "unread", label: "Unread", count: unreadCount },
+          { id: "priority", label: "Priority" },
+          ...(kinds.length > 1
+            ? kinds.map((kind) => ({
+                id: "kind:" + kind,
+                label: <span style={{ textTransform: "capitalize" }}>{kind}</span>,
+              }))
+            : []),
+        ]}
+      />
+      <Panel flush className="accs-reveal">
+        {visible.length ? (
+          <NotificationList>{rows}</NotificationList>
+        ) : (
+          <Empty title="You're all caught up">
+            Updates for your account appear here when they are available.
+          </Empty>
+        )}
+      </Panel>
       {filtered.length > shown && (
         <Button
-          variant="tertiary"
+          variant="secondary"
           onPress={() => setShown((count) => count + 10)}
         >
           Load more
         </Button>
       )}
-    </Stack>
+    </div>
   );
 }
 
@@ -772,6 +776,8 @@ type AssistantMessage = {
 export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const session = useQuery(sessionQuery());
   const queryClient = useQueryClient();
+  const reduce = useReducedMotion();
+  const scroller = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const proposed = suggestions ?? [
@@ -803,96 +809,141 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
     },
   });
 
+  useEffect(() => {
+    const el = scroller.current;
+    if (el && (messages.length || action.isPending))
+      el.scrollTo({ top: el.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+  }, [messages.length, action.isPending, reduce]);
+
   function ask() {
     if (question.trim() && !action.isPending) action.mutate(question.trim());
   }
 
   return (
-    <Stack gap={24}>
-      <TagGroup label="Suggested prompts">
-        {proposed.map((prompt) => (
-          <Tag
-            id={prompt}
-            key={prompt}
-            textValue={prompt}
-            onAction={() => setQuestion(prompt)}
-          >
-            {prompt}
-          </Tag>
-        ))}
-      </TagGroup>
-      {messages.length ? (
-        <MessageList label="Assistant conversation">
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              sender={message.own ? "You" : "ACCS assistant"}
-              body={message.body}
-              own={message.own}
+    <div className="cm-chat">
+      <div className="cm-chat__scroll" ref={scroller}>
+        <div className="cm-chat__col">
+          {messages.length ? (
+            <ol className="cm-msgs" aria-label="Assistant conversation">
+              <AnimatePresence initial={false}>
+                {messages.map((message) => (
+                  <motion.li
+                    key={message.id}
+                    className="cm-msg"
+                    data-own={message.own || undefined}
+                    initial={reduce ? false : { opacity: 0, y: 14, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: reduce ? 0 : 0.34, ease }}
+                  >
+                    {!message.own && (
+                      <span className="cm-msg__avatar" aria-hidden>
+                        <Icon name="chats" size={16} />
+                      </span>
+                    )}
+                    <div className="cm-msg__bubble">
+                      <span className="cm-msg__who">
+                        {message.own ? "You" : "ACCS assistant"}
+                      </span>
+                      <p>{message.body}</p>
+                      {message.sources && message.sources.length > 0 && (
+                        <p className="cm-msg__sources">
+                          Sources
+                          {message.sources.map((source) => (
+                            <Link
+                              href={words(source.href, "/help")}
+                              key={words(source.href) + words(source.title)}
+                            >
+                              {words(source.title, "Help")}
+                            </Link>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+            </ol>
+          ) : (
+            <div className="cm-welcome">
+              <span className="cm-welcome__mark" aria-hidden>
+                <Icon name="chats" size={24} />
+              </span>
+              <h2>Ask about ACCS</h2>
+              <p>Choose a suggested prompt or write a question below.</p>
+            </div>
+          )}
+          {action.isPending && (
+            <div className="cm-typing" role="status">
+              <span className="cm-dots" aria-hidden>
+                <i />
+                <i />
+                <i />
+              </span>
+              Preparing a reply from permitted information
+            </div>
+          )}
+          {action.isError && (
+            <Alert tone="danger" title="The assistant isn't available right now.">
+              <p>
+                Your question is kept. Try again, or open{" "}
+                <Link href="/help">Help</Link>.
+              </p>
+            </Alert>
+          )}
+        </div>
+      </div>
+      <div className="cm-chat__foot">
+        <div className="cm-chat__col">
+          <div className="accs-pills" role="group" aria-label="Suggested prompts">
+            {proposed.map((prompt) => (
+              <button
+                type="button"
+                className="accs-pill"
+                key={prompt}
+                onClick={() => setQuestion(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <MessageComposer
+            label="Question for the assistant"
+            value={question}
+            onChange={setQuestion}
+            onSend={ask}
+            isPending={action.isPending}
+            maxLength={2000}
+          />
+          {/* TBD(D-08): assistant provider data handling and log retention require approval. */}
+          <div className="cm-chat__note">
+            <small>
+              The assistant explains and helps you write. It doesn't decide
+              reports, restrictions, or outcomes, and it can't see records you
+              can't.
+            </small>
+            <Button
+              variant="tertiary"
+              size="sm"
+              onPress={() => {
+                setMessages([]);
+                action.reset();
+              }}
+              isDisabled={action.isPending || !messages.length}
             >
-              {message.sources && (
-                <Row gap={8}>
-                  {message.sources.map((source) => (
-                    <Link
-                      href={words(source.href, "/help")}
-                      key={words(source.href) + words(source.title)}
-                    >
-                      {words(source.title, "Help")}
-                    </Link>
-                  ))}
-                </Row>
-              )}
-            </MessageBubble>
-          ))}
-        </MessageList>
-      ) : (
-        <EmptyState
-          title="Ask about ACCS"
-          description="Choose a suggested prompt or write a question below."
-        />
-      )}
-      {action.isPending && (
-        <Row gap={8}>
-          <Spinner />
-          <span role="status">
-            Preparing a reply from permitted information
-          </span>
-        </Row>
-      )}
-      {action.isError && (
-        <Alert tone="danger" title="The assistant isn't available right now.">
-          <p>
-            Your question is kept. Try again, or open{" "}
-            <Link href="/help">Help</Link>.
-          </p>
-        </Alert>
-      )}
-      <MessageComposer
-        label="Question for the assistant"
-        value={question}
-        onChange={setQuestion}
-        onSend={ask}
-        isPending={action.isPending}
-        maxLength={2000}
-      />
-      <Alert tone="neutral" title="The assistant explains and helps you write">
-        The assistant explains and helps you write. It doesn't decide reports,
-        restrictions, or outcomes, and it can't see records you can't.
-      </Alert>
-      {/* TBD(D-08): assistant provider data handling and log retention require approval. */}
-      <Button
-        variant="tertiary"
-        onPress={() => {
-          setMessages([]);
-          action.reset();
-        }}
-        isDisabled={action.isPending}
-      >
-        Clear conversation
-      </Button>
-    </Stack>
+              Clear conversation
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
+
+const priorityGroups = [
+  { title: "Your work", keys: ["report", "case", "consultation", "evaluation"] },
+  { title: "Conversations and news", keys: ["message", "announcement"] },
+  { title: "Review queues", keys: ["moderation"] },
+];
 
 function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
@@ -921,58 +972,71 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
     evaluation: "Evaluations",
     moderation: "Moderation queue",
   };
+  const known = new Set(priorityGroups.flatMap((group) => group.keys));
+  const groups = [
+    ...priorityGroups.map((group) => ({
+      title: group.title,
+      keys: categories.filter((category) => group.keys.includes(category)),
+    })),
+    { title: "Other", keys: categories.filter((category) => !known.has(category)) },
+  ].filter((group) => group.keys.length);
   return (
-    <Stack gap={24}>
-      <Breadcrumbs
-        items={[
+    <div className="accs-stack">
+      <Heading
+        title="Notification priorities"
+        description="Choose how loudly each kind of update reaches you."
+        crumbs={[
           { label: "Settings", href: "/settings" },
           { label: "Notifications" },
         ]}
       />
-      <Heading title="Notification priorities" />
-      {categories.map((category) => (
-        <section
-          key={category}
-          style={{
-            paddingBlock: "var(--ds-space-16)",
-            borderBottom: "1px solid var(--ds-border-default)",
-          }}
-        >
-          <RadioGroup
-            row
-            label={categoryNames[category] ?? category}
-            value={priorities[category] ?? "normal"}
-            onChange={(priority) =>
-              setPriorities((current) => ({
-                ...current,
-                [category]: priority as Priority,
-              }))
-            }
-          >
-            <Radio value="high">Urgent</Radio>
-            <Radio value="normal">Normal</Radio>
-            <Radio value="muted">Off</Radio>
-          </RadioGroup>
-        </section>
-      ))}
-      {/* TBD(D-06): no category is marked mandatory until the required-category policy is approved. */}
-      <Alert tone="neutral" title="Delivery channels are undecided">
-        Delivery channels such as email are still being decided. Priority
-        choices do not change your access to a report or case.
-      </Alert>
+      <div className="accs-stack accs-stagger">
+        {groups.map((group) => (
+          <Panel flush key={group.title} title={group.title}>
+            <div className="cm-prefs">
+              {group.keys.map((category) => (
+                <div className="cm-pref" key={category}>
+                  <RadioGroup
+                    row
+                    label={categoryNames[category] ?? category}
+                    value={priorities[category] ?? "normal"}
+                    onChange={(priority) =>
+                      setPriorities((current) => ({
+                        ...current,
+                        [category]: priority as Priority,
+                      }))
+                    }
+                  >
+                    <Radio value="high">Urgent</Radio>
+                    <Radio value="normal">Normal</Radio>
+                    <Radio value="muted">Off</Radio>
+                  </RadioGroup>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        ))}
+        {/* TBD(D-06): no category is marked mandatory until the required-category policy is approved. */}
+        <p className="pt-scope">
+          Delivery channels such as email are still being decided. Priority
+          choices do not change your access to a report or case.
+        </p>
+      </div>
       <ActionError error={action.error} />
-      <Button
-        onPress={() =>
-          action.mutate({
-            action: "saveNotificationPreferences",
-            payload: { priorities },
-          })
-        }
-        loading={action.isPending}
-      >
-        Save
-      </Button>
-    </Stack>
+      <div className="cm-savebar">
+        <Button
+          onPress={() =>
+            action.mutate({
+              action: "saveNotificationPreferences",
+              payload: { priorities },
+            })
+          }
+          loading={action.isPending}
+        >
+          Save
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -987,13 +1051,15 @@ export function CommunicationsPage({ page }: { page: PageEnvelope }) {
   if (page.pageId === "P40") return <NotificationsPage page={page} />;
   if (page.pageId === "P44") return <NotificationPrioritiesPage page={page} />;
   return (
-    <Stack gap={24}>
+    <div className="accs-stack">
       <Heading
         title="Assistant"
         description="Ask how ACCS works, where to find things, and what a stage means."
       />
-      <AssistantPanel suggestions={roles(page.data.suggestions)} />
-    </Stack>
+      <Panel flush className="cm-chat-panel accs-reveal">
+        <AssistantPanel suggestions={roles(page.data.suggestions)} />
+      </Panel>
+    </div>
   );
 }
 
@@ -1012,22 +1078,33 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <Stack gap={16} aria-busy="true">
+          pageId === "P40" ? (
+            <div className="accs-stack" aria-busy="true">
+              <span className="cm-sr" role="status">
+                Loading notifications
+              </span>
+              <Panel flush>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <div className="cm-skel" key={index}>
+                    <span className="accs-skeleton cm-skel__icon" />
+                    <span className="cm-skel__lines">
+                      <span className="accs-skeleton" />
+                      <span className="accs-skeleton" />
+                    </span>
+                  </div>
+                ))}
+              </Panel>
+            </div>
+          ) : (
             <ViewState
               kind="loading"
               title={
                 pageId === "P11" || pageId === "P12"
                   ? "Loading conversations"
-                  : pageId === "P40"
-                    ? "Loading notifications"
-                    : "Loading page"
+                  : "Loading page"
               }
             />
-            {pageId === "P40" &&
-              Array.from({ length: 5 }, (_, index) => (
-                <Skeleton key={index} shape="block" height="4rem" />
-              ))}
-          </Stack>
+          )
         ) : page.isError ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (

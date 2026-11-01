@@ -32,7 +32,7 @@ export interface StatProps {
 
 export function Stat({ label, value, change, scopeNote }: StatProps) {
   return (
-    <section className="ds-next-stat" aria-label={label}>
+    <section className="ds-next-stat accs-reveal" aria-label={label}>
       <p className="ds-next-stat__label">{label}</p>
       <p className="ds-next-stat__value">{value}</p>
       {change && <p className="ds-next-stat__change">{change}</p>}
@@ -62,11 +62,11 @@ export function FilterBar({
   return (
     <div
       {...props}
-      className={["ds-next-filter-bar", props.className]
+      className={["accs-toolbar", "ds-next-filter-bar", props.className]
         .filter(Boolean)
         .join(" ")}
     >
-      <div className="ds-next-filter-bar__controls">
+      <div className="accs-grow">
         <Search
           label={searchLabel}
           placeholder={searchPlaceholder}
@@ -74,12 +74,14 @@ export function FilterBar({
           onChange={onQueryChange}
           size="sm"
         />
-        {children}
       </div>
+      {children}
       {activeFilters.length > 0 && (
-        <ul className="ds-next-filter-bar__chips" aria-label="Active filters">
+        <ul className="accs-pills ds-next-filter-bar__chips" aria-label="Active filters">
           {activeFilters.map((filter) => (
-            <li key={filter}>{filter}</li>
+            <li key={filter} className="accs-tag">
+              {filter}
+            </li>
           ))}
         </ul>
       )}
