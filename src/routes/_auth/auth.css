@@ -32,7 +32,9 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
   to { transform: translate3d(5%, 4%, 0) scale(1.12); }
 }
 .au-brand__inner { display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
-.au-brand__crest { width: 40px; height: 40px; flex: none; object-fit: contain; }
+.au-brand__plate { flex: none; display: inline-flex; border-radius: var(--ds-radius-plate, 8px); box-shadow: 0 0 0 1px rgb(255 255 255 / 22%); }
+.au-plate-lg { display: none; }
+@media (min-width: 960px) { .au-plate-lg { display: inline-flex; } .au-plate-sm { display: none; } }
 .au-brand__id { display: flex; flex-direction: column; min-width: 0; }
 .au-brand__name { font-family: var(--accs-font-display); font-size: 1.125rem; letter-spacing: 0.02em; line-height: 1.2; }
 .au-brand__line { font-size: 0.8125rem; color: rgb(255 255 255 / 72%); }
@@ -191,7 +193,7 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
   .au { grid-template-columns: 44% 1fr; grid-template-rows: 1fr; }
   /* The panel stretches with the page; its content stays centered in the viewport while a tall form scrolls. */
   .au-brand__inner { position: sticky; top: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; height: 100dvh; padding: 56px 64px; box-sizing: border-box; }
-  .au-brand__crest { width: 168px; height: 168px; margin-bottom: 20px; }
+  .au-brand__plate { align-self: flex-start; margin-bottom: 20px; }
   .au-brand__name { display: none; }
   .au-brand__line { font-size: 0.875rem; letter-spacing: 0.02em; }
   .au-brand__headline {
@@ -213,3 +215,4 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
 @media (prefers-reduced-motion: reduce) {
   .au-brand::before { animation: none; }
 }
+.au-brand__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

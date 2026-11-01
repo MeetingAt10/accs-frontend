@@ -1,4 +1,4 @@
-import { Icon, Spinner } from '@meetingat10/design-system/react'
+import { DoorPlate, Icon, Spinner } from '@meetingat10/design-system/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { redirect, useRouter } from '@tanstack/react-router'
 import { AnimatePresence, motion, MotionConfig, type Variants } from 'motion/react'
@@ -138,14 +138,13 @@ export function AuthShell({ children, wide }: { children: ReactNode; wide?: bool
       <div className="au">
         <aside className="au-brand" aria-label="About ACCS">
           <motion.div className="au-brand__inner" variants={stagger(0.09, 0.1)} initial="hidden" animate="show">
-            <motion.img
-              className="au-brand__crest"
-              src="/brand/sites/crest.webp"
-              alt=""
-              width={220}
-              height={220}
-              variants={{ hidden: { opacity: 0, scale: 0.88 }, show: { opacity: 1, scale: 1, transition: { duration: 0.8, ease } } }}
-            />
+            <motion.div
+              className="au-brand__plate"
+              variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } }}
+            >
+              <DoorPlate size="lg" code="CCS" className="au-plate-lg" />
+              <DoorPlate size="sm" code="CCS" className="au-plate-sm" />
+            </motion.div>
             <motion.div className="au-brand__id" variants={rise}>
               <strong className="au-brand__name">ACCS</strong>
               <span className="au-brand__line">QCU · College of Computer Studies</span>
