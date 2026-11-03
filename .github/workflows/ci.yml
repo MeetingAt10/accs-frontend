@@ -28,6 +28,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      # build runs vite (which generates src/routeTree.gen.ts) and then tsc -b, so it also type-checks.
       - run: npm run build
+      - run: npm test
