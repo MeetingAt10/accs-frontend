@@ -356,7 +356,6 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               value={education}
               onChange={setEducation}
               maxLength={500}
-              description="This field is proposed and needs approval before it is final."
             />
           </Panel>
         </div>
@@ -377,7 +376,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
           {/* TBD(D-08): profile photo upload requires policy approval. */}
           <Alert tone="neutral" title="Keep it professional">
             Don't add phone numbers or social links. Others see your QCU email
-            only. Photo upload is not available until the policy is approved.
+            only.
           </Alert>
         </aside>
       </div>

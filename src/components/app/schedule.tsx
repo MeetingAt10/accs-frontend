@@ -1626,7 +1626,7 @@ function RequestPage({
             {/* TBD(D-04): cancellation notice periods and rescheduling rules are not approved. */}
             {next.includes('Cancelled') && (
               <p className="accs-meta">
-                Cancelling needs a reason, and the reason stays in the request history. To reschedule, book a new open time. Cancellation rules are still being decided.
+                Cancelling needs a reason, and the reason stays in the request history. To reschedule, book a new open time.
               </p>
             )}
           </Panel>
