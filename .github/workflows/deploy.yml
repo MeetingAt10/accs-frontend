@@ -14,7 +14,7 @@ permissions:
 
 env:
   AWS_REGION: ap-southeast-1
-  STACK: accs-dev
+  STACK: ${{ github.ref_name == 'main' && 'accs-prod' || 'accs-dev' }} # main serves the plain hostnames, dev the -dev hostnames
   SITES: App Forums Schedule Cases Evaluations Records Admin
 
 jobs:
