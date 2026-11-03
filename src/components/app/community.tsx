@@ -889,7 +889,6 @@ export function PostComposer({
                   row
                   value={priority}
                   onChange={setPriority}
-                  description="Priority levels are awaiting policy approval."
                 >
                   <Radio value="general">General</Radio>
                   <Radio value="important">Important</Radio>
@@ -2061,8 +2060,7 @@ function SpacePage({
             {!academic && (
               <p className="fx-note">
                 <Icon name="info" size={16} />
-                The policy on member lists is still under review. You see names
-                and roles only.
+                Member lists show names and roles only.
               </p>
             )}
             <MemberList members={space.students ?? []} academic={academic} />

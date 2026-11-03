@@ -381,8 +381,8 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
             )}
             {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
             {role === 'staff' && (
-              <Alert tone="neutral" title="Staff access is limited">
-                Staff see CCS-wide material only. Other staff content has not been defined yet.
+              <Alert tone="neutral" title="Staff view">
+                Staff see CCS-wide material.
               </Alert>
             )}
           </aside>

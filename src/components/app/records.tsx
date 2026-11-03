@@ -567,7 +567,7 @@ function ClusterList({ page }: { page: PageEnvelope }) {
     >
       <Note>
         A person reviews every suggestion. The system never groups reports
-        into a case by itself. <span className="tbd-comment">TBD(D-07)</span>
+        into a case by itself.
       </Note>
       {clusters.length ? (
         <Panel flush>
@@ -1307,9 +1307,8 @@ function GoodMoralReview({
           </Button>
         </div>
         <p className="rc-policy">
-          Certificate rules need QCU approval. This page records a prerequisite
-          review. It does not issue a certificate or apply a penalty.{" "}
-          <span className="tbd-comment">TBD(D-02)</span>
+          This page records a prerequisite
+          review. It does not issue a certificate or apply a penalty.
         </p>
       </Panel>
       <Panel title="Last review">
@@ -1625,9 +1624,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                 </div>
                 {admin && (
                   <p className="rc-policy">
-                    Current policy does not say how to apply an end-date change or
-                    decline a request.{" "}
-                    <span className="tbd-comment">TBD(D-05)</span>
+                    End-date changes and declined requests are handled outside ACCS.
                   </p>
                 )}
               </>
@@ -1684,7 +1681,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             onChange={setDecisionReference}
           />
           <TextArea
-            label="Basis (policy options TBD)"
+            label="Basis"
             isRequired
             value={basis}
             onChange={setBasis}
@@ -1698,9 +1695,8 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             onChange={setUntil}
           />
           <p className="rc-policy">
-            Only the selected features are paused. The restriction starts today.{" "}
-            {basis ? "" : "Basis options are still under review. "}
-            <span className="tbd-comment">TBD(D-05)</span>
+            Only the selected features are paused. The restriction starts today.
+            {basis ? "" : " Describe the basis for this restriction."}
           </p>
         </ModalBody>
         <ModalActions>
@@ -2021,9 +2017,8 @@ function RecordRestrictionActions({
       </ul>
       {osas && (
         <p className="rc-policy rc-policy--pad">
-          OSAS authority is still being defined. A request records a referral.
-          It does not apply or lift a restriction.{" "}
-          <span className="tbd-comment">TBD(OSAS-03)</span>
+          A request records a referral.
+          It does not apply or lift a restriction.
         </p>
       )}
     </Panel>

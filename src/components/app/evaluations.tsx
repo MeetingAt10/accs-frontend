@@ -1763,11 +1763,10 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
       <Panel title="Participation">
         {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}
         <Select label="Participation rule" selectedKey="undecided" isDisabled>
-          <SelectOption id="undecided">Not decided</SelectOption>
+          <SelectOption id="undecided">Not set</SelectOption>
         </Select>
         <p className="ev-note">
-          QCU hasn't decided the participation rule (D-01). Until it does,
-          there are no grade, certificate, or penalty settings.
+          Cycles have no grade, certificate, or penalty settings.
         </p>
         {/* TBD(D-02): evaluation participation never applies a grade or Good Moral consequence. */}
       </Panel>
@@ -1979,8 +1978,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
                   Publish combined results when the cycle closes
                 </Checkbox>
                 <p className="ev-note">
-                  Results are combined only. QCU hasn't approved release
-                  thresholds or retention yet (D-08).
+                  Results are released in combined form only.
                 </p>
               </>
             )}
