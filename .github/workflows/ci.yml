@@ -1,0 +1,33 @@
+name: CI
+
+# Pull request check; branch protection on the default branch requires the "ci" job to pass.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # npm fetches the design system over SSH with a read-only deploy key.
+      - name: Design system access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
