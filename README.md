@@ -22,6 +22,14 @@ Open `http://<account id lowercased>.localhost:5188/__role?account=<ACCOUNT ID>`
 
 The launcher requires `ACCS_ROLE_LAUNCHER=1` and binds Vite to `127.0.0.1`. It rejects other hosts and cannot run with a public `--host` binding. Its `/__roles` and `/__role` pages are available only on the opted-in dev server; they are not part of the production build. Starting Vite normally keeps the existing API proxy behavior.
 
+## Accounts and first sign-in
+
+`/first-login` is the only page open to an account with temporary credentials; every other route redirects there. `/accounts` is for the Dean (activate the secretary) and the secretary (faculty, advisors, program chairs, students). The student import reads `.xlsx` files in the browser with `read-excel-file`, loaded on demand. Its column names are assumptions until a sample MIS file is provided.
+
+## Dev toolbox
+
+A floating account switcher for the development stack. It is built in only under `pnpm dev` or when `VITE_DEV_TOOLBOX=true` is set at build time; leave it unset for production builds, which then contain no toolbox code. It needs the backend dev routes, which exist only on the `accs-dev-` stack ([backend README](../backend/README.md#dev-toolbox)).
+
 ## Module sites
 
 The signed-in app is seven module sites (Home, Forums, Schedule, Cases, Evaluations, Records, Admin). One build serves all of them, and each site has its own host. Routes and permissions do not change. Site definitions, host resolution, and link rewriting are in `src/lib/sites.ts`; the design is in [`docs/deltas/2026-11-01-subdomain-sites.md`](../docs/deltas/2026-11-01-subdomain-sites.md).
