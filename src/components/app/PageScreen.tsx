@@ -10,6 +10,7 @@ import { pageQuery, sessionQuery } from '@/lib/queries'
 import { siteHref } from '@/lib/sites'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
+import { ModulePicker } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
 import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
@@ -434,6 +435,7 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
           )
         }
       />
+      {session.data && <ModulePicker session={session.data} />}
       {tabbed && (
         <SlidePills
           label="Dashboard role views"

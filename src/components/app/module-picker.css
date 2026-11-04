@@ -1,0 +1,46 @@
+/* Home module picker. The design-system Card and Tile carry the look; this sets the grid and the not-built state.
+   The columns follow the width the picker actually gets (the shell takes 320px for its rail and sidebar from 1024px):
+   one column on a phone, two on a tablet or a laptop, four on a wide screen. A person with four tiles never gets three and one. */
+
+.module-picker {
+  container-type: inline-size;
+}
+.module-picker__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ds-space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@container (min-width: 34rem) {
+  .module-picker__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 60rem) {
+  .module-picker__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Large tile: the icon block on top, the action or status row pinned to the bottom. */
+.module-picker .module-tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 11rem;
+  padding: var(--ds-space-24);
+}
+.module-picker .module-tile .ds-card__meta {
+  margin-top: auto;
+}
+
+/* Not built yet: a flat dashed outline and a quiet title. No link, no hover lift. */
+.module-picker .module-tile--soon {
+  border-style: dashed;
+  border-color: var(--ds-border-default);
+  background: transparent;
+}
+.module-picker .module-tile--soon .ds-card__title {
+  color: var(--ds-text-secondary);
+}
