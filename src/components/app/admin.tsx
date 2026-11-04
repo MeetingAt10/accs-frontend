@@ -85,6 +85,7 @@ const roles: Role[] = [
   "guidance",
   "osas",
   "president",
+  "secretary",
 ];
 const SHORT: Record<string, string> = {
   student: "Student",
@@ -97,6 +98,7 @@ const SHORT: Record<string, string> = {
   guidance: "Guidance",
   osas: "OSAS",
   president: "President",
+  secretary: "Secretary",
 };
 const FULL: Record<string, string> = {
   student: "Student",
@@ -109,6 +111,7 @@ const FULL: Record<string, string> = {
   guidance: "Guidance",
   osas: "OSAS",
   president: "President's Office",
+  secretary: "CCS secretary",
 };
 const roleShort = (role: string) => SHORT[role] ?? cap(role);
 const roleFull = (role: string) => FULL[role] ?? cap(role);

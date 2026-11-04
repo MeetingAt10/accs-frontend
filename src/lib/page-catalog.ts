@@ -49,6 +49,7 @@ export const pageTitles: Record<string, string> = {
   P50: 'Moderation review',
   P51: 'Audit trail',
   P52: 'Monitoring',
+  accounts: 'Accounts',
 }
 
 export const routePermission: Record<string, string | string[]> = {
@@ -102,6 +103,16 @@ export const routePermission: Record<string, string | string[]> = {
   P50: 'moderation.review',
   P51: 'audit.view',
   P52: 'audit.view',
+  accounts: ['account.activateSecretary', 'account.provision'],
+}
+
+/** Pages the server has no page ID for. They open on a permission alone, so `allowedPages` never lists them. */
+const permissionPages = ['accounts']
+
+/** Whether the session may open a page. */
+export function pageAllowed(session: { allowedPages: string[]; permissions?: string[] }, pageId = '') {
+  if (!permissionPages.includes(pageId)) return session.allowedPages.includes(pageId)
+  return [routePermission[pageId]].flat().some((key) => session.permissions?.includes(key))
 }
 
 export function pageIdForPath(path: string) {
@@ -156,6 +167,7 @@ export function pageIdForPath(path: string) {
     [/^\/settings\/notifications$/, 'P44'],
     [/^\/settings$/, 'P43'],
     [/^\/home$/, 'P03'],
+    [/^\/accounts$/, 'accounts'],
   ]
   return rules.find(([pattern]) => pattern.test(path))?.[1]
 }
