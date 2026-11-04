@@ -103,7 +103,7 @@ export function siteForPath(path: string): SiteId {
 }
 
 /** Paths served on every host. */
-export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in') || matches(path, '/register')
+export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in')
 
 function configuredOrigins(): Partial<Record<SiteId, string>> {
   try {

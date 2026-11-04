@@ -17,7 +17,7 @@ export const validateAuthSearch = (search: Record<string, unknown>) => ({
     : undefined,
 })
 
-/** beforeLoad for /sign-in and /register: a signed-in visitor goes straight to their landing page. */
+/** beforeLoad for /sign-in: a signed-in visitor goes straight to their landing page. */
 export async function redirectIfSignedIn({ context, search }: { context: { queryClient: QueryClient }; search: { redirect?: string } }) {
   const session = await context.queryClient.ensureQueryData(sessionQuery()).catch(() => undefined)
   if (session) throw redirect({ href: siteHref(search.redirect ?? landingFor(session)) })

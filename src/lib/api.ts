@@ -93,19 +93,6 @@ const post = <T>(path: string, body: unknown) =>
 export const signIn = (input: { emailOrId: string; password: string; remember?: boolean }) =>
   post<Session>('/auth/sign-in', input)
 
-export interface RegisterInput {
-  fullName: string
-  email: string
-  identifier: string
-  role: 'student' | 'professor' | 'staff'
-  program?: 'BSIT' | 'BSCS' | 'BSIS'
-  yearLevel?: number
-  section?: string
-  password: string
-}
-
-export const register = (input: RegisterInput) => post<Session>('/auth/register', input)
-
 type Done = { ok: true; message: string }
 
 export const forgotPassword = (input: { emailOrId: string }) => post<Done>('/auth/forgot-password', input)

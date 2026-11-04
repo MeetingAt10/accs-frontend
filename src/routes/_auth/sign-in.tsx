@@ -1,6 +1,6 @@
 import { Alert } from '@meetingat10/design-system/react'
 import { useMutation } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { AnimatePresence } from 'motion/react'
 import { useRef, useState, type FormEvent } from 'react'
 
@@ -154,12 +154,7 @@ function SignInForm({
         </Reveal>
         <SubmitButton loading={mutation.isPending}>Sign in</SubmitButton>
       </Form>
-      <Foot>
-        Don't have an account?{' '}
-        <Link to="/register" search={{ redirect: redirectTo }}>
-          Create an account
-        </Link>
-      </Foot>
+      <Foot>Your account is provided by the CCS secretary.</Foot>
     </>
   )
 }
