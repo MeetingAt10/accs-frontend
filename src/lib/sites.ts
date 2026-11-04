@@ -1,4 +1,4 @@
-import { pageIdForPath } from '@/lib/page-catalog'
+import { pageAllowed, pageIdForPath } from '@/lib/page-catalog'
 import type { Role } from '@/lib/api'
 
 // ACCS module sites (docs/deltas/2026-11-01-subdomain-sites.md). A site is a host and navigation boundary only;
@@ -84,11 +84,11 @@ export const sites: Site[] = [
   {
     id: 'admin',
     label: 'Admin',
-    purpose: 'Roles, moderation, restrictions, audit, and monitoring.',
+    purpose: 'Accounts, roles, moderation, restrictions, audit, and monitoring.',
     icon: 'gear',
     lane: 'navy',
-    prefixes: ['/admin'],
-    landings: ['/admin'],
+    prefixes: ['/admin', '/accounts'],
+    landings: ['/admin', '/accounts'],
     modules: ['ADM-01', 'ADM-02', 'ADM-04', 'ADM-05', 'ADM-06'],
   },
 ]
@@ -103,7 +103,7 @@ export function siteForPath(path: string): SiteId {
 }
 
 /** Paths served on every host. */
-export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in')
+export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in') || matches(path, '/first-login')
 
 function configuredOrigins(): Partial<Record<SiteId, string>> {
   try {
@@ -158,7 +158,7 @@ export function siteLanding(site: SiteId, allowedHref: (href: string) => boolean
   return siteById[site].landings.find(allowedHref)
 }
 
-type Access = { allowedPages: string[]; user: { roles: string[] } }
+type Access = { allowedPages: string[]; permissions?: string[]; user: { roles: string[]; mustChangeCredentials?: boolean } }
 
 /** Roles that may open each site (docs/deltas/2026-11-01-real-auth-and-visual-refactor.md section 3). */
 export const siteRoles: Record<SiteId, Role[] | 'all'> = {
@@ -168,10 +168,11 @@ export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas', 'president'],
   evaluations: ['student', 'professor', 'chair', 'dean'],
   records: ['chair', 'dean', 'guidance', 'osas', 'president', 'administrator'],
-  admin: ['administrator'],
+  admin: ['administrator', 'dean', 'secretary'],
 }
 
-const allowsPath = (session: Access, href: string) => session.allowedPages.includes(pageIdForPath(href) ?? '')
+/** Whether the session may open the page that owns `href`. */
+export const allowsPath = (session: Access, href: string) => pageAllowed(session, pageIdForPath(href))
 
 /** A site is open when the role is listed for it and at least one of its landing pages is allowed. */
 export function canOpenSite(session: Access, site: SiteId) {
@@ -191,14 +192,16 @@ export function canOpenPath(session: Access, path: string) {
 const roleLabels: Partial<Record<string, string>> = {
   professor: 'Faculty',
   staff: 'CCS staff',
+  secretary: 'CCS secretary',
   osas: 'OSAS',
   president: "President's Office",
 }
 
 export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)
 
-/** Where a signed-in person lands on this host: the current site's first allowed landing, else Home (Admin for administrators). */
+/** Where a signed-in person lands on this host: the current site's first allowed landing, else Home (Admin for administrators). Temporary sign-in details come first. */
 export function landingFor(session: Access, site = currentSite()) {
+  if (session.user.mustChangeCredentials) return '/first-login'
   const landing = site && site !== 'portal' && canOpenSite(session, site) ? siteLanding(site, (href) => allowsPath(session, href)) : undefined
   return landing ?? (session.user.roles.includes('administrator') ? '/admin' : '/home')
 }

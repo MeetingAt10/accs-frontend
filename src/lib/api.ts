@@ -9,11 +9,13 @@ export type Role =
   | 'guidance'
   | 'osas'
   | 'president'
+  | 'secretary'
 
 export interface SessionUser {
   id: string
   name: string
   email: string
+  username?: string
   roles: Role[]
   program?: string
   section?: string
@@ -21,6 +23,8 @@ export interface SessionUser {
   organizationId?: string
   restrictions: string[]
   title?: string
+  /** True until the person replaces the temporary username and password they were given. */
+  mustChangeCredentials?: boolean
 }
 
 export interface Session {
@@ -94,6 +98,7 @@ export const signIn = (input: { emailOrId: string; password: string; remember?: 
   post<Session>('/auth/sign-in', input)
 
 type Done = { ok: true; message: string }
+type Recorded<T> = Done & { record: T }
 
 export const forgotPassword = (input: { emailOrId: string }) => post<Done>('/auth/forgot-password', input)
 
@@ -102,6 +107,10 @@ export const resetPassword = (input: { emailOrId: string; code: string; password
 
 export const changePassword = (input: { currentPassword: string; password: string }) =>
   post<Done>('/auth/change-password', input)
+
+/** Replaces the temporary username and password. Answers with the new session. */
+export const completeFirstLogin = (input: { currentPassword: string; username: string; password: string }) =>
+  post<Session>('/auth/complete-first-login', input)
 
 export const signOut = () =>
   request<{ ok: true; message: string }>('/auth/sign-out', { method: 'POST', body: '{}' })
@@ -126,3 +135,111 @@ export function performPageAction(pageId: string, action: PageAction) {
     body: JSON.stringify(action),
   })
 }
+
+// --- Accounts. The dean activates the secretary, who creates and manages everyone else. ---
+
+export type Program = 'BSIT' | 'BSCS' | 'BSIS'
+export type AccountType = 'secretary' | 'faculty' | 'advisor' | 'chair' | 'student'
+
+export interface AccountSummary {
+  id: string
+  name: string
+  email: string
+  roles: Role[]
+  program?: string
+  section?: string
+  year?: number
+  studentId?: string
+  adviserId?: string
+  active: boolean
+  mustChangeCredentials?: boolean
+}
+
+export interface AccountTypeRow {
+  type: AccountType
+  label: string
+  active: number
+  inactive: number
+  canManage: boolean
+}
+
+export interface FacultyAccount extends AccountSummary {
+  advisorYears: number[]
+  chairProgram: string | null
+}
+
+export interface Credentials {
+  username: string
+  temporaryPassword: string
+}
+
+export interface Invite {
+  sent: boolean
+  signInUrl: string
+}
+
+/** A new account with the temporary sign-in details the server shows only once. */
+export interface Provisioned {
+  account: AccountSummary
+  credentials: Credentials
+  invite: Invite
+}
+
+/** One row of a batch: created, or refused with a reason. `index` is the row's place in the request. */
+export type RowResult =
+  | ({ index: number; status: 'created' } & Provisioned)
+  | { index: number; status: 'error'; code: string; error: string; fields?: FieldError[] }
+
+export interface BatchResult {
+  created: number
+  failed: number
+  results: RowResult[]
+}
+
+export interface NewFaculty {
+  name: string
+  email: string
+  program: Program
+}
+
+export interface NewStudent extends NewFaculty {
+  studentId: string
+  year: number
+  section: string
+}
+
+const queryString = (params: Record<string, string | undefined>) => {
+  const search = new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => !!entry[1]))
+  return search.size ? '?' + search.toString() : ''
+}
+
+const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
+
+export const getAccountTypes = () => request<{ types: AccountTypeRow[]; secretary?: AccountSummary }>('/accounts/types')
+
+export const activateSecretary = (input: { name?: string; email?: string }) =>
+  post<Recorded<Provisioned>>('/accounts/secretary/activate', input)
+
+export const setAccountActive = (id: string, active: boolean) =>
+  post<Recorded<{ id: string; active: boolean }>>('/accounts/' + encodeURIComponent(id) + '/active', { active })
+
+/** The first 200 matches; `total` is the full count. */
+export const listAccounts = (filters: { role?: Role; q?: string } = {}) =>
+  request<{ accounts: AccountSummary[]; total: number }>('/accounts' + queryString(filters))
+
+export const listFaculty = (filters: { q?: string; program?: Program } = {}) =>
+  request<{ faculty: FacultyAccount[] }>('/accounts/faculty' + queryString(filters))
+
+export const createFaculty = (faculty: NewFaculty[]) => post<Recorded<BatchResult>>('/accounts/faculty', { faculty })
+
+/** At most 25 students per request. */
+export const createStudents = (students: NewStudent[]) => post<Recorded<BatchResult>>('/accounts/students', { students })
+
+export const getAdvisors = () =>
+  request<{ advisors: { yearLevel: number; faculty: AccountSummary[] }[] }>('/accounts/advisors')
+
+export const setAdvisors = (yearLevel: number, facultyIds: string[]) =>
+  put<Recorded<{ yearLevel: number; facultyIds: string[]; studentsUpdated: number }>>('/accounts/advisors/' + yearLevel, { facultyIds })
+
+export const setChair = (program: Program, facultyId: string) =>
+  put<Recorded<{ program: Program; chairId: string; previousChairIds: string[] }>>('/accounts/chairs/' + program, { facultyId })

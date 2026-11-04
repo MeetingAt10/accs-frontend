@@ -34,7 +34,7 @@ export const Route = createFileRoute('/_auth/sign-in')({
 
 function signInMessage(error: unknown) {
   if (!(error instanceof ApiError)) return "Can't reach ACCS right now. Check your connection and try again."
-  if (error.code === 'INVALID_CREDENTIALS') return 'The email, ID, or password is incorrect.'
+  if (error.code === 'INVALID_CREDENTIALS') return 'The email, ID, username, or password is incorrect.'
   if (error.code === 'TOO_MANY_ATTEMPTS') return 'Too many attempts. Wait 15 minutes and try again.'
   return error.message
 }
@@ -110,7 +110,7 @@ function SignInForm({
   function submit(event: FormEvent) {
     event.preventDefault()
     const next = {
-      emailOrId: emailOrId.trim() ? undefined : 'Enter your email or ID.',
+      emailOrId: emailOrId.trim() ? undefined : 'Enter your email, ID, or username.',
       password: password ? undefined : 'Enter your password.',
     }
     setErrors(next)
@@ -121,11 +121,11 @@ function SignInForm({
   return (
     <>
       <Title>Sign in</Title>
-      <Sub>Use your QCU email or your student or employee ID.</Sub>
+      <Sub>Use your QCU email, your student or employee ID, or your username.</Sub>
       <Form formRef={form} onSubmit={submit}>
         {notice && <Rise><Alert tone="success" title={notice} /></Rise>}
         <TextInput
-          label="Email or ID"
+          label="Email, ID, or username"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
@@ -176,7 +176,7 @@ function ForgotForm({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    const missing = emailOrId.trim() ? undefined : 'Enter your email or ID.'
+    const missing = emailOrId.trim() ? undefined : 'Enter your email, ID, or username.'
     setError(missing)
     if (missing) return focusFirstInvalid(form.current)
     mutation.mutate({ emailOrId: emailOrId.trim() })
@@ -185,10 +185,10 @@ function ForgotForm({
   return (
     <>
       <Title>Reset your password</Title>
-      <Sub>Enter your email or ID. We will send a 6-digit code to the QCU email on that account.</Sub>
+      <Sub>Enter your email, ID, or username. We will send a 6-digit code to the QCU email on that account.</Sub>
       <Form formRef={form} onSubmit={submit}>
         <TextInput
-          label="Email or ID"
+          label="Email, ID, or username"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}

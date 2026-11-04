@@ -1,0 +1,118 @@
+/* ==========================================================================
+   Accounts (dean and secretary). Builds on the foundation in styles.css and on the design
+   system components; only what they do not cover lives here.
+   ========================================================================== */
+
+.acct-lead { margin: 0; max-width: 46rem; color: var(--accs-muted); font-size: 0.9375rem; line-height: 1.55; text-wrap: pretty; }
+.acct-muted { color: var(--accs-muted); font-size: 0.8125rem; }
+.acct-summary { margin: 0; color: var(--accs-ink-2); font-size: 0.875rem; }
+.acct-problem { color: var(--accs-danger); font-size: 0.8125rem; font-weight: 600; }
+.acct-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* A tab panel that stays mounted keeps its place in the page only while its tab is showing. */
+.acct-keep[data-inert] { display: none; }
+
+/* ---------- Toolbar and bulk bar ---------- */
+.acct-toolbar .acct-search { flex: 1 1 14rem; min-width: 0; }
+.acct-count { margin-inline-start: auto; color: var(--accs-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.acct-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--accs-line);
+  background: var(--accs-sunken);
+}
+.acct-bulk .acct-actions { margin-inline-start: auto; }
+.acct-bulk .acct-search { flex: 1 1 14rem; min-width: 0; }
+.acct-pad { padding: 12px 20px; }
+.acct-foot { margin: 0; padding: 10px 20px; border-top: 1px solid var(--accs-line); background: var(--accs-sunken); color: var(--accs-muted); font-size: 0.8125rem; }
+
+/* ---------- Tables ---------- */
+.acct-scroll { overflow-x: auto; }
+.acct-scroll--tall { max-height: 28rem; overflow: auto; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); }
+.acct-table td[data-bad] { color: var(--accs-danger); font-weight: 600; }
+.acct-table th.acct-check, .acct-table td.acct-check { width: 1%; padding-inline-end: 0; }
+.acct-table td.acct-act { text-align: end; white-space: nowrap; }
+.acct-person { display: grid; min-width: 0; }
+.acct-person small { color: var(--accs-muted); font-size: 0.75rem; overflow-wrap: anywhere; }
+.acct-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.acct-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+
+@media (max-width: 640px) {
+  .accs-table.acct-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .accs-table.acct-stack, .accs-table.acct-stack tbody { display: block; }
+  .accs-table.acct-stack tr { position: relative; display: grid; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--accs-line); }
+  .accs-table.acct-stack tbody tr:last-child { border-bottom: 0; }
+  .accs-table.acct-stack td { display: block; padding: 0; border: 0; }
+  .accs-table.acct-stack tbody tr:hover td { background: none; }
+  .accs-table.acct-stack td.accs-num { text-align: start; }
+  .accs-table.acct-stack td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 5.5rem;
+    margin-inline-end: 8px;
+    color: var(--accs-faint);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  /* The checkbox sits in the card's corner so the name keeps the full width. */
+  .accs-table.acct-stack td.acct-check { position: absolute; top: 10px; inset-inline-end: 12px; }
+  .accs-table.acct-stack td.acct-check + td.acct-main { padding-inline-end: 40px; }
+  .accs-table.acct-stack td.acct-act { padding-top: 4px; text-align: start; }
+  .acct-bulk, .acct-pad, .acct-foot { padding-inline: 16px; }
+  .acct-bulk .acct-actions { margin-inline-start: 0; }
+}
+
+/* ---------- Forms and dialogs ---------- */
+.acct-form { display: grid; gap: 16px; }
+.acct-form__grid { display: grid; gap: 12px 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.acct-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+
+/* A form around a dialog's body and actions must not break the dialog's own layout. */
+.acct-modal-form { display: contents; }
+
+/* Sign-in details shown once: each value on its own line, selectable in one click, with a copy button. */
+.acct-secret { display: grid; gap: 12px; margin: 0; }
+.acct-secret > div { display: grid; gap: 4px; min-width: 0; }
+.acct-secret dt { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 600; }
+.acct-secret dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-control);
+  background: var(--accs-sunken);
+}
+.acct-secret code { min-width: 0; overflow-wrap: anywhere; color: var(--accs-ink); font-size: 0.9375rem; user-select: all; }
+
+/* The people who hold a role now, each with their state and switch. */
+.acct-holders { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.acct-holders li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-control);
+}
+.acct-holders .acct-person { flex: 1 1 12rem; }
+
+/* A long list of people to tick, scrolling inside its own box. */
+.acct-pick {
+  display: grid;
+  gap: 8px;
+  max-height: 26rem;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-card);
+  background: var(--accs-surface);
+}

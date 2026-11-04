@@ -9,12 +9,12 @@ import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ context, location }) => {
-    try {
-      const session = await context.queryClient.ensureQueryData(sessionQuery())
-      return { session }
-    } catch {
-      throw redirect({ href: '/sign-in?redirect=' + encodeURIComponent(location.href) })
-    }
+    const session = await context.queryClient.ensureQueryData(sessionQuery()).catch(() => undefined)
+    const here = encodeURIComponent(location.href)
+    if (!session) throw redirect({ href: '/sign-in?redirect=' + here })
+    // Temporary sign-in details open nothing but the page that replaces them.
+    if (session.user.mustChangeCredentials) throw redirect({ href: '/first-login?redirect=' + here })
+    return { session }
   },
   component: AppLayout,
 })
