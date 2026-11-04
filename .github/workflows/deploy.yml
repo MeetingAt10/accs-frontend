@@ -55,6 +55,7 @@ jobs:
         env:
           VITE_API_URL: ${{ steps.stack.outputs.api }}/api
           VITE_SITE_ORIGINS: ${{ steps.stack.outputs.origins }}
+          VITE_DEV_TOOLBOX: ${{ github.ref_name == 'dev' && 'true' || '' }} # only the dev branch's build carries the dev toolbox
 
       # Every site serves the same build. A site whose outputs are missing (stack not yet updated) is skipped.
       - name: Upload and invalidate
