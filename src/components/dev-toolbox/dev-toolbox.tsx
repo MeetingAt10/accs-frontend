@@ -6,7 +6,7 @@ import logo from '@/assets/dev-toolbox/accs-dev-toolbox.svg?inline'
 import { ApiError } from '@/lib/api'
 import { listDevUsers, switchDevUser, type DevUser } from '@/lib/dev-toolbox-api'
 import { sessionQuery } from '@/lib/queries'
-import { landingFor, roleLabel, siteHref } from '@/lib/sites'
+import { landingFor, roleLabel } from '@/lib/sites'
 
 import './dev-toolbox.css'
 
@@ -83,8 +83,8 @@ export default function DevToolbox() {
     try {
       const next = await switchDevUser(user.id)
       queryClient.clear()
-      // A full page load leaves nothing of the previous account in memory, and it also covers a landing on another site's host.
-      window.location.assign(siteHref(landingFor(next)))
+      // A full page load leaves nothing of the previous account in memory.
+      window.location.assign(landingFor(next))
     } catch (cause) {
       setSwitching(undefined)
       setError(cause instanceof Error ? cause.message : 'Could not switch accounts.')

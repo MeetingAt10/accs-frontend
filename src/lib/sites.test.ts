@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import inventory from './doc003-modules.json'
 import { pageIdForPath } from './page-catalog'
-import { canOpenPath, canOpenSite, isSharedPath, landingFor, siteForPath, sites, type SiteId } from './sites'
+import { canOpenPath, canOpenSite, landingFor, siteForPath, sites, type SiteId } from './sites'
 
-// One concrete URL per page (P03-P52; P01 `/` and P02 `/sign-in` are served on every host).
+// One concrete URL per page (P03-P52; P01 `/` and P02 `/sign-in` belong to no module site).
 const samplePaths: Record<string, string> = {
   P03: '/home', P04: '/feed', P05: '/feed/new', P06: '/feed/POST-1', P07: '/spaces', P08: '/spaces/S-1', P09: '/organizations',
   P10: '/organizations/O-1', P11: '/messages', P12: '/messages/T-1', P13: '/calendar', P14: '/consultations',
@@ -81,9 +81,9 @@ describe('site access by role', () => {
     expect(canOpenPath(sessionFor('administrator'), '/admin/users')).toBe(true)
   })
 
-  it('falls back to Home when a landing is not openable', () => {
-    expect(landingFor(sessionFor('student'), 'admin')).toBe('/home')
-    expect(landingFor(sessionFor('administrator'), 'portal')).toBe('/admin')
+  it('lands on Home, and administrators on Admin', () => {
+    expect(landingFor(sessionFor('student'))).toBe('/home')
+    expect(landingFor(sessionFor('administrator'))).toBe('/admin')
   })
 })
 
@@ -105,59 +105,7 @@ describe('accounts page', () => {
     expect(canOpenSite(sessionFor('student'), 'admin')).toBe(false)
   })
 
-  it('is where the dean lands on the admin site', () => {
-    expect(landingFor(dean, 'admin')).toBe('/accounts')
-    expect(landingFor(administrator, 'admin')).toBe('/admin')
-  })
-
-  it('sends temporary sign-in details to the first-login page, which every host serves', () => {
+  it('sends temporary sign-in details to the first-login page', () => {
     expect(landingFor({ ...secretary, user: { roles: ['secretary'], mustChangeCredentials: true } })).toBe('/first-login')
-    expect(isSharedPath('/first-login')).toBe(true)
-  })
-})
-
-describe('cross-host links', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
-    vi.unstubAllGlobals()
-    vi.resetModules()
-  })
-
-  async function load(href: string, origins?: Record<string, string>) {
-    vi.resetModules()
-    if (origins) vi.stubEnv('VITE_SITE_ORIGINS', JSON.stringify(origins))
-    const url = new URL(href)
-    vi.stubGlobal('window', { location: { origin: url.origin, hostname: url.hostname, protocol: url.protocol, port: url.port } })
-    return import('./sites')
-  }
-
-  it('uses configured origins', async () => {
-    const m = await load('https://f.example', { portal: 'https://p.example', forums: 'https://f.example' })
-    expect(m.currentSite()).toBe('forums')
-    expect(m.siteHref('/feed?q=x')).toBe('/feed?q=x')
-    expect(m.siteHref('/home')).toBe('https://p.example/home')
-    expect(m.siteHref('/sign-in?redirect=%2Ffeed')).toBe('/sign-in?redirect=%2Ffeed')
-    // A site without an origin stays on this host.
-    expect(m.siteHref('/cases')).toBe('/cases')
-  })
-
-  it('swaps the host label', async () => {
-    const m = await load('http://forums.localhost:5173')
-    expect(m.currentSite()).toBe('forums')
-    expect(m.siteHref('/calendar')).toBe('http://schedule.localhost:5173/calendar')
-    expect(m.siteHref('https://other.example/x')).toBe('https://other.example/x')
-  })
-
-  it('keeps every route on one host in unified mode', async () => {
-    const m = await load('http://localhost:5173')
-    expect(m.currentSite()).toBeUndefined()
-    expect(m.siteHref('/admin/users')).toBe('/admin/users')
-  })
-
-  it('lands on the current site first, then Home', async () => {
-    const m = await load('http://cases.localhost:5173')
-    expect(m.landingFor({ allowedPages: ['P03', 'P18'], user: { roles: ['student'] } })).toBe('/reports')
-    expect(m.landingFor({ allowedPages: ['P03'], user: { roles: ['student'] } })).toBe('/home')
-    expect(m.landingFor({ allowedPages: ['P45'], user: { roles: ['administrator'] } }, 'portal')).toBe('/admin')
   })
 })

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 
 import { pageAllowed, routePermission } from '@/lib/page-catalog'
 import { sessionQuery } from '@/lib/queries'
-import { canOpenSite, currentSite, landingFor, roleLabel, siteById, siteForPath, siteHref } from '@/lib/sites'
+import { canOpenSite, landingFor, roleLabel, siteById, siteForPath } from '@/lib/sites'
 
 import './sites.css'
 
@@ -21,7 +21,7 @@ function DeniedView({ title, children, page }: { title: string; children: ReactN
         {title}
       </h1>
       <p className="shell-denied__text">{children}</p>
-      <Button variant="primary" href={session ? siteHref(landingFor(session)) : '/sign-in'}>
+      <Button variant="primary" href={session ? landingFor(session) : '/sign-in'}>
         Back to Home
       </Button>
     </section>
@@ -32,11 +32,12 @@ function DeniedView({ title, children, page }: { title: string; children: ReactN
 export function AccessDenied({ page = false }: { page?: boolean }) {
   const session = useQuery(sessionQuery()).data
   const path = useRouterState({ select: (state) => state.location.pathname })
-  const blocked = session && [siteForPath(path), currentSite()].find((id) => id && !canOpenSite(session, id))
+  const site = siteForPath(path)
+  const blocked = session && !canOpenSite(session, site)
   const role = session?.user.roles.map(roleLabel).join(' / ') ?? 'account'
   return (
     <DeniedView page={page} title="You don't have access to this page">
-      Your role ({role}) can't open {blocked ? `the ${siteById[blocked].label} site` : 'this page'}. If you need access, ask the CCS
+      Your role ({role}) can't open {blocked ? siteById[site].label : 'this page'}. If you need access, ask the CCS
       administrator.
     </DeniedView>
   )

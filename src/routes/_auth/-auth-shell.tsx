@@ -6,7 +6,7 @@ import { useId, useState, type FormEvent, type ReactNode, type RefObject } from 
 
 import type { Session } from '@/lib/api'
 import { sessionQuery } from '@/lib/queries'
-import { landingFor, siteHref } from '@/lib/sites'
+import { landingFor } from '@/lib/sites'
 import type { QueryClient } from '@tanstack/react-query'
 
 import './auth.css'
@@ -20,7 +20,7 @@ export const validateAuthSearch = (search: Record<string, unknown>) => ({
 /** Where a session goes next: the page it asked for, else its landing page. Temporary sign-in details come first. */
 export function destinationFor(session: Session, redirectTo?: string) {
   if (session.user.mustChangeCredentials) return '/first-login' + (redirectTo ? '?redirect=' + encodeURIComponent(redirectTo) : '')
-  return siteHref(redirectTo ?? landingFor(session))
+  return redirectTo ?? landingFor(session)
 }
 
 /** beforeLoad for /sign-in: a signed-in visitor goes straight to their landing page. */
@@ -29,15 +29,13 @@ export async function redirectIfSignedIn({ context, search }: { context: { query
   if (session) throw redirect({ href: destinationFor(session, search.redirect) })
 }
 
-/** Stores the new session, then navigates (full-page when the destination is another site). */
+/** Stores the new session, then navigates. */
 export function useFinishAuth(redirectTo?: string) {
   const router = useRouter()
   const queryClient = useQueryClient()
   return (session: Session) => {
     queryClient.setQueryData(['session'], session)
-    const destination = destinationFor(session, redirectTo)
-    if (destination.startsWith('/')) router.history.push(destination)
-    else window.location.assign(destination)
+    router.history.push(destinationFor(session, redirectTo))
   }
 }
 

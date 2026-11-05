@@ -22,6 +22,7 @@ import {
   type Destination,
   type NavEntry,
   type NavGroup,
+  NavLink,
 } from "@/components/app/site-chrome";
 import { NotificationItem, NotificationList } from "@/components/ds-next";
 import {
@@ -37,7 +38,6 @@ import {
   canOpenSite,
   siteById,
   siteForPath,
-  siteHref,
   siteLanding,
   sites,
   type SiteId,
@@ -652,9 +652,7 @@ function Topbar({
             onSubmit={(event) => {
               event.preventDefault();
               if (search.trim())
-                window.location.assign(
-                  siteHref("/feed?q=" + encodeURIComponent(search.trim())),
-                );
+                router.history.push("/feed?q=" + encodeURIComponent(search.trim()));
             }}
           >
             <Search
@@ -827,7 +825,7 @@ export function AppChrome({
                   .join("; ")
               : "Some account features are paused."}
           </span>
-          <a href={siteHref("/standing")}>View account standing</a>
+          <NavLink href="/standing">View account standing</NavLink>
         </div>
       )}
       <div className="shell-frame" data-sidebar={groups.length > 0}>

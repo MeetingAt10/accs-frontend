@@ -1,7 +1,7 @@
 import { pageAllowed, pageIdForPath } from '@/lib/page-catalog'
 import type { Role } from '@/lib/api'
 
-// ACCS module sites (docs/deltas/2026-11-01-subdomain-sites.md). A site is a host and navigation boundary only;
+// ACCS module sites (docs/deltas/2026-11-05-one-portal-host.md). A site is a navigation group on the one portal host;
 // route permissions and API checks are unchanged.
 
 export type SiteId = 'portal' | 'forums' | 'schedule' | 'cases' | 'evaluations' | 'records' | 'admin'
@@ -102,57 +102,6 @@ export function siteForPath(path: string): SiteId {
   return sites.find((site) => site.prefixes.some((prefix) => matches(path, prefix)))?.id ?? 'portal'
 }
 
-/** Paths served on every host. */
-export const isSharedPath = (path: string) => path === '/' || matches(path, '/sign-in') || matches(path, '/first-login')
-
-function configuredOrigins(): Partial<Record<SiteId, string>> {
-  try {
-    const raw = import.meta.env.VITE_SITE_ORIGINS
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-const origins = configuredOrigins()
-
-function hostLabelSite(): SiteId | undefined {
-  if (typeof window === 'undefined') return undefined
-  const label = window.location.hostname.split('.')[0]
-  return sites.some((site) => site.id === label) && window.location.hostname.includes('.') ? (label as SiteId) : undefined
-}
-
-/** The site this host serves, or undefined in unified (single-host) mode. */
-export function currentSite(): SiteId | undefined {
-  if (typeof window === 'undefined') return undefined
-  const configured = (Object.entries(origins) as [SiteId, string][]).find(([, origin]) => origin === window.location.origin)
-  return configured?.[0] ?? hostLabelSite()
-}
-
-/** Origin of another site, when this deployment splits sites across hosts. */
-export function siteOrigin(site: SiteId): string | undefined {
-  if (origins[site]) return origins[site]
-  const here = hostLabelSite()
-  if (!here) return undefined
-  const { protocol, hostname, port } = window.location
-  return `${protocol}//${[site, ...hostname.split('.').slice(1)].join('.')}${port ? ':' + port : ''}`
-}
-
-/**
- * Absolute URL when `href` belongs to another host, otherwise `href` unchanged.
- * Leaves external, hash, and query-only links alone.
- */
-export function siteHref(href: string): string {
-  if (!href.startsWith('/') || href.startsWith('//')) return href
-  const here = currentSite()
-  const path = href.split(/[?#]/)[0]
-  if (!here || isSharedPath(path)) return href
-  const owner = siteForPath(path)
-  if (owner === here) return href
-  const origin = siteOrigin(owner)
-  return origin ? origin + href : href
-}
-
 /** First landing route of a site the session may open. */
 export function siteLanding(site: SiteId, allowedHref: (href: string) => boolean) {
   return siteById[site].landings.find(allowedHref)
@@ -183,11 +132,8 @@ export function canOpenSite(session: Access, site: SiteId) {
   )
 }
 
-/** A path is open when its page is allowed and the role may open both the path's site and this host's site. */
-export function canOpenPath(session: Access, path: string) {
-  const host = currentSite()
-  return allowsPath(session, path) && canOpenSite(session, siteForPath(path)) && (!host || canOpenSite(session, host))
-}
+/** A path is open when its page is allowed and the role may open the path's site. */
+export const canOpenPath = (session: Access, path: string) => allowsPath(session, path) && canOpenSite(session, siteForPath(path))
 
 const roleLabels: Partial<Record<string, string>> = {
   professor: 'Faculty',
@@ -199,9 +145,8 @@ const roleLabels: Partial<Record<string, string>> = {
 
 export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)
 
-/** Where a signed-in person lands on this host: the current site's first allowed landing, else Home (Admin for administrators). Temporary sign-in details come first. */
-export function landingFor(session: Access, site = currentSite()) {
+/** Where a signed-in person lands: Home (Admin for administrators). Temporary sign-in details come first. */
+export function landingFor(session: Access) {
   if (session.user.mustChangeCredentials) return '/first-login'
-  const landing = site && site !== 'portal' && canOpenSite(session, site) ? siteLanding(site, (href) => allowsPath(session, href)) : undefined
-  return landing ?? (session.user.roles.includes('administrator') ? '/admin' : '/home')
+  return session.user.roles.includes('administrator') ? '/admin' : '/home'
 }

@@ -5,7 +5,7 @@ import { useRef, useState, type FormEvent } from 'react'
 
 import { ApiError, completeFirstLogin, signOut } from '@/lib/api'
 import { sessionQuery } from '@/lib/queries'
-import { landingFor, siteHref } from '@/lib/sites'
+import { landingFor } from '@/lib/sites'
 
 import {
   AuthShell,
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/first-login')({
   beforeLoad: async ({ context, search }) => {
     const session = await context.queryClient.ensureQueryData(sessionQuery()).catch(() => undefined)
     if (!session) throw redirect({ href: '/sign-in' })
-    if (!session.user.mustChangeCredentials) throw redirect({ href: siteHref(search.redirect ?? landingFor(session)) })
+    if (!session.user.mustChangeCredentials) throw redirect({ href: search.redirect ?? landingFor(session) })
   },
   component: FirstLoginPage,
 })

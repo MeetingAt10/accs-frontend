@@ -32,11 +32,8 @@ A floating account switcher for the development stack. It is built in only under
 
 ## Module sites
 
-The signed-in app is seven module sites (Home, Forums, Schedule, Cases, Evaluations, Records, Admin). One build serves all of them, and each site has its own host. Routes and permissions do not change. Site definitions, host resolution, and link rewriting are in `src/lib/sites.ts`; the design is in [`docs/deltas/2026-11-01-subdomain-sites.md`](../docs/deltas/2026-11-01-subdomain-sites.md).
+The signed-in app has seven module sites (Home, Forums, Schedule, Cases, Evaluations, Records, Admin). They are navigation groups on one host, `portal.access-ccs.com` (`portal-dev` on dev), so moving between them never leaves the app. Site definitions are in `src/lib/sites.ts`; the design is in [`docs/deltas/2026-11-05-one-portal-host.md`](../docs/deltas/2026-11-05-one-portal-host.md).
 
-- **Unified mode:** `http://localhost:5173` serves every route on one host, with no cross-host redirects. This is the default for `npm run dev`.
-- **Several hosts locally:** open `http://<site>.localhost:5173`, where `<site>` is `portal`, `forums`, `schedule`, `cases`, `evaluations`, `records`, or `admin`. A route that belongs to another site loads on that site's host. The dev proxy is per host, so each host keeps its own session and you sign in once per host.
-- **Deployed builds:** set `VITE_SITE_ORIGINS` at build time to a JSON map of site to origin, for example `VITE_SITE_ORIGINS='{"portal":"https://portal.example","forums":"https://forums.example"}'`. The deploy scripts fill it from the stack's `SiteOrigins` output ([`architecture/README.md`](../architecture/README.md)). A site with no entry stays on the current host.
-- **Tests:** `npm test` runs Vitest, including `src/lib/sites.test.ts`. It checks that each of the 58 DOC003 modules is assigned to exactly one site and is reachable through one of its pages on that site, that every page maps to a site, and the cross-host link rules. The module list is `src/lib/doc003-modules.json`, generated from the DOC003 module inventory.
+- **Tests:** `npm test` runs Vitest, including `src/lib/sites.test.ts`. It checks that each of the 58 DOC003 modules is assigned to exactly one site and is reachable through one of its pages on that site, and that every page maps to a site. The module list is `src/lib/doc003-modules.json`, generated from the DOC003 module inventory.
 
 - Routes live in `src/routes/`. `src/routeTree.gen.ts` is generated on first `dev`/`build`.

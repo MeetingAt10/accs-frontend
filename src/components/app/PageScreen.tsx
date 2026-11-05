@@ -1,13 +1,12 @@
 import { Alert, Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams, useRouter, useRouterState } from '@tanstack/react-router'
-import { useState, type ComponentProps, type ReactNode } from 'react'
+import { useParams, useRouterState } from '@tanstack/react-router'
+import { useState, type ReactNode } from 'react'
 
 import { ApiError, type PageEnvelope } from '@/lib/api'
 import { formatDate, initials, relativeTime } from '@/lib/format'
 import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
 import { pageQuery, sessionQuery } from '@/lib/queries'
-import { siteHref } from '@/lib/sites'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { ModulePicker } from '@/components/app/module-picker'
@@ -15,6 +14,7 @@ import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
 import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
 import { Counter, SlidePills, SwapView } from '@/components/app/portal-motion'
+import { NavLink as Go } from '@/components/app/site-chrome'
 
 type Item = Record<string, unknown>
 
@@ -63,26 +63,6 @@ function useAllow() {
     const id = pageIdForPath(href.split(/[?#]/)[0])
     return Boolean(id) && pages.includes(id as string)
   }
-}
-
-/** Anchor that navigates in place on the same site and across hosts for other sites. */
-function Go({ href, children, ...rest }: { href: string; children: ReactNode } & Omit<ComponentProps<'a'>, 'href'>) {
-  const router = useRouter()
-  const target = siteHref(href)
-  return (
-    <a
-      {...rest}
-      href={target === href ? router.history.createHref(href) : target}
-      onClick={(event) => {
-        rest.onClick?.(event)
-        if (target !== href || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-        event.preventDefault()
-        router.history.push(href)
-      }}
-    >
-      {children}
-    </a>
-  )
 }
 
 /** Panel header link, only when the role may open the target. */
@@ -188,7 +168,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
                 label={label}
                 value={<Counter value={stat.value} />}
                 note={/synthetic|demo|sample|prototype/i.test(note) ? undefined : note || undefined}
-                href={target && allow(target) ? siteHref(target) : undefined}
+                href={target && allow(target) ? target : undefined}
               />
             )
           })}

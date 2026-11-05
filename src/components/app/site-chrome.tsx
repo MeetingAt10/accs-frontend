@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent
 
 import type { Session } from '@/lib/api'
 import { initials } from '@/lib/format'
-import { roleLabel, siteById, siteHref, type Site, type SiteId } from '@/lib/sites'
+import { roleLabel, siteById, type Site, type SiteId } from '@/lib/sites'
 
 import './sites.css'
 
@@ -19,7 +19,7 @@ function useSlide() {
   return useReducedMotion() ? { duration: 0 } : { type: 'spring' as const, stiffness: 520, damping: 42, mass: 0.8 }
 }
 
-/** Router link that also works across site hosts: same-host links use client routing, others load the other host. */
+/** Router link: plain clicks use client routing; modified clicks keep the browser's behavior. */
 export function NavLink({
   href,
   onNavigate,
@@ -28,18 +28,16 @@ export function NavLink({
   ...rest
 }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; onNavigate?: () => void }) {
   const router = useRouter()
-  const target = siteHref(href)
-  const local = target === href
   function click(event: MouseEvent<HTMLAnchorElement>) {
     onClick?.(event)
     if (event.defaultPrevented) return
     onNavigate?.()
-    if (!local || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     router.history.push(href)
   }
   return (
-    <a {...rest} href={local ? router.history.createHref(href) : target} onClick={click}>
+    <a {...rest} href={router.history.createHref(href)} onClick={click}>
       {children}
     </a>
   )

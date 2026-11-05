@@ -15,7 +15,6 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   STACK: ${{ github.ref_name == 'main' && 'accs-prod' || 'accs-dev' }} # main serves the plain hostnames, dev the -dev hostnames
-  SITES: App Forums Schedule Cases Evaluations Records Admin
 
 jobs:
   deploy:
@@ -49,24 +48,19 @@ jobs:
         run: |
           out() { aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
           echo "api=$(out ApiUrl)" >> "$GITHUB_OUTPUT"
-          echo "origins=$(out SiteOrigins)" >> "$GITHUB_OUTPUT"
+          echo "bucket=$(out AppBucket)" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(out AppDistributionId)" >> "$GITHUB_OUTPUT"
+          echo "url=$(out AppUrl)" >> "$GITHUB_OUTPUT"
 
       - run: npm run build
         env:
           VITE_API_URL: ${{ steps.stack.outputs.api }}/api
-          VITE_SITE_ORIGINS: ${{ steps.stack.outputs.origins }}
           VITE_DEV_TOOLBOX: ${{ github.ref_name == 'dev' && 'true' || '' }} # only the dev branch's build carries the dev toolbox
 
-      # Every site serves the same build. A site whose outputs are missing (stack not yet updated) is skipped.
-      - name: Upload and invalidate
-        run: |
-          out() { aws cloudformation describe-stacks --stack-name "$STACK" --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" --output text; }
-          for p in $SITES; do
-            bucket=$(out "${p}Bucket"); dist=$(out "${p}DistributionId"); url=$(out "${p}Url")
-            if [ -z "$bucket" ] || [ "$bucket" = None ] || [ -z "$dist" ] || [ "$dist" = None ]; then
-              echo "skip $p: stack outputs missing"; continue
-            fi
-            aws s3 sync dist "s3://$bucket" --delete
-            aws cloudfront create-invalidation --distribution-id "$dist" --paths '/*' > /dev/null
-            echo "Deployed $p to $url" >> "$GITHUB_STEP_SUMMARY"
-          done
+      - name: Upload
+        run: aws s3 sync dist "s3://${{ steps.stack.outputs.bucket }}" --delete
+
+      - name: Invalidate
+        run: aws cloudfront create-invalidation --distribution-id "${{ steps.stack.outputs.distribution }}" --paths '/*'
+
+      - run: echo "Deployed to ${{ steps.stack.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
