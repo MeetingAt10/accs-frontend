@@ -3,7 +3,7 @@ import { useQuery, type QueryClient } from '@tanstack/react-query'
 import { useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
-import { routePermission } from '@/lib/page-catalog'
+import { pageAllowed, routePermission } from '@/lib/page-catalog'
 import { sessionQuery } from '@/lib/queries'
 import { canOpenSite, currentSite, landingFor, roleLabel, siteById, siteForPath, siteHref } from '@/lib/sites'
 
@@ -67,7 +67,7 @@ export function RequirePermission({ pageId, children }: { pageId: string; childr
   const hasPermission = requiredPermissions.some((key) =>
     session.data?.permissions.includes(key),
   )
-  if (session.error || !session.data?.allowedPages.includes(pageId) || !hasPermission) {
+  if (session.error || !session.data || !pageAllowed(session.data, pageId) || !hasPermission) {
     return recordPages.includes(pageId) ? <RestrictedView record /> : <AccessDenied />
   }
   return children
@@ -85,7 +85,7 @@ export async function RoutePermission(queryClient: QueryClient, pageId: string) 
     const hasPermission = requiredPermissions.some((key) =>
       session.permissions.includes(key),
     )
-    return { permission: session.allowedPages.includes(pageId) && hasPermission }
+    return { permission: pageAllowed(session, pageId) && hasPermission }
   } catch {
     return { permission: false }
   }

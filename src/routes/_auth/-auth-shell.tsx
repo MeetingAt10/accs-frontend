@@ -17,10 +17,16 @@ export const validateAuthSearch = (search: Record<string, unknown>) => ({
     : undefined,
 })
 
-/** beforeLoad for /sign-in and /register: a signed-in visitor goes straight to their landing page. */
+/** Where a session goes next: the page it asked for, else its landing page. Temporary sign-in details come first. */
+export function destinationFor(session: Session, redirectTo?: string) {
+  if (session.user.mustChangeCredentials) return '/first-login' + (redirectTo ? '?redirect=' + encodeURIComponent(redirectTo) : '')
+  return siteHref(redirectTo ?? landingFor(session))
+}
+
+/** beforeLoad for /sign-in: a signed-in visitor goes straight to their landing page. */
 export async function redirectIfSignedIn({ context, search }: { context: { queryClient: QueryClient }; search: { redirect?: string } }) {
   const session = await context.queryClient.ensureQueryData(sessionQuery()).catch(() => undefined)
-  if (session) throw redirect({ href: siteHref(search.redirect ?? landingFor(session)) })
+  if (session) throw redirect({ href: destinationFor(session, search.redirect) })
 }
 
 /** Stores the new session, then navigates (full-page when the destination is another site). */
@@ -29,7 +35,7 @@ export function useFinishAuth(redirectTo?: string) {
   const queryClient = useQueryClient()
   return (session: Session) => {
     queryClient.setQueryData(['session'], session)
-    const destination = siteHref(redirectTo ?? landingFor(session))
+    const destination = destinationFor(session, redirectTo)
     if (destination.startsWith('/')) router.history.push(destination)
     else window.location.assign(destination)
   }

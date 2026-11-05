@@ -16,7 +16,8 @@
     "@tanstack/react-router": "^1.0.0",
     "motion": "^14.6.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "read-excel-file": "^9.3.14"
   },
   "devDependencies": {
     "@tanstack/react-query-devtools": "^5.0.0",

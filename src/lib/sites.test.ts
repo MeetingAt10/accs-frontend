@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import inventory from './doc003-modules.json'
 import { pageIdForPath } from './page-catalog'
-import { canOpenPath, canOpenSite, landingFor, siteForPath, sites, type SiteId } from './sites'
+import { canOpenPath, canOpenSite, isSharedPath, landingFor, siteForPath, sites, type SiteId } from './sites'
 
 // One concrete URL per page (P03-P52; P01 `/` and P02 `/sign-in` are served on every host).
 const samplePaths: Record<string, string> = {
@@ -84,6 +84,35 @@ describe('site access by role', () => {
   it('falls back to Home when a landing is not openable', () => {
     expect(landingFor(sessionFor('student'), 'admin')).toBe('/home')
     expect(landingFor(sessionFor('administrator'), 'portal')).toBe('/admin')
+  })
+})
+
+// /accounts has no server page: the account permissions open it, for the dean and the secretary only.
+describe('accounts page', () => {
+  const dean = { user: { roles: ['dean'] }, permissions: ['account.activateSecretary'], allowedPages: ['P03', 'P40'] }
+  const secretary = { user: { roles: ['secretary'] }, permissions: ['account.provision'], allowedPages: ['P03', 'P40'] }
+  const administrator = { user: { roles: ['administrator'] }, permissions: [], allowedPages: ['P03', 'P45'] }
+
+  it('opens under the admin site for the dean and the secretary, and for no one else', () => {
+    expect(siteForPath('/accounts')).toBe('admin')
+    for (const session of [dean, secretary]) {
+      expect(canOpenSite(session, 'admin')).toBe(true)
+      expect(canOpenPath(session, '/accounts')).toBe(true)
+      expect(canOpenPath(session, '/admin/users')).toBe(false)
+    }
+    expect(canOpenPath(administrator, '/accounts')).toBe(false)
+    expect(canOpenPath(sessionFor('student'), '/accounts')).toBe(false)
+    expect(canOpenSite(sessionFor('student'), 'admin')).toBe(false)
+  })
+
+  it('is where the dean lands on the admin site', () => {
+    expect(landingFor(dean, 'admin')).toBe('/accounts')
+    expect(landingFor(administrator, 'admin')).toBe('/admin')
+  })
+
+  it('sends temporary sign-in details to the first-login page, which every host serves', () => {
+    expect(landingFor({ ...secretary, user: { roles: ['secretary'], mustChangeCredentials: true } })).toBe('/first-login')
+    expect(isSharedPath('/first-login')).toBe(true)
   })
 })
 

@@ -32,8 +32,8 @@ import {
   type Session,
 } from "@/lib/api";
 import { pageQuery } from "@/lib/queries";
-import { pageIdForPath } from "@/lib/page-catalog";
 import {
+  allowsPath,
   canOpenSite,
   siteById,
   siteForPath,
@@ -78,9 +78,7 @@ export function siteDestinations(session: Session): Destination[] {
     const href =
       siteLanding(
         site.id,
-        (href) =>
-          !(isAdmin && href === "/home") &&
-          session.allowedPages.includes(pageIdForPath(href) ?? ""),
+        (href) => !(isAdmin && href === "/home") && allowsPath(session, href),
       ) ?? entries.find((entry) => !(isAdmin && entry.href === "/home"))?.href;
     return href ? [{ site, href, entries }] : [];
   });
@@ -333,6 +331,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P13",
           icon: "calendar",
         },
+        { label: "Accounts", href: "/accounts", icon: "users" },
       ],
     },
     {
@@ -523,6 +522,22 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/cases",
           pageId: "P21",
           icon: "tray",
+        },
+      ],
+    },
+  ],
+  secretary: [
+    {
+      label: "Workspace",
+      entries: [
+        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
+        { label: "Accounts", href: "/accounts", icon: "users" },
+        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+        {
+          label: "Organizations",
+          href: "/organizations",
+          pageId: "P09",
+          icon: "flag",
         },
       ],
     },
