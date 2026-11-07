@@ -66,6 +66,10 @@ export class ApiError extends Error {
   }
 }
 
+/** A plain description of a failed request: the server's own message, or a network-error fallback. */
+export const apiErrorText = (error: unknown) =>
+  error instanceof ApiError ? error.message : "Can't reach ACCS right now. Check your connection and try again."
+
 const baseUrl = import.meta.env.VITE_API_URL ?? '/api'
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

@@ -23,6 +23,7 @@ import { ProfileHeader, PersonCard } from "@/components/ds-next";
 import { StandingBadge } from "@/components/app/records";
 import {
   ApiError,
+  apiErrorText,
   changePassword,
   performPageAction,
   signOut,
@@ -649,11 +650,15 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
   const action = useAction("P43");
   const [theme, setTheme] = useState(word(settings.theme, "system"));
   const [density, setDensity] = useState(word(settings.density, "comfortable"));
-  const signOutAction = async () => {
-    await signOut().catch(() => undefined);
-    client.removeQueries();
-    router.history.push("/sign-in");
-  };
+  // Only a successful sign-out clears the cache and leaves the page - a failed request must
+  // keep the person right where they are, with the server session (and the cache) intact.
+  const signOutAction = useMutation({
+    mutationFn: signOut,
+    onSuccess: () => {
+      client.removeQueries();
+      router.history.push("/sign-in");
+    },
+  });
   const saveAppearance = (nextTheme: string, nextDensity: string) => {
     setTheme(nextTheme);
     setDensity(nextDensity);
@@ -740,7 +745,8 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
               <Button
                 variant="secondary"
                 icon="sign-out"
-                onPress={() => void signOutAction()}
+                loading={signOutAction.isPending}
+                onPress={() => signOutAction.mutate()}
               >
                 Sign out
               </Button>
@@ -755,6 +761,23 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
               <p id="other-device-note" className="pa-muted">
                 Signing out of other devices isn't available yet.
               </p>
+              {signOutAction.isError && (
+                <Alert
+                  tone="danger"
+                  title="Sign out failed."
+                  actions={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => signOutAction.mutate()}
+                    >
+                      Try again
+                    </Button>
+                  }
+                >
+                  {apiErrorText(signOutAction.error)} You&apos;re still signed in on this device.
+                </Alert>
+              )}
             </div>
           </Panel>
           <Panel title="Shortcuts">

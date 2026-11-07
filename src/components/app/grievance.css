@@ -95,7 +95,8 @@
 .gv-table tr:hover .gv-open { color: var(--site-accent-ink); }
 .gv-table tr:hover .gv-open svg { transform: translateX(3px); }
 
-@media (max-width: 639.98px) {
+/* Below 1024px (docs/pages/07-cases.md): the 8-column queue table becomes the compact case queue. */
+@media (max-width: 1023.98px) {
   .gv-sortbar { display: flex; }
   .gv-table thead { display: none; }
   .gv-table, .gv-table tbody { display: block; }

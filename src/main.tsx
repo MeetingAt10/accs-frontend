@@ -3,6 +3,8 @@ import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import { RouteError, RouteNotFound } from '@/components/app/route-fallbacks'
+
 import '@meetingat10/design-system/tokens.css'
 import '@meetingat10/design-system/components.css'
 import '@meetingat10/design-system/fonts.css'
@@ -13,7 +15,16 @@ import './motion.css'
 import { routeTree } from './routeTree.gen'
 
 const queryClient = new QueryClient()
-const router = createRouter({ routeTree, context: { queryClient }, defaultViewTransition: true, defaultPreload: "intent" })
+const router = createRouter({
+  routeTree,
+  context: { queryClient },
+  defaultViewTransition: true,
+  defaultPreload: "intent",
+  // Router-wide fallbacks. A route with its own `errorComponent` (the session check, for
+  // example) still takes over for its own errors; this only catches everything else.
+  defaultNotFoundComponent: RouteNotFound,
+  defaultErrorComponent: RouteError,
+})
 
 declare module '@tanstack/react-router' {
   interface Register {

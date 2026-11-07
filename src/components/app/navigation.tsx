@@ -1,5 +1,7 @@
 import {
+  Alert,
   Badge,
+  Button,
   Drawer,
   IconButton,
   Link,
@@ -27,12 +29,13 @@ import {
 import { NotificationItem, NotificationList } from "@/components/ds-next";
 import {
   ApiError,
+  apiErrorText,
   performPageAction,
   signOut,
   type Role,
   type Session,
 } from "@/lib/api";
-import { pageQuery } from "@/lib/queries";
+import { notificationsFromQuery, pageQuery } from "@/lib/queries";
 import {
   allowsPath,
   canOpenSite,
@@ -559,14 +562,18 @@ export const accountNavigation: RoleGroup[] = [
 ];
 
 
+// Only a successful sign-out clears the cache and leaves the page - a failed request must
+// keep the person right where they are, with the server session (and the cache) intact.
 function useSignOut() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  return async () => {
-    await signOut().catch(() => undefined);
-    queryClient.removeQueries();
-    router.history.push("/sign-in");
-  };
+  return useMutation({
+    mutationFn: signOut,
+    onSuccess: () => {
+      queryClient.removeQueries();
+      router.history.push("/sign-in");
+    },
+  });
 }
 
 function Topbar({
@@ -617,13 +624,8 @@ function Topbar({
     }
   }
 
-  const notificationItems = notifications.data?.data.notifications;
-  const recentNotifications = Array.isArray(notificationItems)
-    ? (notificationItems.slice(0, 5) as Record<string, unknown>[])
-    : [];
-  const unreadCount = recentNotifications.filter(
-    (notice) => notice.read !== true,
-  ).length;
+  const { recent: recentNotifications, unreadCount } =
+    notificationsFromQuery(notifications);
   const siteLabel = siteById[site].label;
 
   return (
@@ -683,7 +685,23 @@ function Topbar({
             title="Notifications"
             placement="bottom end"
           >
-            {recentNotifications.length ? (
+            {notifications.isPending ? (
+              <p>Loading notifications…</p>
+            ) : notifications.isError ? (
+              <Alert
+                tone="danger"
+                title="Could not load notifications."
+                actions={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => void notifications.refetch()}
+                  >
+                    Try again
+                  </Button>
+                }
+              />
+            ) : recentNotifications.length ? (
               <Stack gap={12}>
                 <NotificationList>
                   {recentNotifications.map((notification) => (
@@ -742,7 +760,8 @@ export function AppChrome({
   const destinations = siteDestinations(session);
   const { groups, current } = siteNav(session, path, site);
   const [menuOpen, setMenuOpen] = useState(false);
-  const onSignOut = useSignOut();
+  const signOutAction = useSignOut();
+  const onSignOut = () => signOutAction.mutate();
   const allowed = new Set(session.allowedPages);
   const accountLinks = [
     { label: "Profile", href: "/profile", pageId: "P39", icon: "user" },
@@ -827,6 +846,23 @@ export function AppChrome({
           </span>
           <NavLink href="/standing">View account standing</NavLink>
         </div>
+      )}
+      {signOutAction.isError && (
+        <Alert
+          tone="danger"
+          title="Sign out failed."
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => signOutAction.mutate()}
+            >
+              Try again
+            </Button>
+          }
+        >
+          {apiErrorText(signOutAction.error)} You&apos;re still signed in on this device.
+        </Alert>
       )}
       <div className="shell-frame" data-sidebar={groups.length > 0}>
         <SiteRail
