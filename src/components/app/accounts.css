@@ -4,6 +4,7 @@
    ========================================================================== */
 
 .acct-lead { margin: 0; max-width: 46rem; color: var(--accs-muted); font-size: 0.9375rem; line-height: 1.55; text-wrap: pretty; }
+[role="tabpanel"] > .acct-lead { margin-block-end: 16px; }
 .acct-muted { color: var(--accs-muted); font-size: 0.8125rem; }
 .acct-summary { margin: 0; color: var(--accs-ink-2); font-size: 0.875rem; }
 .acct-problem { color: var(--accs-danger); font-size: 0.8125rem; font-weight: 600; }

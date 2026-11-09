@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { campusIso, campusLocal, readAccess, readTalk, readWording, secureLink } from './concern-talk'
+import { campusIso, campusLocal, readAccess, readerAccess, readTalk, readWording, secureLink } from './concern-talk'
 
 describe('concern talk', () => {
   it('turns campus time into one moment and back, whatever zone the browser is in', () => {
@@ -38,5 +38,23 @@ describe('concern talk', () => {
     expect(wording.talk.chat).toBe('Chat text')
     expect(wording.talk.video).not.toBe('')
     expect(readWording(undefined).recording.allow).toBe('I allow this call to be recorded.')
+  })
+})
+
+describe('who can read a report before it is sent', () => {
+  it('shows the adviser as a reader unless the concern is about them', () => {
+    expect(readerAccess({ aboutAdvisor: false, allowChair: false, allowDean: false })).toEqual([
+      ['Your adviser', 'Can read it'],
+      ['Your program chair', 'Cannot read it'],
+      ['The Dean', 'Cannot read it'],
+    ])
+    expect(readerAccess({ aboutAdvisor: false, allowChair: true, allowDean: true }).map(([, can]) => can)).toEqual(['Can read it', 'Can read it', 'Can read it'])
+  })
+
+  it('leaves the adviser out and sends the report to the program chair instead', () => {
+    const [adviser, chair, dean] = readerAccess({ aboutAdvisor: true, allowChair: false, allowDean: false })
+    expect(adviser[1]).toMatch(/^Cannot read it/)
+    expect(chair[1]).toMatch(/^Can read it.*instead/)
+    expect(dean[1]).toBe('Cannot read it')
   })
 })

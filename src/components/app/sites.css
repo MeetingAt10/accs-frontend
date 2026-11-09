@@ -1,9 +1,8 @@
-/* App shell: site rail, contextual sidebar, topbar, drawer, access screens.
-   Layout >= 1024px: 72px rail | 248px sidebar | content. Below that the rail and sidebar
-   collapse into the topbar menu drawer. The accent comes from [data-site] on .shell. */
+/* App shell: main navigation panel, topbar, drawer, access screens.
+   Layout >= 1024px: 248px panel | content. Below that the panel collapses into the topbar menu drawer.
+   Account and utility links live in the topbar. The accent comes from [data-site] on .shell. */
 
 .shell {
-  --shell-rail-w: 72px;
   --shell-side-w: 248px;
   --shell-top-h: 56px;
   min-height: 100dvh;
@@ -43,113 +42,66 @@
 
 /* ---------- Frame ---------- */
 .shell-frame { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100dvh; }
-.shell-rail, .shell-side { display: none; }
+.shell-side { display: none; }
 .shell-main { min-width: 0; display: flex; flex-direction: column; }
 
 @media (min-width: 1024px) {
-  .shell-frame { grid-template-columns: var(--shell-rail-w) var(--shell-side-w) minmax(0, 1fr); }
-  .shell-frame[data-sidebar='false'] { grid-template-columns: var(--shell-rail-w) minmax(0, 1fr); }
-  .shell-rail, .shell-side { display: flex; position: sticky; top: 0; height: 100dvh; align-self: start; }
+  .shell-frame { grid-template-columns: var(--shell-side-w) minmax(0, 1fr); }
+  .shell-side { display: flex; position: sticky; top: 0; height: 100dvh; align-self: start; }
 }
 
-/* ---------- Rail ---------- */
-.shell-rail {
-  z-index: 30;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 4px 12px;
-  background: var(--accs-navy-rail);
-  color: #fff;
-}
+/* ---------- Logo mark ---------- */
 .shell-mark {
   display: grid;
   place-items: center;
+  flex: none;
   width: 40px;
   height: 40px;
-  margin-bottom: 10px;
   border-radius: 12px;
   background: linear-gradient(145deg, #1a3f9e, var(--accs-navy));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 16%), 0 6px 14px -6px rgb(0 0 0 / 50%);
+  color: #fff;
   font-family: var(--accs-font-display);
   font-size: 1.125rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
-.shell-rail__nav { display: grid; gap: 4px; width: 100%; justify-items: center; flex: 1; align-content: start; overflow-y: auto; scrollbar-width: none; }
-.shell-rail__item {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  width: 64px;
-  padding: 9px 0 7px;
-  border-radius: 14px;
-  color: rgb(255 255 255 / 66%);
-  text-decoration: none;
-  transition: color 160ms var(--accs-ease), background-color 160ms var(--accs-ease);
-}
-.shell-rail__item:hover { background: rgb(255 255 255 / 8%); color: #fff; }
-.shell-rail__item[aria-current='page'] { color: #fff; background: transparent; }
-.shell-rail__item:focus-visible { outline-color: #fff; }
-.shell-rail__label { font-size: 10px; font-weight: 600; line-height: 1.1; letter-spacing: 0; max-width: 100%; white-space: nowrap; }
-.shell-rail__pill {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: 14px;
-  background: var(--site-accent);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%), 0 8px 18px -8px rgb(0 0 0 / 60%);
-  transition: background-color 280ms var(--accs-ease);
-}
-.shell-rail__bar {
-  position: absolute;
-  left: -4px;
-  top: 50%;
-  width: 3px;
-  height: 30px;
-  margin-top: -15px;
-  border-radius: 0 3px 3px 0;
-  background: #fff;
-}
 
-/* ---------- Account menu (rail bottom) ---------- */
+/* ---------- Account menu (topbar) ---------- */
 .shell-account { position: relative; }
 .shell-avatar {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  margin-inline-start: 4px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--accs-line);
   border-radius: 50%;
-  background: rgb(255 255 255 / 14%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
-  color: #fff;
-  font-size: 0.8125rem;
+  background: var(--accs-sunken);
+  color: var(--accs-ink);
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background-color 160ms var(--accs-ease), transform 160ms var(--accs-ease);
+  transition: background-color 160ms var(--accs-ease), border-color 160ms var(--accs-ease), transform 160ms var(--accs-ease);
 }
-.shell-avatar:hover { background: rgb(255 255 255 / 24%); }
+.shell-avatar:hover, .shell-avatar[aria-expanded='true'] { border-color: var(--accs-line-strong); background: var(--accs-surface); }
 .shell-avatar:active { transform: scale(0.94); }
-.shell-avatar:focus-visible { outline-color: #fff; }
 .shell-menu {
   position: absolute;
-  left: calc(100% + 12px);
-  bottom: 0;
+  inset-inline-end: 0;
+  top: calc(100% + 10px);
   z-index: 60;
   display: grid;
   gap: 2px;
-  width: 248px;
+  width: min(248px, calc(100vw - 24px));
   padding: 8px;
   border: 1px solid var(--accs-line);
   border-radius: 14px;
   background: var(--accs-surface);
   box-shadow: var(--accs-shadow-pop);
   color: var(--accs-ink);
-  transform-origin: bottom left;
+  transform-origin: top right;
 }
 .shell-menu__who { display: grid; gap: 2px; padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--accs-line); }
 .shell-menu__who strong { font-size: 0.875rem; }
@@ -182,7 +134,7 @@
   border-right: 1px solid var(--accs-line);
   background: var(--accs-surface);
 }
-.shell-side__head { padding: 18px 16px 10px; }
+.shell-side__head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 10px; }
 .shell-side__name { margin: 0; font-family: var(--accs-font-display); font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
 .shell-side__nav { flex: 1; display: grid; align-content: start; gap: 18px; padding: 6px 8px 16px; overflow-y: auto; }
 .shell-group { display: grid; gap: 2px; }
@@ -206,21 +158,11 @@
 .shell-nav-item[aria-current='page'] { background: transparent; color: var(--site-accent-ink); font-weight: 600; }
 .shell-nav-item__pill { position: absolute; inset: 0; z-index: -1; border-radius: 9px; background: var(--site-accent-wash); }
 .shell-nav-item svg { flex: none; }
+.shell-nav-item[data-section]:not([aria-current='page']) { color: var(--site-accent-ink); font-weight: 600; }
+.shell-sub { display: grid; gap: 2px; margin: 2px 0 6px 19px; padding-inline-start: 8px; border-inline-start: 1px solid var(--accs-line); }
+.shell-sub .shell-group { gap: 2px; }
 .shell-nav-item--danger { width: 100%; border: 0; background: none; color: var(--accs-danger); text-align: start; cursor: pointer; }
 .shell-nav-item--danger:hover { background: var(--accs-danger-bg); color: var(--accs-danger); }
-.shell-person {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 12px 14px;
-  border-top: 1px solid var(--accs-line);
-}
-.shell-person__link { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; color: inherit; text-decoration: none; }
-.shell-person__text { display: grid; min-width: 0; }
-.shell-person__name { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shell-person__role { color: var(--accs-muted); font-size: 0.75rem; }
-.shell-person .accs-avatar { width: 34px; height: 34px; }
-
 /* ---------- Topbar ---------- */
 .shell-top {
   position: sticky;
@@ -242,6 +184,27 @@
 .shell-top__crumb span[aria-hidden] { color: var(--accs-faint); }
 .shell-top__site, .shell-top__crumb span[aria-hidden] { display: none; }
 @media (min-width: 640px) { .shell-top__site, .shell-top__crumb span[aria-hidden] { display: inline; } }
+/* Unread count on the bell: the design system's dot colour as a pill. Gone when nothing is unread. */
+.shell-bell[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: 2px;
+  inset-inline-end: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--ds-now);
+  box-shadow: 0 0 0 2px var(--accs-surface);
+  color: var(--ds-surface);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
 .shell-top__tools { display: flex; align-items: center; gap: 4px; flex: none; }
 .shell-top__search { display: none; width: min(22rem, 30vw); margin-right: 8px; }
 .shell-top__search .ds-field { margin: 0; }

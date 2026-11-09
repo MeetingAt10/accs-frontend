@@ -3,7 +3,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import logo from '@/assets/dev-toolbox/accs-dev-toolbox.svg?inline'
-import { ApiError } from '@/lib/api'
+import { activateSecretary, ApiError, getAccountTypes, type Credentials } from '@/lib/api'
 import { listDevUsers, switchDevUser, type DevUser } from '@/lib/dev-toolbox-api'
 import { sessionQuery } from '@/lib/queries'
 import { landingFor, roleLabel } from '@/lib/sites'
@@ -45,6 +45,8 @@ export default function DevToolbox() {
   const [search, setSearch] = useState('')
   const [switching, setSwitching] = useState<string>()
   const [error, setError] = useState<string>()
+  const [resetting, setResetting] = useState(false)
+  const [reset, setReset] = useState<{ name: string; credentials: Credentials }>()
   const session = useQuery({ ...sessionQuery(), enabled: open }).data
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -92,6 +94,28 @@ export default function DevToolbox() {
   }
 
   const groups = groupByRole(users.data ?? [], search)
+  const canReset = session?.permissions.includes('account.activateSecretary')
+
+  // Starts the demo over: the dean's own "activate the secretary" call. It gives the secretary new temporary sign-in
+  // details, makes them change them at the next sign-in, and switches the account back on if it was off.
+  async function resetSecretary() {
+    if (resetting) return
+    setResetting(true)
+    setError(undefined)
+    setReset(undefined)
+    try {
+      const { secretary } = await getAccountTypes()
+      if (!secretary) throw new Error('There is no secretary account to reset.')
+      const { record } = await activateSecretary({ name: secretary.name, email: secretary.email })
+      setReset({ name: record.account.name, credentials: record.credentials })
+      void queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      void users.refetch()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not reset the secretary.')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   return (
     <div className="dev-toolbox" ref={root}>
@@ -123,6 +147,19 @@ export default function DevToolbox() {
             <p className="dev-toolbox__who">
               Signed in as <strong>{session.user.name}</strong>, {session.user.roles.map(roleLabel).join(' · ')}
             </p>
+          )}
+          {canReset && (
+            <div className="dev-toolbox__reset">
+              <button type="button" className="dev-toolbox__retry" aria-disabled={resetting || undefined} onClick={() => void resetSecretary()}>
+                {resetting ? 'Resetting…' : 'Reset secretary for a new demo'}
+              </button>
+              {reset && (
+                <p role="status">
+                  {reset.name} must sign in with username <strong>{reset.credentials.username}</strong> and password{' '}
+                  <strong>{reset.credentials.temporaryPassword}</strong>, then choose new ones.
+                </p>
+              )}
+            </div>
           )}
           <input
             ref={field}

@@ -119,16 +119,26 @@ const readersOf = ({ aboutAdvisor, allowChair, allowDean }: Sharing, adviser = '
   ...(allowDean ? ['The Dean'] : []),
 ]
 
+/** Who can read a report that is about to be sent, one row per reader. The adviser is excluded when the concern is about them. */
+export function readerAccess({ aboutAdvisor, allowChair, allowDean }: Sharing): Array<[string, string]> {
+  return [
+    ['Your adviser', aboutAdvisor ? 'Cannot read it. They are not told about it.' : 'Can read it'],
+    ['Your program chair', aboutAdvisor ? 'Can read it. It goes to them instead of your adviser.' : allowChair ? 'Can read it' : 'Cannot read it'],
+    ['The Dean', allowDean ? 'Can read it' : 'Cannot read it'],
+  ]
+}
+
 /** Review step: who can read the report, and the two extras. Both stay off unless the student turns them on. */
 export function ReadersChoice({ sharing, adviser, onChange }: { sharing: Sharing; adviser?: string; onChange: (patch: Partial<Sharing>) => void }) {
   return (
     <section aria-labelledby="gv-readers">
       <h2 className="gv-sub" id="gv-readers">Who can read this</h2>
       <div className="gv-stack">
-        <ul className="gv-list">{readersOf(sharing, adviser).map((who) => <li key={who}>{who}</li>)}</ul>
-        {sharing.aboutAdvisor && <p className="gv-hint">You said this concern is about your adviser. Your adviser is not told and cannot open it.</p>}
+        <Facts rows={readerAccess(sharing).map(([who, can]): [string, ReactNode] => [who === 'Your adviser' && adviser && !sharing.aboutAdvisor ? who + ', ' + adviser : who, can])} />
+        {sharing.aboutAdvisor && <Alert tone="info" title="Your adviser is left out">You said this concern is about your adviser. Your adviser is not told and cannot open it. Your program chair receives it instead.</Alert>}
         {!sharing.aboutAdvisor && <Checkbox isSelected={sharing.allowChair} onChange={(allowChair) => onChange({ allowChair })} description="Your program chair can open it too. Leave this off if only your adviser should see it.">Also allow the program chair to see this</Checkbox>}
         <Checkbox isSelected={sharing.allowDean} onChange={(allowDean) => onChange({ allowDean })} description="The Dean can open it too. Leave this off if the Dean should not see it.">Also allow the Dean to see this</Checkbox>
+        <Alert tone="neutral" title="Consent comes before sending">Your report is not sent until you read the consent form and agree to it. The button below opens that form.</Alert>
       </div>
     </section>
   )

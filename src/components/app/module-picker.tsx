@@ -29,19 +29,38 @@ type Entry = {
   roles: string[]
   /** Routes the tile opens; the first one the session may open wins. Left out while the module is not built. */
   to?: string[]
+  /** Added to the route the tile opens, e.g. a tab on the accounts page. It takes no part in the access check. */
+  query?: string
 }
 
-export type ModuleTile = Omit<Entry, 'roles' | 'to'> & { href?: string }
+export type ModuleTile = Omit<Entry, 'roles' | 'to' | 'query'> & { href?: string }
 
+// Each role's tiles are named for the task they start, in the order the demo walks them. The secretary's tiles open the
+// tabs of the one accounts page.
 // ponytail: advisor assignments are not on the session yet, so every professor gets the advisor tiles.
 // Gate the professor tiles on the assignment once the session carries it.
 const entries: Entry[] = [
-  { id: 'concerns', label: 'Concerns', about: 'Concerns and the conversations that follow.', icon: 'file', tone: 'neutral', roles: ['student', 'professor'], to: ['/reports', '/cases'] },
-  { id: 'schedule', label: 'Schedule', about: 'Consultation times and your calendar.', icon: 'calendar', tone: 'consult', roles: ['student', 'professor'], to: ['/calendar', '/consultations'] },
-  { id: 'messages', label: 'Messages', about: 'Conversations with students and faculty.', icon: 'envelope', tone: 'community', roles: ['student', 'professor'], to: ['/messages'] },
-  { id: 'notifications', label: 'Notifications', about: 'Updates on your concerns and consultations.', icon: 'bell', roles: ['student', 'professor'], to: ['/notifications'] },
-  { id: 'accounts', label: 'Accounts', about: 'Activate and manage accounts.', icon: 'users', roles: ['dean', 'secretary'], to: ['/accounts'] },
-  { id: 'dean', label: 'Dean', icon: 'graduation-cap', roles: ['dean'] },
+  { id: 'dean-accounts', label: 'Accounts', about: 'Activate the secretary, who sets up every other account.', icon: 'users', roles: ['dean'], to: ['/accounts'] },
+  { id: 'dean-cases', label: 'Case oversight', about: 'Concerns across the college and where each one stands.', icon: 'file', tone: 'neutral', roles: ['dean'], to: ['/cases'] },
+  { id: 'dean-records', label: 'Student records', about: 'Authorized student records.', icon: 'archive', tone: 'neutral', roles: ['dean'], to: ['/records'] },
+  { id: 'dean-notifications', label: 'Notifications', about: 'Updates that need the Dean.', icon: 'bell', roles: ['dean'], to: ['/notifications'] },
+
+  { id: 'setup', label: 'Account setup', about: 'The setup steps and the state of every account.', icon: 'users', roles: ['secretary'], to: ['/accounts'], query: '?tab=status' },
+  { id: 'faculty', label: 'Faculty accounts', about: 'Create faculty accounts and issue their sign-in details.', icon: 'user', roles: ['secretary'], to: ['/accounts'], query: '?tab=faculty' },
+  { id: 'advisors', label: 'Advisor assignments', about: 'Choose the advisors for each year level.', icon: 'list', roles: ['secretary'], to: ['/accounts'], query: '?tab=advisors' },
+  { id: 'chairs', label: 'Program chair assignments', about: 'Choose the program chair for each program.', icon: 'chalkboard', roles: ['secretary'], to: ['/accounts'], query: '?tab=chairs' },
+  { id: 'import', label: 'Student import', about: 'Create student accounts from an Excel file.', icon: 'upload', roles: ['secretary'], to: ['/accounts'], query: '?tab=students' },
+
+  { id: 'file-concern', label: 'File a concern', about: 'Tell your advisor or the college what happened.', icon: 'pencil', tone: 'neutral', roles: ['student'], to: ['/reports/new'] },
+  { id: 'my-concerns', label: 'My concerns', about: 'Concerns you filed and the replies to them.', icon: 'file', tone: 'neutral', roles: ['student'], to: ['/reports'] },
+  { id: 'student-consultations', label: 'Consultations', about: 'Book a time with a faculty member.', icon: 'calendar', tone: 'consult', roles: ['student'], to: ['/consultations', '/calendar'] },
+  { id: 'student-messages', label: 'Messages', about: 'Conversations with your advisor and faculty.', icon: 'envelope', tone: 'community', roles: ['student'], to: ['/messages'] },
+
+  { id: 'assigned-concerns', label: 'Assigned concerns', about: 'Concerns from the students you advise.', icon: 'file', tone: 'neutral', roles: ['professor'], to: ['/cases', '/reports'] },
+  { id: 'faculty-schedule', label: 'Consultation schedule', about: 'Consultation requests and your calendar.', icon: 'calendar', tone: 'consult', roles: ['professor'], to: ['/calendar', '/consultations'] },
+  { id: 'availability', label: 'My availability', about: 'Set when students can book you.', icon: 'clock', tone: 'consult', roles: ['professor'], to: ['/consultations/availability'] },
+  { id: 'faculty-messages', label: 'Messages', about: 'Conversations with students and faculty.', icon: 'envelope', tone: 'community', roles: ['professor'], to: ['/messages'] },
+
   { id: 'chair', label: 'Program chair', icon: 'chalkboard', roles: ['chair'] },
   { id: 'guidance', label: 'Guidance', icon: 'hand-heart', roles: ['guidance'] },
   { id: 'osas', label: 'OSAS', icon: 'student', roles: ['osas'] },
@@ -50,11 +69,11 @@ const entries: Entry[] = [
 
 /** Tiles for this session, in catalog order. */
 export function moduleTiles(session: Parameters<typeof canOpenPath>[0]) {
-  return entries.flatMap(({ roles, to, ...tile }): ModuleTile[] => {
+  return entries.flatMap(({ roles, to, query = '', ...tile }): ModuleTile[] => {
     if (!roles.some((role) => session.user.roles.includes(role))) return []
     if (!to) return [tile]
-    const href = to.find((path) => canOpenPath(session, path))
-    return href ? [{ ...tile, href }] : []
+    const path = to.find((candidate) => canOpenPath(session, candidate))
+    return path ? [{ ...tile, href: path + query }] : []
   })
 }
 

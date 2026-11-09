@@ -18,9 +18,9 @@ import {
   notificationHref,
 } from "@/components/app/communications";
 import {
+  AccountMenu,
   DrawerNav,
-  SiteRail,
-  SiteSidebar,
+  SitePanel,
   type Destination,
   type NavEntry,
   type NavGroup,
@@ -562,6 +562,9 @@ export const accountNavigation: RoleGroup[] = [
 ];
 
 
+/** Account and utility pages. They sit in the top bar (or are the Home site), not in the main navigation panel. */
+const utilityHrefs = ["/home", "/notifications", "/assistant", "/profile", "/help", "/settings"];
+
 // Only a successful sign-out clears the cache and leaves the page - a failed request must
 // keep the person right where they are, with the server session (and the cache) intact.
 function useSignOut() {
@@ -579,11 +582,17 @@ function useSignOut() {
 function Topbar({
   title,
   site,
+  session,
+  accountLinks,
   onMenu,
+  onSignOut,
 }: {
   title: string;
   site: SiteId;
+  session: Session;
+  accountLinks: NavEntry[];
   onMenu: () => void;
+  onSignOut: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -674,7 +683,8 @@ function Topbar({
             trigger={
               <IconButton
                 icon="bell"
-                dot={unreadCount > 0}
+                className="shell-bell"
+                data-count={unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : undefined}
                 label={
                   unreadCount
                     ? `Notifications, ${unreadCount} unread`
@@ -729,6 +739,7 @@ function Topbar({
               </Stack>
             )}
           </Popover>
+          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
         </div>
       </header>
       <Drawer
@@ -769,6 +780,20 @@ export function AppChrome({
     { label: "Settings", href: "/settings", pageId: "P43", icon: "gear" },
     { label: "Help", href: "/help", pageId: "P42", icon: "question" },
   ].filter((link) => allowed.has(link.pageId));
+  // The top bar already has the bell, so its account menu leaves Notifications out. The drawer lists everything.
+  const menuLinks = accountLinks.filter((link) => link.href !== "/notifications");
+  // These live in the top bar (Assistant, Notifications, the account menu) or are Home itself, so the panel does not repeat them.
+  const panelGroups = groups
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
+    }))
+    .filter((group) => group.entries.length > 0);
+  const panelCurrent = panelGroups.some((group) =>
+    group.entries.some((entry) => entry.href === current),
+  )
+    ? current
+    : undefined;
   const restricted =
     session.user.restrictions.length > 0 &&
     session.user.roles.includes("student");
@@ -864,26 +889,22 @@ export function AppChrome({
           {apiErrorText(signOutAction.error)} You&apos;re still signed in on this device.
         </Alert>
       )}
-      <div className="shell-frame" data-sidebar={groups.length > 0}>
-        <SiteRail
+      <div className="shell-frame">
+        <SitePanel
           destinations={destinations}
           current={site}
-          session={session}
-          accountLinks={accountLinks}
-          onSignOut={() => void onSignOut()}
+          groups={panelGroups}
+          currentHref={panelCurrent}
         />
-        {groups.length > 0 && (
-          <SiteSidebar
+        <div className="shell-main">
+          <Topbar
+            title={title}
             site={site}
-            groups={groups}
-            current={current}
             session={session}
-            profileHref={allowed.has("P39") ? "/profile" : undefined}
+            accountLinks={menuLinks}
+            onMenu={() => setMenuOpen(true)}
             onSignOut={() => void onSignOut()}
           />
-        )}
-        <div className="shell-main">
-          <Topbar title={title} site={site} onMenu={() => setMenuOpen(true)} />
           <main className="shell-content" id="main-content" tabIndex={-1}>
             <div className="shell-content__inner">
               <div className="shell-page">{children}</div>

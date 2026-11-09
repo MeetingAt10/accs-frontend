@@ -208,7 +208,14 @@ function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: stri
 type Draft = Sharing & { narrative: string; category: string; severity: SeverityLevel | ''; identity: Identity; location: string; occurredOn: string }
 const blankDraft: Draft = { narrative: '', category: '', severity: '', identity: 'named', location: '', occurredOn: '', aboutAdvisor: false, allowChair: false, allowDean: false }
 
-const stepNames = ['Describe', 'Classify', 'Identity', 'Review']
+const stepNames = ['Describe concern', 'Add details', 'Privacy and consent', 'Review and submit']
+// One line under the steps saying what this step is for.
+const stepHints = [
+  'Tell us what happened in your own words.',
+  'Say what kind of concern it is, how serious it is, and whether it is about your adviser.',
+  'Choose how the people handling your concern see you. You give your consent to send it on the last step.',
+  'Check who can read your concern. Your report is not sent until you accept the consent form.',
+]
 const stepMotion: Variants = {
   enter: (dir: number) => ({ opacity: 0, x: dir * 28 }),
   center: { opacity: 1, x: 0 },
@@ -218,7 +225,7 @@ const stepMotion: Variants = {
 /** Numbered sequence with a connector that fills as steps complete. */
 function StepIndicator({ current }: { current: number }) {
   return (
-    <ol className="gv-steps" aria-label="Report steps">
+    <ol className="gv-steps" aria-label="Concern steps">
       {stepNames.map((name, index) => (
         <li key={name} className="gv-steps__item" data-state={index < current ? 'done' : index === current ? 'current' : 'todo'} aria-current={index === current ? 'step' : undefined}>
           <span className="gv-steps__dot">{index < current ? <Icon name="check" size={16} /> : index + 1}</span>
@@ -317,13 +324,14 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
     <MotionConfig reducedMotion="user">
       <div className="gv-wizard gv-page">
         <PageHeader
-          title="New report"
-          description="You review everything before you send it."
+          title="File a concern"
+          description="You review everything, and give your consent, before it is sent."
           crumbs={[{ label: 'My reports', href: '/reports' }, { label: 'New report' }]}
           actions={<MenuButton label="Draft" onAction={(key) => key === 'save' ? saveDraft() : setDiscardOpen(true)}><MenuItem id="save">Save draft</MenuItem><MenuItem id="discard" danger>Discard draft</MenuItem></MenuButton>}
         />
         <div className="gv-stack accs-reveal">
           <StepIndicator current={step} />
+          <p className="gv-hint">Step {step + 1} of {stepNames.length}: {stepHints[step]}</p>
           {words(source.id) && <Alert tone="info" title={'Linked to your discussion "' + words(source.title) + '"'}>The link is saved only if you submit this report.</Alert>}
           {error && <Alert tone="danger" title="Check this step">{error}</Alert>}
           {action.error && action.variables?.action === 'saveDraft' ? <Alert tone="danger" title="Couldn't save your draft">Your text is kept on this device. Try saving again.</Alert> : <ActionError error={action.error} />}
@@ -364,7 +372,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                   ]} />
                   <section className="gv-narrative"><h2 className="gv-sub">Your description</h2><p>{draft.narrative}</p></section>
                   <ReadersChoice sharing={draft} adviser={adviser} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
-                  <div className="gv-edit-links"><Button variant="tertiary" onPress={() => go(0)}>Edit description</Button><Button variant="tertiary" onPress={() => go(1)}>Edit classification</Button><Button variant="tertiary" onPress={() => go(2)}>Edit identity choice</Button></div>
+                  <div className="gv-edit-links"><Button variant="tertiary" onPress={() => go(0)}>Edit description</Button><Button variant="tertiary" onPress={() => go(1)}>Edit details</Button><Button variant="tertiary" onPress={() => go(2)}>Edit privacy choice</Button></div>
                   <Note>Your report stays linked to your verified account. The responsible office reviews it and decides the next steps.</Note>
                 </>}
               </motion.div>
@@ -373,7 +381,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
           {send.error && <Alert tone="danger" title="Your report was not sent">{send.error.message} Nothing was sent, and your text is kept.</Alert>}
           <div className="gv-foot">
             <Button variant="secondary" isDisabled={step === 0 || action.isPending || send.isPending} onPress={() => { setError(''); go(step - 1) }}>Back</Button>
-            {step < 3 ? <Button onPress={() => { if (validate(step)) go(step + 1) }}>Next</Button> : <Button loading={send.isPending} onPress={review}>Submit report</Button>}
+            {step < 3 ? <Button onPress={() => { if (validate(step)) go(step + 1) }}>Next</Button> : <Button loading={send.isPending} onPress={review}>Review consent and submit</Button>}
           </div>
         </div>
         <ConsentDialog key={consentOpen ? 'open' : 'closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
@@ -547,9 +555,9 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
             {words(report.narrative) && <Narrative report={report} title="What you reported" />}
-            <Panel title="Progress"><Timeline report={report} /></Panel>
             <TalkChoice report={report} wording={readWording(page.data.consentWording)} action={talkAction} />
             <Panel title="Messages"><Conversation report={report} pageId="P20" /></Panel>
+            <Panel title="Progress"><Timeline report={report} /></Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Report details">
             <Panel title="Details">
@@ -644,6 +652,28 @@ export function CaseActionBar({ report }: { report: Report }) {
   )
 }
 
+/** The facts a handler looks for first, in one place above the case: who and what, how the student wants to talk, and what is already agreed. */
+function CaseGlance({ report }: { report: Report }) {
+  const talk = readTalk(report)
+  const access = readAccess(report)
+  const meeting = talk.mode === 'chat' ? 'Not needed for chat' : talk.scheduledAt ? formatDateTime(talk.scheduledAt) : talk.mode ? 'Not added yet' : '—'
+  const shared = [access.allowChair && 'Program chair', access.allowDean && 'Dean'].filter(Boolean).join(', ')
+  return (
+    <Panel title="Case at a glance">
+      <Facts values={[
+        ['Reference', <span className="accs-mono" key="ref">{reportReference(report)}</span>],
+        ['Status', <StatusChip key="status" tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>],
+        ['Severity', <SeverityChip key="severity" report={report} />],
+        ['Assigned to', stageLabel(report) + (report.office ? ' · ' + report.office : '')],
+        ['Consent', access.consentAt ? 'Given ' + formatDateTime(access.consentAt) : 'Not recorded'],
+        ['Shared with', shared ? 'You, ' + shared : 'You only'],
+        ['How the student wants to talk', modeLabel(talk.mode) || 'Not chosen yet'],
+        ['Meeting time', meeting],
+      ]} />
+    </Panel>
+  )
+}
+
 function CaseWorkspace({ page }: { page: PageEnvelope }) {
   const report = object(page.data.record) as Report
   const talkAction = useAction('P22')
@@ -670,12 +700,14 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
         {report.bypassed === true && <ConflictNotice />}
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
+            <CaseGlance report={report} />
             <Narrative report={report} title="Student's statement" />
-            <Panel title="History"><Timeline report={report} handler /></Panel>
             <HandlerTalk report={report} action={talkAction} />
             <Panel title="Messages"><Conversation report={report} pageId="P22" /></Panel>
+            <Panel title="History"><Timeline report={report} handler /></Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Case details">
+            <CaseActionBar report={report} />
             <Panel title="Details">
               <Facts values={[
                 ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, '—')], ['Program', words(report.program, '—')],
@@ -686,7 +718,6 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
               <Note>Only authorized handlers can open this record. We record every action.</Note>
             </Panel>
             <AccessPanel access={readAccess(report)} viewer="handler" />
-            <CaseActionBar report={report} />
             <CaseNotes report={report} />
           </aside>
         </div>

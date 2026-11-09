@@ -17,52 +17,70 @@ const own = ['/home', '/messages', '/calendar', '/notifications']
 const accounts = [routePermission.accounts].flat().slice(0, 1)
 
 describe('module picker tiles', () => {
-  it('gives a student the four finished modules, each a link', () => {
-    expect(links(session(['student'], [...own, '/reports']))).toEqual([
-      ['concerns', '/reports'],
-      ['schedule', '/calendar'],
-      ['messages', '/messages'],
-      ['notifications', '/notifications'],
+  it('gives a student the task tiles, each a link', () => {
+    expect(links(session(['student'], [...own, '/reports', '/reports/new', '/consultations']))).toEqual([
+      ['file-concern', '/reports/new'],
+      ['my-concerns', '/reports'],
+      ['student-consultations', '/consultations'],
+      ['student-messages', '/messages'],
     ])
   })
 
-  it('gives a faculty account the advisor modules, with concerns on the case queue', () => {
-    expect(links(session(['professor'], [...own, '/cases']))).toEqual([
-      ['concerns', '/cases'],
-      ['schedule', '/calendar'],
-      ['messages', '/messages'],
-      ['notifications', '/notifications'],
+  it('gives a faculty account the advisor tiles', () => {
+    expect(links(session(['professor'], [...own, '/cases', '/consultations', '/consultations/availability']))).toEqual([
+      ['assigned-concerns', '/cases'],
+      ['faculty-schedule', '/calendar'],
+      ['availability', '/consultations/availability'],
+      ['faculty-messages', '/messages'],
     ])
   })
 
   it('leaves out a finished module the session cannot open', () => {
-    const noMessages = session(['student'], ['/home', '/calendar', '/reports', '/notifications'])
-    expect(moduleTiles(noMessages).map((tile) => tile.id)).toEqual(['concerns', 'schedule', 'notifications'])
+    const noMessages = session(['student'], ['/home', '/reports', '/reports/new'])
+    expect(moduleTiles(noMessages).map((tile) => tile.id)).toEqual(['file-concern', 'my-concerns'])
   })
 
-  it('gives the dean and the secretary Accounts', () => {
-    expect(links(session(['dean'], ['/home'], accounts))).toEqual([
-      ['accounts', '/accounts'],
-      ['dean', undefined],
+  it('gives the dean the oversight tiles', () => {
+    expect(links(session(['dean'], ['/home', '/cases', '/records', '/notifications'], accounts))).toEqual([
+      ['dean-accounts', '/accounts'],
+      ['dean-cases', '/cases'],
+      ['dean-records', '/records'],
+      ['dean-notifications', '/notifications'],
     ])
-    expect(links(session(['secretary'], ['/home'], accounts))).toEqual([['accounts', '/accounts']])
   })
 
-  it.each(['dean', 'chair', 'guidance', 'osas', 'president'])('lists the %s module without a link', (role) => {
+  it('gives the secretary the setup tiles, each on its own tab of Accounts', () => {
+    expect(links(session(['secretary'], ['/home'], accounts))).toEqual([
+      ['setup', '/accounts?tab=status'],
+      ['faculty', '/accounts?tab=faculty'],
+      ['advisors', '/accounts?tab=advisors'],
+      ['chairs', '/accounts?tab=chairs'],
+      ['import', '/accounts?tab=students'],
+    ])
+  })
+
+  it('hides the secretary tiles from a session that cannot open Accounts', () => {
+    expect(moduleTiles(session(['secretary'], ['/home']))).toEqual([])
+  })
+
+  it.each(['chair', 'guidance', 'osas', 'president'])('lists the %s module without a link', (role) => {
     const unfinished = moduleTiles(session([role], ['/home'])).filter((tile) => tile.id === role)
     expect(unfinished).toHaveLength(1)
     expect(unfinished[0].href).toBeUndefined()
   })
 
-  it('combines roles in catalog order', () => {
-    const both = session(['professor', 'dean'], [...own, '/cases'], accounts)
+  it('combines roles in catalog order, unfinished modules last', () => {
+    const both = session(['professor', 'chair', 'dean'], [...own, '/cases', '/consultations/availability', '/records'], accounts)
     expect(moduleTiles(both).map((tile) => tile.id)).toEqual([
-      'concerns',
-      'schedule',
-      'messages',
-      'notifications',
-      'accounts',
-      'dean',
+      'dean-accounts',
+      'dean-cases',
+      'dean-records',
+      'dean-notifications',
+      'assigned-concerns',
+      'faculty-schedule',
+      'availability',
+      'faculty-messages',
+      'chair',
     ])
   })
 

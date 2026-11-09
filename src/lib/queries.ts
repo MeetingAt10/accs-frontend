@@ -24,12 +24,12 @@ export const pageQuery = (pageId: string, recordId?: string, filters = '') =>
   })
 
 /**
- * The notification bell popover's items and unread count from the P40 page query. Reads them
+ * The notification bell popover's items (the latest 5) and the unread count of every notification, from the P40 page query. Reads them
  * only from a successful fetch - a failed or still-loading query must not read as "zero
  * notifications" (it isn't; the request just hasn't told us yet).
  */
 export function notificationsFromQuery(page: { isSuccess: boolean; data?: PageEnvelope }) {
   const items = page.isSuccess ? page.data?.data.notifications : undefined
-  const recent = Array.isArray(items) ? (items.slice(0, 5) as Record<string, unknown>[]) : []
-  return { recent, unreadCount: recent.filter((notice) => notice.read !== true).length }
+  const all = Array.isArray(items) ? (items as Record<string, unknown>[]) : []
+  return { recent: all.slice(0, 5), unreadCount: all.filter((notice) => notice.read !== true).length }
 }

@@ -1004,8 +1004,8 @@ function ConsultationsPage({
         title={professor ? 'Consultation requests' : 'Consultations'}
         description={
           professor
-            ? 'Approve or decline requests, and set the times you offer.'
-            : 'Track your requests or book a professor.'
+            ? 'Approve or decline requests, and set the times you offer. To meet a student about a concern, add the time, link or place on the case.'
+            : 'Track your requests or book a professor. To talk about a concern you filed, choose how in that concern.'
         }
         actions={
           professor ? (

@@ -47,11 +47,11 @@ describe('notificationsFromQuery', () => {
     })
   })
 
-  it('reads the first 5 items and counts the unread ones on a successful query', () => {
+  it('reads the first 5 items and counts the unread ones among all of them on a successful query', () => {
     const items = Array.from({ length: 7 }, (_, index) => ({ id: String(index), read: index < 2 }))
     expect(notificationsFromQuery({ isSuccess: true, data: notificationsPage(items) })).toEqual({
       recent: items.slice(0, 5),
-      unreadCount: 3, // of the first 5, indexes 2-4 are unread
+      unreadCount: 5, // of all 7, indexes 2-6 are unread
     })
   })
 
