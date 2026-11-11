@@ -270,3 +270,4 @@
 @media (prefers-reduced-motion: reduce) {
   .gv-timeline > li[data-current]::before { animation: none; }
 }
+.gv-routing { margin: 4px 0 8px; padding-inline-start: 18px; }

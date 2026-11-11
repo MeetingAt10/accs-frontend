@@ -8,6 +8,7 @@ import { listDevUsers, switchDevUser, type DevUser } from '@/lib/dev-toolbox-api
 import { sessionQuery } from '@/lib/queries'
 import { landingFor, roleLabel } from '@/lib/sites'
 
+import { EscalationLab } from './escalation-lab'
 import './dev-toolbox.css'
 
 // Development-stack account switcher (docs/deltas/2026-11-05-consultation-50-percent.md, slice E).
@@ -47,6 +48,7 @@ export default function DevToolbox() {
   const [error, setError] = useState<string>()
   const [resetting, setResetting] = useState(false)
   const [reset, setReset] = useState<{ name: string; credentials: Credentials }>()
+  const [lab, setLab] = useState(false)
   const session = useQuery({ ...sessionQuery(), enabled: open }).data
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -161,6 +163,11 @@ export default function DevToolbox() {
               )}
             </div>
           )}
+          <div className="dev-toolbox__reset">
+            <button type="button" className="dev-toolbox__retry" onClick={() => { setOpen(false); setLab(true) }}>
+              Escalation lab: see where a report goes
+            </button>
+          </div>
           <input
             ref={field}
             type="search"
@@ -223,6 +230,7 @@ export default function DevToolbox() {
           </div>
         </div>
       )}
+      {lab && <EscalationLab students={(users.data ?? []).filter((u) => u.active && u.roles.includes('student'))} onClose={() => setLab(false)} />}
     </div>
   )
 }

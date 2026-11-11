@@ -585,8 +585,34 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
   )
 }
 
-export function ConflictNotice() {
-  return <Alert tone="warning" title="Routed to you because the assigned adviser may be involved">The system only suggests the routing. It is not a finding.</Alert>
+type Routing = { rule: string; scope: string; criticalTerm?: string; heldBack: string[]; engineVersion: string; lexiconVersion: string; mentions: Array<{ personId: string; name: string; role: string; alias: string; term?: string; distance?: number; conflict: number }>; thresholds: { bypass: number; triage: number } }
+const routingTitles: Record<string, string> = {
+  'student-or-named-adviser': 'Routed to you because the student said the concern is about their adviser, or named the adviser',
+  'adviser-conflict': 'Routed to you because the assigned adviser may be involved',
+  'subject-professor-conflict': 'Routed to you because a subject professor may be involved',
+  'possible-conflict': 'Routed to you to check whether a faculty member is involved',
+  'wide-scope': 'Routed to you because the concern affects the whole program or college',
+  'chair-conflict': 'Routed to you because the Program Chair may be involved',
+  critical: 'Routed to you because the report has words that need urgent care',
+}
+const personRoles: Record<string, string> = { adviser: 'adviser', subject: 'subject professor', chair: 'Program Chair', dean: 'Dean' }
+
+/** Why the system sent the concern here: the matched name or phrase, the nearby complaint word, the score. Handlers only. */
+export function ConflictNotice({ routing }: { routing?: Routing }) {
+  if (!routing) return <Alert tone="warning" title="Routed to you because the assigned adviser may be involved">The system only suggests the routing. It is not a finding.</Alert>
+  const title = routingTitles[routing.rule]
+  const lines = routing.mentions.filter((m) => m.conflict >= routing.thresholds.triage)
+  if (!title && !lines.length && !routing.heldBack.length && !routing.criticalTerm) return null
+  return (
+    <Alert tone="warning" title={title ?? 'Routing notes'}>
+      <ul className="gv-routing">
+        {lines.map((m) => <li key={m.personId}>The report mentions the student's {personRoles[m.role] ?? m.role} ({m.name}) as "{m.alias}"{m.term ? `, ${m.distance} ${m.distance === 1 ? 'word' : 'words'} from "${m.term}"` : ''}. Score {m.conflict.toFixed(2)}.</li>)}
+        {routing.criticalTerm && <li>Words that may need urgent care: "{routing.criticalTerm}".</li>}
+        {routing.heldBack.map((note) => <li key={note}>{note}</li>)}
+      </ul>
+      The system only suggests the routing. It is not a finding.
+    </Alert>
+  )
 }
 
 export function CaseNotes({ report }: { report: Report }) {
@@ -697,7 +723,7 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
         <CaseHeader report={report} crumbs={crumbs} />
-        {report.bypassed === true && <ConflictNotice />}
+        {(report.bypassed === true || !!report.routing) && <ConflictNotice routing={report.routing as Routing | undefined} />}
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
             <CaseGlance report={report} />
