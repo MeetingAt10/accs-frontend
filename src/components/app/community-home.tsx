@@ -40,7 +40,7 @@ export function communityTabs(session: Access): Tab[] {
 export function CommunityHeader({ session, greeting, date }: { session: Session; greeting: string; date: string }) {
   const faculty = session.user.roles.includes('professor')
   // The module tiles are already the role's tasks in order: the first is the main one, the rest sit beside it.
-  const actions = moduleTiles(session).filter((tile) => tile.href)
+  const actions = moduleTiles(session).filter((tile) => tile.href).slice(0, 4)
   return (
     <header className="ch-head">
       <div>

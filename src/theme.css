@@ -239,12 +239,6 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .accs-panel--interactive:hover { background: var(--accs-sunken); box-shadow: none; transform: none; }
 
 /* ---------- Module tiles and design-system cards ---------- */
-/* Home tiles are links, not cards: no outline, a quiet hover, and the "Open" row without a rule above it. */
-:root .module-picker .module-tile { min-height: 0; padding: 14px; margin: 0; border: 0; border-radius: var(--accs-radius-card); background: transparent; box-shadow: none; transition: background-color 150ms var(--accs-ease); }
-:root .module-picker .module-tile:hover { background: var(--accs-sunken); transform: none; box-shadow: none; }
-:root .module-picker .module-tile .ds-card__meta { border-top: 0; padding-top: 4px; }
-:root .module-picker .module-tile--soon { border: 1px dashed var(--accs-line); }
-:root .module-picker__grid { gap: 8px; }
 :root .ds-card { --ds-sheet-rule: var(--accs-line); box-shadow: none; }
 :root .ds-card__title { font-family: var(--accs-font-body); font-weight: 600; letter-spacing: -0.01em; }
 /* Icon squares are all the same quiet neutral; no solid black or colored blocks. */
@@ -284,16 +278,6 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .au-brand__facts li { border-inline-start-color: rgb(250 250 250 / 30%); }
 
 /* ---------- Home: short and scannable ---------- */
-/* Module tiles become one row of quick links (icon and name); the sidebar already lists them in full. */
-:root .module-picker { gap: 8px; }
-:root .module-picker > .accs-panel__title { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 500; }
-:root .module-picker__grid { display: flex; flex-wrap: wrap; gap: 4px; }
-:root .module-picker .module-tile { flex-direction: row; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: var(--accs-radius-control); }
-:root .module-picker .module-tile :is(.ds-card__body, .ds-card__meta) { display: none; }
-:root .module-picker .module-tile .ds-card__title { font-size: 0.875rem; font-weight: 500; }
-:root .module-picker .module-tile .ds-tile { width: 28px; height: 28px; }
-:root .module-picker .module-tile .ds-tile > .ds-icon { width: 16px; height: 16px; }
-:root .module-picker .module-tile--soon { opacity: 0.6; }
 /* Getting started is one line that opens. */
 :root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 10px; }
 :root .getting-started-box > summary { cursor: pointer; color: var(--accs-muted); font-size: 0.875rem; font-weight: 500; list-style-position: inside; }
@@ -324,3 +308,45 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 /* ---------- Pagers ---------- */
 :root .accs-pager { margin-top: 8px; }
 :root :is(.accs-pager, .ds-pagination) [aria-current="page"] { color: var(--accs-on-accent); }
+
+/* ---------- Use the width of the screen ---------- */
+/* Pages fill the space beside the sidebar instead of a centered 1280px column with empty margins on wide screens. */
+:root .shell-content__inner { max-width: none; margin: 0; }
+/* The side column grows a little on wide screens so the two columns stay balanced. */
+@media (min-width: 1024px) {
+  :root .accs-split { grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 420px); }
+  :root .accs-split--wide-rail { grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 480px); }
+}
+/* A post page and the concern form get room to breathe instead of a narrow column. */
+:root .fx-thread-page { max-width: 72rem; }
+:root .gv-wizard { max-width: none; }
+
+/* ---------- Charts ---------- */
+/* Line charts keep a readable size on wide pages instead of growing with the page; series get distinct colors. */
+:root { --accs-chart-1: #18181b; --accs-chart-2: #0d9488; --accs-chart-3: #d97706; --accs-chart-4: #a1a1aa; }
+:root[data-theme='dark'] { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; } }
+:root .ch-plot { height: 240px; }
+
+/* ---------- Messages and settings use the space ---------- */
+/* The two-pane messenger fills the window height below the header, like a chat app, instead of stopping halfway. */
+@media (min-width: 1024px) {
+  :root .ds-cols.communications-messages { height: calc(100dvh - 12rem); min-height: 28rem; }
+  :root .communications-messages__inbox { max-height: none; }
+  :root .communications-messages__thread { display: flex; flex-direction: column; min-height: 0; }
+  :root .communications-messages__thread > * { flex: 0 0 auto; }
+  /* An open conversation keeps its message box at the bottom; with none open, the empty state sits in the middle. */
+  :root .communications-messages__thread > :last-child:not(.ds-empty) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  :root .communications-messages__thread > :last-child:not(.ds-empty) > :last-child { margin-top: auto; }
+  :root .communications-messages__thread:has(> .ds-empty) { justify-content: center; }
+  :root .cm-chat-panel { height: calc(100dvh - 12rem); max-height: none; }
+}
+/* Settings: the password fields fill their column. */
+:root .pa-pw { max-width: none; }
+
+/* Avatars: one quiet neutral, not the design system's blue and purple fills. */
+:root :is(.ds-avatar, .ds-avatar--community, .ds-avatar--consult, .ds-avatar--neutral) { background: var(--accs-sunken); color: var(--accs-ink); }
+
+/* ---------- Module tiles ---------- */
+/* The design-system cards, three to a row on wide screens so a role's six tasks sit in two even rows. */
+@container (min-width: 48rem) { :root .module-picker__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
