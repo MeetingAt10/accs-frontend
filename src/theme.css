@@ -4,14 +4,14 @@
    borders, small radii, no drop shadows, and fewer boxes. Loaded after styles.css, it overrides the app tokens
    (--accs-*, --site-*) and the design-system tokens (--ds-*) so every module and component follows it.
 
-   Fonts: Geist for all interface text, Geist Mono for IDs, codes and numbers, and Instrument Serif for page titles
-   only. One sans carries everything; the mono and the serif are used sparingly so the type stays uniform.
+   Fonts: Geist for all interface text, Geist Mono for IDs, codes and numbers, and Poppins for page titles
+   only. Geist carries everything; Geist Mono and Poppins are used sparingly so the type stays uniform.
    ========================================================================== */
 
 :root {
   --accs-font-body: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
   --accs-font-display: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
-  --accs-font-title: 'Instrument Serif', ui-serif, Georgia, serif;
+  --accs-font-title: 'Poppins', var(--accs-font-body);
   --accs-font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --ds-font-family-body: var(--accs-font-body);
   --ds-font-family-display: var(--accs-font-display);
@@ -219,8 +219,9 @@
 html, body { font-family: var(--accs-font-body); font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; }
 body { background: var(--accs-paper); color: var(--accs-ink); }
 code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feature-settings: normal; }
-/* Page titles use the serif; everything else stays in the sans. */
-.accs-page-title, .accs-page-header h1, :root .ch-head__title { font-family: var(--accs-font-title); font-weight: 400; letter-spacing: -0.01em; }
+/* Page titles use Poppins; everything else stays in Geist. */
+:root .accs-page-title { font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
+.accs-page-title, .accs-page-header h1, :root .ch-head__title { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
 :focus-visible { outline: 2px solid var(--accs-faint); outline-offset: 2px; }
 
 /* ---------- Fewer boxes ----------
@@ -274,39 +275,39 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .au-brand { color: #fafafa; background: radial-gradient(110% 80% at 0% 0%, rgb(255 255 255 / 7%), transparent 65%), #09090b; --ds-plate-bg: #fafafa; --ds-plate-fg: #09090b; }
 :root .au-brand::before { background: radial-gradient(40% 40% at 25% 30%, rgb(255 255 255 / 5%), transparent 70%), radial-gradient(35% 35% at 75% 75%, rgb(161 161 170 / 8%), transparent 70%); }
 :root .au-brand__line { color: rgb(250 250 250 / 65%); }
-:root .au-brand__headline { font-family: var(--accs-font-title); font-weight: 400; letter-spacing: -0.01em; }
+:root .au-brand__headline { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
 :root .au-brand__facts li { border-inline-start-color: rgb(250 250 250 / 30%); }
 
 /* ---------- Home: short and scannable ---------- */
 /* Getting started is one line that opens. */
-:root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 10px; }
+:root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 16px; }
 :root .getting-started-box > summary { cursor: pointer; color: var(--accs-muted); font-size: 0.875rem; font-weight: 500; list-style-position: inside; }
 :root .getting-started-box > summary:hover { color: var(--accs-ink); }
 :root .getting-started-box__count { margin-inline-start: 6px; color: var(--accs-faint); font-weight: 400; }
 :root .getting-started-box[open] > .getting-started { margin-top: 10px; }
 /* Student and faculty home head: greeting as the title, the date under it, actions beside it on wide screens. */
 :root .ch-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
-:root .ch-head__title { margin: 0; font-size: clamp(1.75rem, 1.4rem + 1vw, 2.25rem); line-height: 1.1; }
-:root .ch-head__eyebrow { margin: 4px 0 0; }
+:root .ch-head__title { margin: 0; font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
+:root .ch-head__eyebrow { margin: 8px 0 0; }
 
-/* ---------- Less white space everywhere ---------- */
-:root .shell-content__inner { padding: 14px 16px 28px; }
-@media (min-width: 768px) { :root .shell-content__inner { padding: 20px 28px 32px; } }
-:root .shell-page { gap: 16px; }
-:root .accs-stack { gap: 16px; }
-:root .accs-stack--tight { gap: 8px; }
-:root .accs-split { gap: 20px; }
-:root .accs-page-head { gap: 12px 20px; }
-:root .accs-panel { gap: 6px; }
-:root .accs-panel > .accs-panel__head { padding-bottom: 8px; }
+/* ---------- Spacing: room to breathe, without the old boxes ---------- */
+:root .shell-content__inner { padding: 20px 16px 40px; }
+@media (min-width: 768px) { :root .shell-content__inner { padding: 32px 40px 48px; } }
+:root .shell-page { gap: 32px; }
+:root .accs-stack { gap: 32px; }
+:root .accs-stack--tight { gap: 12px; }
+:root .accs-split { gap: 40px; }
+:root .accs-page-head { gap: 16px 24px; }
+:root .accs-panel { gap: 8px; }
+:root .accs-panel > .accs-panel__head { padding-bottom: 12px; }
 /* Rows line up with their heading and change background on hover. */
-:root .accs-row { padding: 9px 8px; gap: 10px; border-radius: 6px; }
-:root .accs-kpi { padding: 12px 16px; }
-:root .accs-table th { padding: 8px 12px; }
-:root .accs-table td { padding: 9px 12px; }
+:root .accs-row { padding: 14px 12px; gap: 12px; border-radius: 8px; }
+:root .accs-kpi { padding: 16px 20px; }
+:root .accs-table th { padding: 10px 14px; }
+:root .accs-table td { padding: 12px 14px; }
 
 /* ---------- Pagers ---------- */
-:root .accs-pager { margin-top: 8px; }
+:root .accs-pager { margin-top: 16px; }
 :root :is(.accs-pager, .ds-pagination) [aria-current="page"] { color: var(--accs-on-accent); }
 
 /* ---------- Use the width of the screen ---------- */
@@ -353,7 +354,7 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 
 /* ---------- People rows ---------- */
 /* Directory rows are two lines (name and roles, then office and title) with a smaller avatar and less padding. */
-:root .ds-next-person-card { padding: 8px 12px; gap: 12px; align-items: center; }
+:root .ds-next-person-card { padding: 12px 14px; gap: 14px; align-items: center; }
 :root .ds-next-person-card__avatar { width: 32px; height: 32px; font-size: 0.75rem; }
 :root .ds-next-person-card__body { gap: 2px; }
 :root .ds-next-person-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
