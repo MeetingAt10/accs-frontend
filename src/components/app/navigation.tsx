@@ -140,7 +140,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",
@@ -218,7 +218,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",

@@ -91,7 +91,7 @@ export function AboutPanel({ session }: { session: Session }) {
     <Panel title="About">
       <div className="accs-stack accs-stack--tight">
         <p className="ch-about">
-          The College of Computer Studies community for announcements, class discussions, and consultations.
+          The College of Computer Studies community for announcements, class discussions, and appointments.
         </p>
         {(program || section) && (
           <p className="ch-about ch-about--meta">

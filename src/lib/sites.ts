@@ -44,7 +44,7 @@ export const sites: Site[] = [
   {
     id: 'schedule',
     label: 'Schedule',
-    purpose: 'Calendars, faculty availability, and consultation requests.',
+    purpose: 'Calendars, faculty availability, and appointment requests.',
     icon: 'calendar',
     lane: 'consult',
     prefixes: ['/calendar', '/consultations'],

@@ -307,7 +307,7 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
               </Panel>
             )}
             {consultations.length > 0 && (
-              <Panel flush title={counted('Consultations', /consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
+              <Panel flush title={counted('Appointments', /consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
                 <Rows>
                   {consultations.map((item, index) => {
                     const student = asItem(item.student)
@@ -315,8 +315,8 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                     const slot = asItem(item.slot)
                     const status = text(item.status, 'Requested')
                     return (
-                      <Entry key={text(item.id, 'consultation-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
-                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Consultation'))}</p>
+                      <Entry key={text(item.id, 'appointment-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
+                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Appointment'))}</p>
                         <Sub>
                           <StatusChip tone={toneFor(status)}>{status}</StatusChip>
                           {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
@@ -410,7 +410,7 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
 
   const shortcuts: { label: string; href: string; icon: 'plus' | 'calendar' | 'megaphone' | 'list-checks' | 'clock'; when?: string[] }[] = [
     { label: 'New report', href: '/reports/new', icon: 'plus', when: ['student'] },
-    { label: 'Book consultation', href: '/consultations', icon: 'calendar', when: ['student'] },
+    { label: 'Book appointment', href: '/consultations', icon: 'calendar', when: ['student'] },
     { label: 'Post announcement', href: '/feed/new', icon: 'megaphone' },
     { label: 'Manage availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
     { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
