@@ -78,8 +78,8 @@ export const sites: Site[] = [
     purpose: 'Authorized student records, restrictions, and program analytics.',
     icon: 'archive',
     lane: 'neutral',
-    prefixes: ['/records', '/restrictions', '/analytics'],
-    landings: ['/analytics', '/records', '/restrictions'],
+    prefixes: ['/records', '/restrictions', '/analytics', '/clearance'],
+    landings: ['/analytics', '/records', '/restrictions', '/clearance'],
     modules: ['CHR-03', 'CHR-05', 'DEAN-05', 'GUD-03', 'GUD-04', 'OSAS-02', 'OSAS-03', 'ADM-03'],
   },
   {
@@ -117,7 +117,7 @@ export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas'],
   cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas'],
   evaluations: ['student', 'professor', 'chair', 'dean'],
-  records: ['chair', 'dean', 'guidance', 'osas', 'administrator'],
+  records: ['chair', 'dean', 'guidance', 'osas', 'administrator', 'secretary'],
   admin: ['administrator', 'dean', 'secretary'],
 }
 

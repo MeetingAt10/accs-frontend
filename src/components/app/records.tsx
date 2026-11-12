@@ -32,6 +32,7 @@ import {
   StatusChip,
   siteCrumb,
   toneFor,
+  type Tone,
 } from "@/components/app/page-shell";
 import { BarChart, CountUp, TrendChart } from "@/components/ds-next/charts";
 import {
@@ -722,7 +723,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
             Read each report in context.
           </p>
           {status === "To review" ? (
-            <div className="rc-reasons">
+            <div className="rc-hold-reasons">
               <TextArea
                 label="Review note"
                 value={reason}
@@ -2083,6 +2084,25 @@ function StandingPage({ page }: { page: PageEnvelope }) {
         />
       }
     >
+      {Object.keys(object(record.clearance)).length > 0 && (
+        <Panel title="Clearance">
+          <p className="rc-clearance">
+            <ClearanceChip clearance={object(record.clearance)} />
+            <span>
+              {word(object(record.clearance).status) === "on_hold"
+                ? "Your clearance is on hold until these are done:"
+                : "Nothing is holding your clearance."}
+            </span>
+          </p>
+          {items(object(record.clearance).reasons).length > 0 && (
+            <ul className="rc-hold-reasons">
+              {items(object(record.clearance).reasons).map((reason, index) => (
+                <li key={index}>{word(reason.message)}</li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
       {restrictions.length > 0 && (
         <>
           <Panel flush title="Paused features">
@@ -2132,6 +2152,159 @@ function StandingPage({ page }: { page: PageEnvelope }) {
           Contact the Guidance Office
         </Link>
       </p>
+    </Screen>
+  );
+}
+
+/* ---------- Clearance (P53) ---------- */
+
+const evaluationTone: Record<string, Tone> = { submitted: "ok", pending: "warn", missing: "danger", none: "neutral" };
+
+/** "Finished", "Not finished: 1 of 2", "Missing: 0 of 2", or the label the API sent. */
+export function evaluationText(evaluation: Item) {
+  const status = word(evaluation.status);
+  const label = word(evaluation.label, status ? status : "—");
+  return status === "pending" || status === "missing"
+    ? `${label}: ${word(evaluation.submitted, "0")} of ${word(evaluation.total, "0")}`
+    : label;
+}
+
+function ClearanceChip({ clearance }: { clearance: Item }) {
+  const onHold = word(clearance.status) === "on_hold";
+  return <StatusChip tone={onHold ? "warn" : "ok"}>{word(clearance.label, onHold ? "On hold" : "Clear")}</StatusChip>;
+}
+
+function ClearanceList({ page }: { page: PageEnvelope }) {
+  const router = useRouter();
+  const location = useRouterState({ select: (state) => state.location });
+  const params = new URLSearchParams(location.searchStr);
+  const session = useQuery(sessionQuery());
+  const canOpenRecord = (session.data?.allowedPages ?? []).includes("P34");
+  const rows = items(page.data.students);
+  const cycles = items(page.data.cycles);
+  const cycle = object(page.data.cycle);
+  const summary = object(page.data.summary);
+  const clearanceSummary = object(page.data.clearanceSummary);
+  const filters = object(page.data.filters);
+  const programs = Array.isArray(filters.programs) ? filters.programs.map(String) : [];
+  const sections = [...new Set(rows.map((row) => word(row.section)).filter(Boolean))].sort();
+  const [search, setSearch] = useState("");
+  const setParam = (changes: Record<string, string>) => {
+    const next = new URLSearchParams(location.searchStr);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    router.history.replace(location.pathname + (next.size ? "?" + next.toString() : ""));
+  };
+  const quick = params.get("clearance") === "on_hold" ? "hold" : params.get("status") === "pending,missing" ? "unfinished" : "all";
+  const needle = search.trim().toLowerCase();
+  const shown = rows.filter((row) => {
+    const student = object(row.student);
+    return !needle || `${word(student.name)} ${word(student.studentId)}`.toLowerCase().includes(needle);
+  });
+  const select = (label: string, key: string, options: Array<[string, string]>, all: string) => (
+    <Select label={label} selectedKey={params.get(key) ?? ""} onSelectionChange={(value) => setParam({ [key]: String(value ?? "") })}>
+      {[["", all] as [string, string], ...options].map(([id, name]) => <SelectOption id={id} key={id || "all"}>{name}</SelectOption>)}
+    </Select>
+  );
+  return (
+    <Screen
+      header={
+        <PageHeader
+          crumbs={[siteCrumb("/clearance"), { label: "Clearance" }]}
+          title="Clearance"
+          description={[word(filters.scope), word(cycle.title) && "Evaluation: " + word(cycle.title)].filter(Boolean).join(" · ")}
+        />
+      }
+    >
+      <Kpis label="Clearance summary">
+        <Kpi label="Finished evaluation" value={word(summary.submitted, "0")} />
+        <Kpi label="Not finished" value={word(summary.pending, "0")} note={word(cycle.status) === "Closed" ? undefined : "The cycle is still open"} />
+        <Kpi label="Missing" value={word(summary.missing, "0")} note="Cycle closed, not finished" />
+        <Kpi label="Clear" value={word(clearanceSummary.clear, "0")} />
+        <Kpi label="On hold" value={word(clearanceSummary.onHold, "0")} />
+      </Kpis>
+      <div className="accs-toolbar rc-toolbar" role="search">
+        <div className="accs-grow">
+          <Search label="Search by name or student ID" placeholder="Search name or student ID" size="sm" value={search} onChange={setSearch} />
+        </div>
+        <FilterField label="Show">
+          <Seg
+            label="Show"
+            value={quick}
+            onChange={(value) => setParam(value === "hold" ? { clearance: "on_hold", status: "" } : value === "unfinished" ? { status: "pending,missing", clearance: "" } : { status: "", clearance: "" })}
+            options={[
+              { id: "all", label: "All" },
+              { id: "unfinished", label: "Not finished" },
+              { id: "hold", label: "On hold" },
+            ]}
+          />
+        </FilterField>
+      </div>
+      <div className="rc-filters">
+        {cycles.length > 1 && select("Evaluation cycle", "cycle", cycles.map((entry) => [word(entry.id), word(entry.title)]), "Current cycle")}
+        {programs.length > 1 && select("Program", "program", programs.map((entry) => [entry, entry]), "All programs")}
+        {select("Year", "year", ["1", "2", "3", "4"].map((year) => [year, "Year " + year]), "All years")}
+        {sections.length > 0 && select("Section", "section", sections.map((entry) => [entry, "Section " + entry]), "All sections")}
+        {select("Evaluation", "status", [["submitted", "Finished"], ["pending", "Not finished"], ["missing", "Missing"], ["none", "Nothing to evaluate"], ["pending,missing", "Not finished or missing"]], "Any")}
+        {select("Clearance", "clearance", [["clear", "Clear"], ["on_hold", "On hold"]], "Any")}
+      </div>
+      <p className="rc-count" aria-live="polite">
+        {shown.length} {shown.length === 1 ? "student" : "students"}
+      </p>
+      {shown.length ? (
+        <PagedList items={shown} noun="students" resetKey={location.searchStr + needle}>
+          {(shown) => (
+            <div className="accs-table-wrap rc-table-wrap">
+              <table className="accs-table rc-table">
+                <caption className="rc-sr">Clearance</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Student</th>
+                    <th scope="col">Student ID</th>
+                    <th scope="col">Program</th>
+                    <th scope="col">Year</th>
+                    <th scope="col">Section</th>
+                    <th scope="col">Evaluation</th>
+                    <th scope="col">Clearance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((row, index) => {
+                    const student = object(row.student);
+                    const evaluation = object(row.evaluation);
+                    const clearance = object(row.clearance);
+                    const reasons = items(clearance.reasons);
+                    const name = word(student.name, "Student");
+                    return (
+                      <tr key={word(student.id, String(index))}>
+                        <td>
+                          {canOpenRecord && word(student.id)
+                            ? <Link variant="quiet" href={"/records/" + encodeURIComponent(word(student.id))}>{name}</Link>
+                            : name}
+                        </td>
+                        <td className="accs-mono">{word(student.studentId, "—")}</td>
+                        <td>{word(row.program, "—")}</td>
+                        <td>{word(row.year, "—")}</td>
+                        <td>{word(object(student).sectionName, word(row.section, "—"))}</td>
+                        <td>{row.evaluation ? <StatusChip tone={evaluationTone[word(evaluation.status)] ?? "neutral"}>{evaluationText(evaluation)}</StatusChip> : "—"}</td>
+                        <td>
+                          <ClearanceChip clearance={clearance} />
+                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i}>{word(reason.message)}</li>)}</ul>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </PagedList>
+      ) : (
+        <Empty title="No students match">Change the filters to see more students.</Empty>
+      )}
+      <Note>Clearance is on hold when the last closed evaluation cycle is not finished, or when strikes are not settled with OSAS.</Note>
     </Screen>
   );
 }
@@ -2187,6 +2360,8 @@ export function OversightScreen({ pageId }: { pageId: string }) {
       <StudentRecord page={page.data} studentId={recordId ?? ""} />
     ) : pageId === "P35" ? (
       <RestrictionManagement page={page.data} />
+    ) : pageId === "P53" ? (
+      <ClearanceList page={page.data} />
     ) : (
       <StandingPage page={page.data} />
     );

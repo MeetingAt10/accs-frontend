@@ -584,7 +584,35 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
       ) : (
         forms
       )}
-      {/* TBD(D-01): participation rules are undecided; no penalty or enforcement state is shown. */}
+      {Array.isArray(page.data.completion) && page.data.completion.length > 0 && (
+        <Panel flush title="Your completion">
+          <ul className="accs-rows">
+            {items(page.data.completion).map((entry) => {
+              const status = words(entry.status);
+              const label = words(entry.label, status);
+              const text = status === "pending" || status === "missing"
+                ? `${label}: ${words(entry.submitted, "0")} of ${words(entry.total, "0")}`
+                : label;
+              const tone = status === "submitted" ? "ok" : status === "missing" ? "danger" : status === "pending" ? "warn" : "neutral";
+              return (
+                <li key={words(entry.cycleId)}>
+                  <div className="accs-row ev-row">
+                    <div>
+                      <p className="accs-row__title">{words(entry.cycleTitle, "Evaluation cycle")}</p>
+                      <p className="accs-row__sub">
+                        {words(entry.cycleStatus)}
+                        {words(entry.closes) ? ` · closes ${formatDate(entry.closes)}` : ""}
+                      </p>
+                    </div>
+                    <StatusChip tone={tone}>{text}</StatusChip>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="ev-note">Finishing your evaluations is required for clearance once a cycle closes.</p>
+        </Panel>
+      )}
     </div>
   );
 }
