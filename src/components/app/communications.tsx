@@ -751,7 +751,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         ) : (
           <Empty title="No notifications">
             {filter === "all"
-              ? "Updates about your reports, consultations, and messages show up here."
+              ? "Updates about your reports, appointments, and messages show up here."
               : "Nothing matches this filter."}
           </Empty>
         )}
@@ -953,7 +953,7 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
       ? "Report replies"
       : "New assigned reports",
     case: "Case milestones",
-    consultation: "Consultation updates",
+    consultation: "Appointment updates",
     message: "Messages",
     announcement: "Announcements",
     evaluation: "Evaluations",

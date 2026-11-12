@@ -405,7 +405,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
 
 const topicFor = (faq: Item) => {
   const href = word(faq.href);
-  if (href.includes("consultation")) return "Consultations";
+  if (href.includes("consultation")) return "Appointments";
   if (href.includes("report") || href.includes("case"))
     return "Reports and privacy";
   if (href.includes("evaluations")) return "Evaluations";
@@ -459,7 +459,7 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <PageHeader
         title="Help"
-        description="Answers on reports, consultations, evaluations, and your account."
+        description="Answers on reports, appointments, evaluations, and your account."
         actions={
           <Button href="/assistant" variant="secondary" icon="chats">
             Ask the assistant

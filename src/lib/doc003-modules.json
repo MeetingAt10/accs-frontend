@@ -93,7 +93,7 @@
   {
    "id": "STU-05",
    "role": "student",
-   "name": "Consultation requests",
+   "name": "Appointment requests",
    "pages": [
     "P03",
     "P14",
@@ -230,7 +230,7 @@
   {
    "id": "PRO-05",
    "role": "professor",
-   "name": "Consultation decisions",
+   "name": "Appointment decisions",
    "pages": [
     "P03",
     "P14",
