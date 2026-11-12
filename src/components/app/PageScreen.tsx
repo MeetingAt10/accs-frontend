@@ -413,7 +413,7 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
     { label: 'Book consultation', href: '/consultations', icon: 'calendar', when: ['student'] },
     { label: 'Post announcement', href: '/feed/new', icon: 'megaphone' },
     { label: 'Manage availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
-    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas', 'president'] },
+    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
   ]
   const actions = shortcuts
     .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href))

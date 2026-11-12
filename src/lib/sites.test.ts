@@ -19,9 +19,9 @@ const samplePaths: Record<string, string> = {
 }
 
 describe('module sites follow DOC003', () => {
-  it('assigns each of the 58 inventory modules to exactly one site', () => {
+  it('assigns each of the 56 inventory modules to exactly one site', () => {
     const assigned = sites.flatMap((site) => site.modules)
-    expect(inventory.modules).toHaveLength(58)
+    expect(inventory.modules).toHaveLength(56)
     expect([...assigned].sort()).toEqual(inventory.modules.map((m) => m.id).sort())
   })
 

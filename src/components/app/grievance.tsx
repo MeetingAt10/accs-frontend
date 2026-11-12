@@ -39,15 +39,14 @@ const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new D
 const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
 const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
 
-// Pipeline: the six handling stages plus Resolved, mapped from stage and status.
+// Pipeline: the five handling stages (Adviser to OSAS, which is the last) plus Submitted and Resolved.
 const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
 const stageOf = (report: Item): string => isClosed(report) ? 'resolved'
-  : report.stage === 'executive' ? 'osas'
-    : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
-      : words(report.stage, 'adviser')
+  : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
+    : words(report.stage, 'adviser')
 const stageIndex = (report: Item) => Math.max(0, stages.findIndex(([key]) => key === stageOf(report)))
 const stageStep = (report: Item) => Math.max(1, stageIndex(report))
-const stageLabel = (report: Item) => report.stage === 'executive' && !isClosed(report) ? "President's office" : stages[stageIndex(report)][1]
+const stageLabel = (report: Item) => stages[stageIndex(report)][1]
 
 function useAction(pageId: string) {
   const queryClient = useQueryClient()
@@ -611,21 +610,22 @@ export function CaseNotes({ report }: { report: Report }) {
   )
 }
 
-const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone', return: 'Return to OSAS' }
-const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' }, osas: { stage: 'executive', label: "President's Office" }, executive: { stage: 'osas', label: 'OSAS' } }
+const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone' }
+const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' } }
 
 export function CaseActionBar({ report }: { report: Report }) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
-  const allowed = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
+  const allowedAll = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
   const [selected, setSelected] = useState('')
   const [reason, setReason] = useState('')
   const [update, setUpdate] = useState('')
   const [error, setError] = useState('')
   const action = useAction('P22')
-  const transition = ['escalate', 'transfer', 'return'].includes(selected)
+  // OSAS is the last office: it has no next office, and no case is returned to an earlier one.
+  const allowed = allowedAll.filter((type) => type !== 'return' && !(report.stage === 'osas' && ['escalate', 'transfer'].includes(type)))
+  const transition = ['escalate', 'transfer'].includes(selected)
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
-  // TBD(D-04): offer only server-approved chain transitions; no undefined bypass or executive power.
   if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions available. You can only read this report at its current stage.</p></Panel>
   const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
@@ -634,7 +634,7 @@ export function CaseActionBar({ report }: { report: Report }) {
         {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
         {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
       </div>
-      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'return', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
+      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
         <ModalBody>
           <div className="gv-stack">
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
@@ -736,7 +736,7 @@ const sortColumns: Array<[string, string]> = [['id', 'Reference'], ['category', 
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   const roles = session.data?.user.roles ?? []
-  const role = ['chair', 'dean', 'guidance', 'osas', 'president', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
+  const role = ['chair', 'dean', 'guidance', 'osas', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
   const initial = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
   const [query, setQuery] = useState(initial.get('q') ?? '')
   const [level, setLevel] = useState(initial.get('severity') ?? '')
@@ -752,8 +752,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
     : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
-          : role === 'president' ? [['open', 'Awaiting action'], ['closed', 'Closed']]
-            : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
+          : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
   const validTab = tabDefs.some(([id]) => id === tab) ? tab : tabDefs[0][0]
   const sortValue = (report: Item) => sort.column === 'id' ? reportReference(report) : sort.column === 'student' ? studentName(report) : words(report[String(sort.column)])
   const inTab = (report: Item, selected: string) => selected === 'closed' ? isClosed(report)
@@ -770,7 +769,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
-  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : role === 'president' ? 'Executive cases' : 'Assigned reports'
+  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : 'Assigned reports'
   const toggleSort = (column: string) => setSort((current) => ({ column, direction: current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   return (
     <MotionConfig reducedMotion="user">
