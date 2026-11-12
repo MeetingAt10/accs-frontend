@@ -3,7 +3,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  CheckboxGroup,
   DatePicker,
   Disclosure,
   Icon,
@@ -937,6 +936,13 @@ function FacultyResults({
               data={criteria}
               referenceLabel={`${words(programAverage.program, "Program")} average`}
             />
+            {programAverage.released === false && (
+              <p className="ev-note">
+                {words(programAverage.program, "Program")} average available
+                when all evaluations are in ({number(programAverage.submitted)}{" "}
+                of {number(programAverage.assigned)}).
+              </p>
+            )}
           </Panel>
           <Panel flush title="Feedback themes">
             {themes.length ? (
@@ -1653,7 +1659,6 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const [instructions, setInstructions] = useState(words(record.instructions));
   const [opens, setOpens] = useState(words(record.opens));
   const [closes, setCloses] = useState(words(record.closes));
-  const [forms, setForms] = useState(strings(record.forms));
   const [formQuestions, setFormQuestions] = useState(
     questions(record.questions),
   );
@@ -1670,7 +1675,6 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     ...(!opens || !closes || closes < opens
       ? ["Open and close dates (close on or after open)"]
       : []),
-    ...(!forms.length ? ["At least one form"] : []),
     ...(!formQuestions.length ||
     formQuestions.some(
       (question) => !question.text.trim() || !question.criterion.trim(),
@@ -1694,7 +1698,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     instructions,
     opens,
     closes,
-    forms,
+    // Cycles use the student evaluation form only (MeetingAt10/accs-backend#47).
+    forms: ["student"],
     questions: formQuestions,
   };
 
@@ -1787,19 +1792,10 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             isDisabled={!editable}
           />
         </div>
-        <CheckboxGroup
-          label="Forms"
-          value={forms}
-          onChange={setForms}
-          isDisabled={!editable}
-          isRequired
-        >
-          {Object.entries(formLabels).map(([key, label]) => (
-            <Checkbox value={key} key={key}>
-              {label}
-            </Checkbox>
-          ))}
-        </CheckboxGroup>
+        <p className="ev-note">
+          Form: <strong>{formLabels.student}</strong>. Students evaluate the
+          faculty who teach their sections; it is the only form a cycle uses.
+        </p>
       </Panel>
       <Panel title="Participation">
         {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}
