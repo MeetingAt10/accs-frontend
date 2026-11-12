@@ -937,14 +937,15 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
   const settings = object(page.data.settings);
   const saved = object(settings.priorities);
   const categories = roles(page.data.categories);
+  // Categories the server says cannot be turned off (for example report, case and evaluation updates).
+  const required = new Set(roles(page.data.requiredCategories));
   const [priorities, setPriorities] = useState<Record<string, Priority>>(() =>
     Object.fromEntries(
-      categories.map((category) => [
-        category,
-        ["high", "normal", "muted"].includes(words(saved[category]))
-          ? (saved[category] as Priority)
-          : "normal",
-      ]),
+      categories.map((category) => {
+        const value = words(saved[category]);
+        const known = ["high", "normal", "muted"].includes(value) ? (value as Priority) : "normal";
+        return [category, required.has(category) && known === "muted" ? "normal" : known];
+      }),
     ),
   );
   const action = useCommunicationAction("P44");
@@ -986,6 +987,7 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
                   <RadioGroup
                     row
                     label={categoryNames[category] ?? category}
+                    description={required.has(category) ? "Required. These updates can't be turned off." : undefined}
                     value={priorities[category] ?? "normal"}
                     onChange={(priority) =>
                       setPriorities((current) => ({
@@ -996,14 +998,14 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
                   >
                     <Radio value="high">Urgent</Radio>
                     <Radio value="normal">Normal</Radio>
-                    <Radio value="muted">Off</Radio>
+                    {!required.has(category) && <Radio value="muted">Off</Radio>}
                   </RadioGroup>
+                  {required.has(category) && <span className="accs-tag cm-required">Required</span>}
                 </div>
               ))}
             </div>
           </Panel>
         ))}
-        {/* TBD(D-06): no category is marked mandatory until the required-category policy is approved. */}
         <p className="pt-scope">
           Email and other delivery channels are not set up yet. Priority
           choices never change your access to a report or case.

@@ -74,3 +74,6 @@
   .cm-chat__scroll { padding: 16px 12px; }
   .cm-chat__foot { padding: 12px; }
 }
+/* A category that cannot be turned off is tagged Required next to its choices. */
+.cm-pref { position: relative; }
+.cm-required { position: absolute; top: 16px; right: 20px; }
