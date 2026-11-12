@@ -9,7 +9,7 @@ import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
-import { AboutPanel, CommunityHeader, Composer, dashboardStats, isCommunityRole } from '@/components/app/community-home'
+import { CommunityHeader, dashboardStats, isCommunityRole } from '@/components/app/community-home'
 import { GettingStarted } from '@/components/app/getting-started'
 import { ModulePicker } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
@@ -123,20 +123,25 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
   const me = session.data?.user.id
   const community = isCommunityRole(role)
   const stats = dashboardStats(asItems(data.stats), role)
-  const announcements = asItems(data.announcements)
-  const posts = asItems(data.posts)
-  const reports = asItems(data.reports)
-  const cases = asItems(data.cases)
-  const sections = asItems(data.sections)
-  const consultations = asItems(data.consultations)
-  const todos = asItems(data.todos)
+  // Each list on the home shows its three newest items; "View all" opens the rest.
+  const top = (items: Item[]) => items.slice(0, 3)
+  const announcements = top(asItems(data.announcements))
+  // A post already listed as an announcement is not repeated under "From your spaces".
+  const announced = new Set(asItems(data.announcements).map((item) => text(item.id)))
+  const posts = top(asItems(data.posts).filter((item) => !announced.has(text(item.id))))
+  const reports = top(asItems(data.reports))
+  const cases = top(asItems(data.cases))
+  const sections: Item[] = []
+  const consultations = top(asItems(data.consultations))
+  // To-dos live on the calendar and updates under the bell, so the home leaves them out.
+  const todos: Item[] = []
   const assignments = asItems(data.assignments)
-  const notes = asItems(data.notifications)
+  const notes: Item[] = []
   const today = manilaToday()
   const events = asItems(data.events)
     .filter((event) => dayKey(event.date) >= today)
     .sort((a, b) => dayKey(a.date).localeCompare(dayKey(b.date)) || text(a.start).localeCompare(text(b.start)))
-    .slice(0, 5)
+    .slice(0, 3)
   const submitted = assignments.filter((item) => /submitted/i.test(text(item.status))).length
   const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
   const empty =
@@ -417,8 +422,9 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
 
   const community = isCommunityRole(role) && Boolean(session.data)
-  const communityLead = community && session.data ? <Composer session={session.data} /> : undefined
-  const communityIntro = community && session.data ? <AboutPanel session={session.data} /> : undefined
+  // The home stays short: posting lives in Forums, and the sidebar already leads to classes and help.
+  const communityLead = undefined
+  const communityIntro = undefined
 
   return (
     <div className="accs-stack">
