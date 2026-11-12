@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { campusIso, campusLocal, readAccess, readerAccess, readTalk, readWording, secureLink } from './concern-talk'
+import { alsoReadableBy, campusIso, campusLocal, readAccess, readerAccess, readTalk, readWording, secureLink } from './concern-talk'
 
 describe('concern talk', () => {
   it('turns campus time into one moment and back, whatever zone the browser is in', () => {
@@ -27,9 +27,9 @@ describe('concern talk', () => {
     expect(readTalk({ talk: { mode: 'fax' } }).mode).toBeUndefined()
   })
 
-  it('reads a report from before the sharing choices as not shared', () => {
-    expect(readAccess({})).toEqual({ aboutAdvisor: false, allowChair: false, allowDean: false, consentAt: '', wording: '' })
-    expect(readAccess({ aboutAdvisor: true, allowDean: true, consent: { at: 'T', wording: 'W' } })).toEqual({ aboutAdvisor: true, allowChair: false, allowDean: true, consentAt: 'T', wording: 'W' })
+  it('reads who can read a report, ignoring the old allowChair / allowDean answers', () => {
+    expect(readAccess({})).toEqual({ aboutAdvisor: false, confidential: false, consentAt: '', wording: '' })
+    expect(readAccess({ aboutAdvisor: true, allowChair: false, allowDean: true, confidential: true, consent: { at: 'T', wording: 'W' } })).toEqual({ aboutAdvisor: true, confidential: true, consentAt: 'T', wording: 'W' })
   })
 
   it('keeps the wording the page sent and fills in the rest', () => {
@@ -41,20 +41,34 @@ describe('concern talk', () => {
   })
 })
 
-describe('who can read a report before it is sent', () => {
-  it('shows the adviser as a reader unless the concern is about them', () => {
-    expect(readerAccess({ aboutAdvisor: false, allowChair: false, allowDean: false })).toEqual([
+describe('who can read a report', () => {
+  it('lists the adviser, the program chair and the Dean, with no choice to make', () => {
+    expect(readerAccess({ aboutAdvisor: false })).toEqual([
       ['Your adviser', 'Can read it'],
-      ['Your program chair', 'Cannot read it'],
-      ['The Dean', 'Cannot read it'],
+      ['Your program chair', 'Can read it'],
+      ['The Dean', 'Can read it'],
     ])
-    expect(readerAccess({ aboutAdvisor: false, allowChair: true, allowDean: true }).map(([, can]) => can)).toEqual(['Can read it', 'Can read it', 'Can read it'])
   })
 
   it('leaves the adviser out and sends the report to the program chair instead', () => {
-    const [adviser, chair, dean] = readerAccess({ aboutAdvisor: true, allowChair: false, allowDean: false })
+    const [adviser, chair, dean] = readerAccess({ aboutAdvisor: true })
     expect(adviser[1]).toMatch(/^Cannot read it/)
     expect(chair[1]).toMatch(/^Can read it.*instead/)
-    expect(dean[1]).toBe('Cannot read it')
+    expect(dean[1]).toBe('Can read it')
+  })
+
+  it('says the program chair and the Dean see the status only once the adviser marks it confidential', () => {
+    const [adviser, chair, dean] = readerAccess({ aboutAdvisor: false, confidential: true })
+    expect(adviser[1]).toBe('Can read it')
+    expect(chair[1]).toMatch(/status only/)
+    expect(dean[1]).toMatch(/status only/)
+    expect(alsoReadableBy({ aboutAdvisor: false, confidential: true })).toMatch(/status only/)
+    expect(alsoReadableBy({ aboutAdvisor: false })).toBe('Program chair and Dean')
+  })
+
+  it('falls back to the 2026-11-11 consent wording, with no choice about the chair or the Dean', () => {
+    const report = readWording(undefined).report
+    expect(report).toMatch(/Program Chair of my program and the Dean can also read it/)
+    expect(report).not.toMatch(/I choose/)
   })
 })

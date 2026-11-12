@@ -12,7 +12,8 @@ import { getPage, performPageAction, type PageAction, type PageEnvelope } from '
 import { sessionQuery } from '@/lib/queries'
 import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
 import { RestrictedView } from '@/components/app/guards'
-import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, modeLabel, readAccess, readTalk, readWording, type Sharing } from '@/components/app/concern-talk'
+import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, alsoReadableBy, modeLabel, readAccess, readTalk, readWording } from '@/components/app/concern-talk'
+import { categoryDetailMax, categoryText, choicePayload, choiceProblems, cleanChoice, readCategoryOptions } from '@/lib/concern-categories'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import './grievance.css'
@@ -39,15 +40,14 @@ const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new D
 const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
 const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
 
-// Pipeline: the six handling stages plus Resolved, mapped from stage and status.
+// Pipeline: the five handling stages (Adviser to OSAS, which is the last) plus Submitted and Resolved.
 const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
 const stageOf = (report: Item): string => isClosed(report) ? 'resolved'
-  : report.stage === 'executive' ? 'osas'
-    : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
-      : words(report.stage, 'adviser')
+  : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
+    : words(report.stage, 'adviser')
 const stageIndex = (report: Item) => Math.max(0, stages.findIndex(([key]) => key === stageOf(report)))
 const stageStep = (report: Item) => Math.max(1, stageIndex(report))
-const stageLabel = (report: Item) => report.stage === 'executive' && !isClosed(report) ? "President's office" : stages[stageIndex(report)][1]
+const stageLabel = (report: Item) => stages[stageIndex(report)][1]
 
 function useAction(pageId: string) {
   const queryClient = useQueryClient()
@@ -205,9 +205,9 @@ function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: stri
   )
 }
 
-// The extra readers are off unless the student turns them on, and the consent is never kept in a draft.
-type Draft = Sharing & { narrative: string; category: string; severity: SeverityLevel | ''; identity: Identity; location: string; occurredOn: string }
-const blankDraft: Draft = { narrative: '', category: '', severity: '', identity: 'named', location: '', occurredOn: '', aboutAdvisor: false, allowChair: false, allowDean: false }
+// The consent is never kept in a draft. Drafts from before #31 may still carry allowChair / allowDean; they are ignored.
+type Draft = { narrative: string; category: string; subcategory: string; categoryDetail: string; severity: SeverityLevel | ''; identity: Identity; location: string; occurredOn: string; aboutAdvisor: boolean }
+const blankDraft: Draft = { narrative: '', category: '', subcategory: '', categoryDetail: '', severity: '', identity: 'named', location: '', occurredOn: '', aboutAdvisor: false }
 
 const stepNames = ['Describe concern', 'Add details', 'Privacy and consent', 'Review and submit']
 // One line under the steps saying what this step is for.
@@ -242,16 +242,18 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   const storageKey = 'accs-report-draft-' + (session.data?.user.id ?? 'signed-in')
   const serverDraft = object(page.data.draft)
+  const options = readCategoryOptions(page.data.categoryOptions)
   const [draft, setDraft] = useState<Draft>(() => {
     let local: Item = {}
     try { local = object(JSON.parse(localStorage.getItem(storageKey) ?? '{}')) } catch { /* Keep the server draft when local storage is unavailable. */ }
     const saved = { ...serverDraft, ...local }
     return {
-      narrative: words(saved.narrative), category: words(saved.category),
+      narrative: words(saved.narrative),
+      ...cleanChoice({ category: words(saved.category), subcategory: words(saved.subcategory), categoryDetail: words(saved.categoryDetail) }, options),
       severity: ['low', 'medium', 'high'].includes(words(saved.severity)) ? saved.severity as SeverityLevel : '',
       identity: page.data.anonymityAllowed !== false && saved.identity === 'anonymous' ? 'anonymous' : 'named',
       location: words(saved.location), occurredOn: words(saved.occurredOn),
-      aboutAdvisor: saved.aboutAdvisor === true, allowChair: saved.allowChair === true, allowDean: saved.allowDean === true,
+      aboutAdvisor: saved.aboutAdvisor === true,
     }
   })
   const [step, setStep] = useState(0)
@@ -265,7 +267,12 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
   const send = useAction('P19')
   const source = object(page.data.sourcePost)
   const adviser = words(object(page.data.adviser).name)
-  const categories = Array.isArray(page.data.categories) ? page.data.categories.map(String) : []
+  const option = options.find((entry) => entry.label === draft.category)
+  const missing = choiceProblems(draft, options)
+  // A field the API refused, shown on that field (for example a sub-category it no longer lists).
+  const refused = (path: string) => (send.error as { fields?: Array<{ path: string; message: string }> } | null)?.fields?.find((field) => field.path === path)?.message
+  const fieldError = (path: 'category' | 'subcategory' | 'categoryDetail') => refused(path) ?? (error && step === 1 ? missing[path] : undefined)
+  const chooseCategory = (category: string) => setDraft((current) => current.category === category ? current : { ...current, category, subcategory: '', categoryDetail: '' })
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }))
   const go = (next: number) => { setDir(next > step ? 1 : -1); setStep(next); send.reset() }
 
@@ -276,15 +283,15 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
 
   const validate = (current: number) => {
     const message = current === 0 && !draft.narrative.trim() ? 'Describe what happened before continuing.'
-      : current === 1 && (!draft.category || !draft.severity) ? 'Choose a category and severity before continuing.' : ''
+      : current === 1 && (Object.keys(missing).length > 0 || !draft.severity) ? 'Choose a category, a sub-category (or describe it), and how serious it is.' : ''
     setError(message)
     return !message
   }
-  const saveDraft = () => action.mutate({ action: 'saveDraft', payload: { narrative: draft.narrative, ...(draft.category ? { category: draft.category } : {}), ...(draft.severity ? { severity: draft.severity } : {}), identity: draft.identity } })
+  const saveDraft = () => action.mutate({ action: 'saveDraft', payload: { narrative: draft.narrative, ...(draft.category ? { category: draft.category } : {}), ...(draft.subcategory ? { subcategory: draft.subcategory } : {}), ...(draft.categoryDetail.trim() ? { categoryDetail: draft.categoryDetail.trim() } : {}), ...(draft.severity ? { severity: draft.severity } : {}), identity: draft.identity } })
   // Submit opens the consent form. Nothing is sent until the student agrees there.
   const review = () => {
-    if (!draft.narrative.trim() || !draft.category || !draft.severity) {
-      setError('Add a description, category, and severity before you submit.')
+    if (!draft.narrative.trim() || Object.keys(missing).length > 0 || !draft.severity) {
+      setError('Add a description, a category with its sub-category, and how serious it is before you submit.')
       return
     }
     setError('')
@@ -294,8 +301,8 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
   const submit = () => send.mutate({
     action: 'createReport',
     payload: {
-      narrative: draft.narrative, category: draft.category, severity: draft.severity, identity: draft.identity,
-      aboutAdvisor: draft.aboutAdvisor, allowChair: !draft.aboutAdvisor && draft.allowChair, allowDean: draft.allowDean,
+      narrative: draft.narrative, ...choicePayload(draft, options), severity: draft.severity, identity: draft.identity,
+      aboutAdvisor: draft.aboutAdvisor,
       consent: { readStatement: true },
       ...(draft.location ? { location: draft.location } : {}),
       ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
@@ -351,9 +358,19 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                   <Note>The assistant helps you write. It doesn't decide what happened or what happens next.</Note>
                 </>}
                 {step === 1 && <>
-                  <Select label="Category" selectedKey={draft.category || null} onSelectionChange={(key) => update('category', String(key ?? ''))} isRequired>
-                    {categories.map((category) => <SelectOption id={category} key={category}>{category}</SelectOption>)}
-                  </Select>
+                  <Grid columns={2}>
+                    <Select label="Category" selectedKey={draft.category || null} onSelectionChange={(key) => chooseCategory(String(key ?? ''))} isRequired
+                      description={option?.description || 'What kind of concern it is.'} isInvalid={Boolean(fieldError('category'))} errorMessage={fieldError('category')}>
+                      {options.map((entry) => <SelectOption id={entry.label} key={entry.label}>{entry.label}</SelectOption>)}
+                    </Select>
+                    {option?.requiresDetail
+                      ? <TextField label="Describe it briefly" isRequired maxLength={categoryDetailMax} value={draft.categoryDetail} onChange={(value) => update('categoryDetail', value)}
+                        description={'A few words, up to ' + categoryDetailMax + ' characters.'} isInvalid={Boolean(fieldError('categoryDetail'))} errorMessage={fieldError('categoryDetail')} />
+                      : <Select key={draft.category || 'none'} label="Sub-category" selectedKey={draft.subcategory || null} onSelectionChange={(key) => update('subcategory', String(key ?? ''))} isRequired
+                        isDisabled={!option} description={option ? 'Pick the one closest to what happened.' : 'Choose a category first.'} isInvalid={Boolean(fieldError('subcategory'))} errorMessage={fieldError('subcategory')}>
+                        {(option?.subcategories ?? []).map((sub) => <SelectOption id={sub} key={sub}>{sub}</SelectOption>)}
+                      </Select>}
+                  </Grid>
                   <RadioGroup label="How serious is it?" value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)} isRequired>
                     <Radio value="low" card description="Limited impact right now.">Low</Radio>
                     <Radio value="medium" card description="Affects ongoing activities or support.">Medium</Radio>
@@ -367,12 +384,12 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                 {step === 2 && <IdentityChoice value={draft.identity} onChange={(value) => update('identity', value)} allowAnonymous={page.data.anonymityAllowed !== false} />}
                 {step === 3 && <>
                   <Facts values={[
-                    ['Category', draft.category], ['Severity', cap(draft.severity)], ['Identity', draft.identity === 'anonymous' ? 'Alias to handlers' : 'Use my name'],
+                    ['Category', categoryText(draft, '—')], ['Severity', cap(draft.severity)], ['Identity', draft.identity === 'anonymous' ? 'Alias to handlers' : 'Use my name'],
                     ['When', draft.occurredOn ? formatDate(draft.occurredOn) : 'Not specified'], ['Where', draft.location || 'Not specified'],
                     ['Linked discussion', words(source.title, 'None')],
                   ]} />
                   <section className="gv-narrative"><h2 className="gv-sub">Your description</h2><p>{draft.narrative}</p></section>
-                  <ReadersChoice sharing={draft} adviser={adviser} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
+                  <ReadersChoice sharing={draft} adviser={adviser} />
                   <div className="gv-edit-links"><Button variant="tertiary" onPress={() => go(0)}>Edit description</Button><Button variant="tertiary" onPress={() => go(1)}>Edit details</Button><Button variant="tertiary" onPress={() => go(2)}>Edit privacy choice</Button></div>
                   <Note>Your report stays linked to your verified account. The responsible office reviews it and decides the next steps.</Note>
                 </>}
@@ -490,9 +507,9 @@ function ReportList({ page }: { page: PageEnvelope }) {
                     return (
                       <li key={words(report.id)}>
                         <a className="accs-row gv-row" href={reportPath(report)}>
-                          <span className="accs-mono gv-row__ref">{reportReference(report)}</span>
+                          <span className="accs-mono gv-row__ref" title={reportReference(report)}>{reportReference(report)}</span>
                           <span className="gv-row__main">
-                            <span className="accs-row__title">{words(report.category, 'General concern')}</span>
+                            <span className="accs-row__title">{categoryText(report)}</span>
                             <span className="accs-row__sub">{words(report.office, '—')}</span>
                           </span>
                           <span className="gv-row__progress">
@@ -522,7 +539,7 @@ function CaseHeader({ report, crumbs, children }: { report: Report; crumbs: Arra
   return (
     <PageHeader
       crumbs={crumbs}
-      title={report.category || 'General concern'}
+      title={categoryText(report)}
       description={<><span className="accs-mono">{reportReference(report)}</span>{report.caseFileId ? <> · from report <span className="accs-mono">{report.id}</span></> : null} · filed {formatDate(report.createdAt)}</>}
       actions={<div className="gv-chips">
         <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
@@ -568,7 +585,7 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
           <aside className="accs-stack accs-stagger" aria-label="Report details">
             <Panel title="Details">
               <Facts values={[
-                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, 'General concern')], ['Program', words(report.program, '—')],
+                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report)], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
                 ['Identity', report.identity === 'anonymous' ? disclosed ? 'Name shared with this office' : 'Alias to this office' : 'Named'],
               ]} />
@@ -612,21 +629,22 @@ export function CaseNotes({ report }: { report: Report }) {
   )
 }
 
-const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone', return: 'Return to OSAS' }
-const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' }, osas: { stage: 'executive', label: "President's Office" }, executive: { stage: 'osas', label: 'OSAS' } }
+const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone' }
+const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' } }
 
 export function CaseActionBar({ report }: { report: Report }) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
-  const allowed = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
+  const allowedAll = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
   const [selected, setSelected] = useState('')
   const [reason, setReason] = useState('')
   const [update, setUpdate] = useState('')
   const [error, setError] = useState('')
   const action = useAction('P22')
-  const transition = ['escalate', 'transfer', 'return'].includes(selected)
+  // OSAS is the last office: it has no next office, and no case is returned to an earlier one.
+  const allowed = allowedAll.filter((type) => type !== 'return' && !(report.stage === 'osas' && ['escalate', 'transfer'].includes(type)))
+  const transition = ['escalate', 'transfer'].includes(selected)
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
-  // TBD(D-04): offer only server-approved chain transitions; no undefined bypass or executive power.
   if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions available. You can only read this report at its current stage.</p></Panel>
   const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
@@ -635,7 +653,7 @@ export function CaseActionBar({ report }: { report: Report }) {
         {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
         {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
       </div>
-      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'return', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
+      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
         <ModalBody>
           <div className="gv-stack">
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
@@ -663,7 +681,6 @@ function CaseGlance({ report }: { report: Report }) {
   const talk = readTalk(report)
   const access = readAccess(report)
   const meeting = talk.mode === 'chat' ? 'Not needed for chat' : talk.scheduledAt ? formatDateTime(talk.scheduledAt) : talk.mode ? 'Not added yet' : '—'
-  const shared = [access.allowChair && 'Program chair', access.allowDean && 'Dean'].filter(Boolean).join(', ')
   return (
     <Panel title="Case at a glance">
       <Facts values={[
@@ -672,7 +689,7 @@ function CaseGlance({ report }: { report: Report }) {
         ['Severity', <SeverityChip key="severity" report={report} />],
         ['Assigned to', stageLabel(report) + (report.office ? ' · ' + report.office : '')],
         ['Consent', access.consentAt ? 'Given ' + formatDateTime(access.consentAt) : 'Not recorded'],
-        ['Shared with', shared ? 'You, ' + shared : 'You only'],
+        ['Also readable by', alsoReadableBy(access)],
         ['How the student wants to talk', modeLabel(talk.mode) || 'Not chosen yet'],
         ['Meeting time', meeting],
       ]} />
@@ -806,7 +823,7 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
             {!readOnly && <ConfidentialControl report={report} />}
             <Panel title="Details">
               <Facts values={[
-                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, '—')], ['Program', words(report.program, '—')],
+                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report, '—')], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
                 ['Reporter', words(object(report.reporter).name, words(report.alias, '—'))],
                 ['Identity', report.identity === 'anonymous' ? 'Alias unless disclosed to this office' : 'Named'],
@@ -832,7 +849,7 @@ export const following = (report: Item) => report.readOnly === true || report.st
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   const roles = session.data?.user.roles ?? []
-  const role = ['chair', 'dean', 'guidance', 'osas', 'president', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
+  const role = ['chair', 'dean', 'guidance', 'osas', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
   const initial = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
   const [query, setQuery] = useState(initial.get('q') ?? '')
   const [level, setLevel] = useState(initial.get('severity') ?? '')
@@ -848,8 +865,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
     : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
-          : role === 'president' ? [['open', 'Awaiting action'], ['closed', 'Closed']]
-            : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
+          : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
   // Rows this reader can see but not act on (read-only, status only) have their own tab.
   const followLabel = role === 'chair' ? 'All in program' : role === 'dean' ? 'All concerns' : 'Following'
   const tabsShown = records.some(following) ? [...tabDefs, ['following', followLabel]] : tabDefs
@@ -871,7 +887,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
-  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : role === 'president' ? 'Executive cases' : 'Assigned reports'
+  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : 'Assigned reports'
   const toggleSort = (column: string) => setSort((current) => ({ column, direction: current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   return (
     <MotionConfig reducedMotion="user">
@@ -924,9 +940,9 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
                     const talk = modeLabel(readTalk(report).mode)
                     return (
                       <tr key={words(report.id)}>
-                        <td className="gv-c-ref"><a className="accs-mono gv-ref-link" href={casePath(report)}>{reportReference(report)}</a></td>
+                        <td className="gv-c-ref"><a className="accs-mono gv-ref-link" href={casePath(report)} title={reportReference(report)}>{reportReference(report)}</a></td>
                         <td className="gv-c-title">
-                          <span className="gv-title">{report.statusOnly === true ? 'Status only' : words(report.category, 'General concern')}</span>
+                          <span className="gv-title">{report.statusOnly === true ? 'Status only' : categoryText(report)}</span>
                           {report.confidential === true && <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>}
                           {report.bypassed === true && <span className="accs-tag gv-bypass">Adviser bypassed</span>}
                         </td>

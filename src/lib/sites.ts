@@ -59,7 +59,7 @@ export const sites: Site[] = [
     lane: 'neutral',
     prefixes: ['/reports', '/cases'],
     landings: ['/cases', '/reports'],
-    modules: ['STU-06', 'STU-07', 'STU-08', 'STU-09', 'PRO-06', 'CHR-02', 'CHR-07', 'DEAN-02', 'GUD-01', 'GUD-02', 'OSAS-01', 'PRES-01', 'PRES-02'],
+    modules: ['STU-06', 'STU-07', 'STU-08', 'STU-09', 'PRO-06', 'CHR-02', 'CHR-07', 'DEAN-02', 'GUD-01', 'GUD-02', 'OSAS-01'],
   },
   {
     id: 'evaluations',
@@ -115,9 +115,9 @@ export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   portal: 'all',
   forums: 'all',
   schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas'],
-  cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas', 'president'],
+  cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas'],
   evaluations: ['student', 'professor', 'chair', 'dean'],
-  records: ['chair', 'dean', 'guidance', 'osas', 'president', 'administrator'],
+  records: ['chair', 'dean', 'guidance', 'osas', 'administrator'],
   admin: ['administrator', 'dean', 'secretary'],
 }
 
@@ -141,7 +141,6 @@ const roleLabels: Partial<Record<string, string>> = {
   staff: 'CCS staff',
   secretary: 'CCS secretary',
   osas: 'OSAS',
-  president: "President's Office",
 }
 
 export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)

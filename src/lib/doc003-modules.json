@@ -553,24 +553,6 @@
     "P12",
     "P13"
    ]
-  },
-  {
-   "id": "PRES-01",
-   "role": "president",
-   "name": "Executive case intake",
-   "pages": [
-    "P03",
-    "P21",
-    "P22"
-   ]
-  },
-  {
-   "id": "PRES-02",
-   "role": "president",
-   "name": "Executive case action",
-   "pages": [
-    "P22"
-   ]
   }
  ]
 }

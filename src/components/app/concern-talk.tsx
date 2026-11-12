@@ -15,7 +15,10 @@ import { Empty, Panel, StatusChip } from '@/components/app/page-shell'
 type Item = Record<string, unknown>
 export type PageMutation = UseMutationResult<ActionResult, Error, PageAction>
 export type TalkMode = 'chat' | 'video' | 'voice' | 'face_to_face'
-export type Sharing = { aboutAdvisor: boolean; allowChair: boolean; allowDean: boolean }
+// Who reads a concern follows from the rules, not from the student's choices (MeetingAt10/accs-backend#31): the adviser
+// (or the Program Chair when it is about the adviser), the Program Chair and the Dean. The adviser can mark it confidential;
+// then the Program Chair and the Dean see its status only.
+export type Sharing = { aboutAdvisor: boolean; confidential?: boolean }
 
 const object = (value: unknown): Item => value && typeof value === 'object' && !Array.isArray(value) ? value as Item : {}
 const list = (value: unknown): Item[] => Array.isArray(value) ? value.map(object) : []
@@ -29,7 +32,7 @@ export type Wording = { report: string; talk: Record<TalkMode, string>; recordin
 // The server saves the wording it sent with each consent, and sends it with the report pages (`consentWording`).
 // This copy is the same text, for the moment before those pages load it.
 const fallbackWording: Wording = {
-  report: 'I have read my statement and I want to send it. My adviser can read it so they can help me. I choose whether my Program Chair or the Dean can read it too. If my statement is about my adviser, my adviser is not told about it and cannot read it. It goes to my Program Chair instead. ACCS keeps a record of this agreement with the date and time.',
+  report: 'I have read my statement and I want to send it. My adviser can read it so they can help me. The Program Chair of my program and the Dean can also read it, unless my adviser marks it confidential; then they see only its status. If my statement is about my adviser, my adviser is not told about it and cannot read it. It goes to my Program Chair instead. ACCS keeps a record of this agreement with the date and time.',
   talk: {
     chat: 'I agree to talk about my statement in a written chat in ACCS with the office handling it. Only that office and I can read and write in this chat.',
     video: 'I agree to talk about my statement in a video call. The office handling it will add a meeting link and a time. They will see me on the call, so they will know who I am.',
@@ -86,12 +89,12 @@ export function readTalk(report: Item): Talk {
   }
 }
 
-export type Access = Sharing & { consentAt: string; wording: string }
+export type Access = Sharing & { confidential: boolean; consentAt: string; wording: string }
 
 /** Who can read the report, and the consent the student gave when they sent it. */
 export function readAccess(report: Item): Access {
   const consent = object(report.consent)
-  return { aboutAdvisor: report.aboutAdvisor === true, allowChair: report.allowChair === true, allowDean: report.allowDean === true, consentAt: text(consent.at), wording: text(consent.wording) }
+  return { aboutAdvisor: report.aboutAdvisor === true, confidential: report.confidential === true, consentAt: text(consent.at), wording: text(consent.wording) }
 }
 
 const handlerOf = (report: Item) => report.stage === 'adviser' ? 'your adviser' : report.stage === 'chair' ? 'your program chair' : 'the office handling this report'
@@ -113,31 +116,34 @@ function Facts({ rows }: { rows: Array<[string, ReactNode]> }) {
 
 // ---------- Filing: who can read it, and the consent form ----------
 
-const readersOf = ({ aboutAdvisor, allowChair, allowDean }: Sharing, adviser = '') => [
-  aboutAdvisor ? 'Your program chair' : adviser ? 'Your adviser, ' + adviser : 'Your adviser',
-  ...(allowChair && !aboutAdvisor ? ['Your program chair'] : []),
-  ...(allowDean ? ['The Dean'] : []),
+const readersOf = ({ aboutAdvisor }: Sharing, adviser = '') => [
+  ...(aboutAdvisor ? [] : [adviser ? 'Your adviser, ' + adviser : 'Your adviser']),
+  aboutAdvisor ? 'Your program chair, who receives it instead of your adviser' : 'Your program chair',
+  'The Dean',
 ]
 
-/** Who can read a report that is about to be sent, one row per reader. The adviser is excluded when the concern is about them. */
-export function readerAccess({ aboutAdvisor, allowChair, allowDean }: Sharing): Array<[string, string]> {
+const statusOnlyNote = 'Sees its status only. Your adviser marked it confidential.'
+
+/** Who can read a concern, one row per reader. The adviser is left out when the concern is about them. */
+export function readerAccess({ aboutAdvisor, confidential = false }: Sharing): Array<[string, string]> {
+  const overseer = confidential && !aboutAdvisor ? statusOnlyNote : 'Can read it'
   return [
     ['Your adviser', aboutAdvisor ? 'Cannot read it. They are not told about it.' : 'Can read it'],
-    ['Your program chair', aboutAdvisor ? 'Can read it. It goes to them instead of your adviser.' : allowChair ? 'Can read it' : 'Cannot read it'],
-    ['The Dean', allowDean ? 'Can read it' : 'Cannot read it'],
+    ['Your program chair', aboutAdvisor ? 'Can read it. It goes to them instead of your adviser.' : overseer],
+    ['The Dean', overseer],
   ]
 }
 
-/** Review step: who can read the report, and the two extras. Both stay off unless the student turns them on. */
-export function ReadersChoice({ sharing, adviser, onChange }: { sharing: Sharing; adviser?: string; onChange: (patch: Partial<Sharing>) => void }) {
+/** Review step: who will read the concern. There is nothing to choose; the consent form comes next. */
+export function ReadersChoice({ sharing, adviser }: { sharing: Sharing; adviser?: string }) {
   return (
     <section aria-labelledby="gv-readers">
       <h2 className="gv-sub" id="gv-readers">Who can read this</h2>
       <div className="gv-stack">
         <Facts rows={readerAccess(sharing).map(([who, can]): [string, ReactNode] => [who === 'Your adviser' && adviser && !sharing.aboutAdvisor ? who + ', ' + adviser : who, can])} />
-        {sharing.aboutAdvisor && <Alert tone="info" title="Your adviser is left out">You said this concern is about your adviser. Your adviser is not told and cannot open it. Your program chair receives it instead.</Alert>}
-        {!sharing.aboutAdvisor && <Checkbox isSelected={sharing.allowChair} onChange={(allowChair) => onChange({ allowChair })} description="Your program chair can open it too. Leave this off if only your adviser should see it.">Also allow the program chair to see this</Checkbox>}
-        <Checkbox isSelected={sharing.allowDean} onChange={(allowDean) => onChange({ allowDean })} description="The Dean can open it too. Leave this off if the Dean should not see it.">Also allow the Dean to see this</Checkbox>
+        {sharing.aboutAdvisor
+          ? <Alert tone="info" title="Your adviser is left out">You said this concern is about your adviser. Your adviser is not told and cannot open it. Your program chair receives it instead.</Alert>
+          : <p className="gv-hint">If your adviser marks it confidential, the Program Chair and the Dean see only its status.</p>}
         <Alert tone="neutral" title="Consent comes before sending">Your report is not sent until you read the consent form and agree to it. The button below opens that form.</Alert>
       </div>
     </section>
@@ -309,23 +315,25 @@ export function HandlerTalk({ report, action }: { report: Item; action: PageMuta
 export function AccessPanel({ access, viewer }: { access: Access; viewer: 'student' | 'handler' }) {
   const student = viewer === 'student'
   const consent = access.consentAt ? 'Given ' + formatDateTime(access.consentAt) : 'Not recorded'
-  const others = [access.allowChair && 'Program chair', access.allowDean && 'Dean'].filter(Boolean).join(', ')
   const rows: Array<[string, ReactNode]> = student
     ? [
-      ['Your adviser', access.aboutAdvisor ? 'Not told and cannot open it' : 'Can read it'],
-      ['Program chair', access.aboutAdvisor || access.allowChair ? 'Can read it' : 'Not shared'],
-      ['The Dean', access.allowDean ? 'Can read it' : 'Not shared'],
+      ...readerAccess(access).map(([who, can]): [string, ReactNode] => [who.replace(/^Your program chair$/, 'Program chair'), can]),
       ['Your consent', consent],
     ]
     : [
       ['Student consent', consent],
-      ['Also shared with', others || 'No one else'],
+      ['Also readable by', alsoReadableBy(access)],
       ...(access.aboutAdvisor ? [['About the adviser', 'Yes. The adviser was not told.'] as [string, ReactNode]] : []),
     ]
   return (
-    <Panel title={student ? 'Who can see this' : 'Consent and sharing'}>
+    <Panel title={student ? 'Who can see this' : 'Consent and access'}>
       <Facts rows={rows} />
       {!student && access.wording && <details className="gv-details"><summary>What the student agreed to</summary><p className="gv-wording">{access.wording}</p></details>}
     </Panel>
   )
+}
+
+/** For a handler: who else reads the concern besides the office handling it. */
+export function alsoReadableBy(access: Sharing) {
+  return access.confidential && !access.aboutAdvisor ? 'Program chair and Dean, status only (marked confidential)' : 'Program chair and Dean'
 }

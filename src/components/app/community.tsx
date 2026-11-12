@@ -160,7 +160,6 @@ const roleNames: Record<string, string> = {
   osas: 'OSAS',
   administrator: 'Administrator',
   staff: 'CCS Staff',
-  president: 'President’s Office',
 }
 
 function list<T>(value: unknown): T[] {
