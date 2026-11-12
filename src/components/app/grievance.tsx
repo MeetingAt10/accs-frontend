@@ -420,7 +420,7 @@ function Thread({ entries, label, internal = false, mine }: { entries: Item[]; l
 }
 
 /** Two-way chat. It is on only when the student chose system chat; it checks for new messages every few seconds while the tab is visible. */
-function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22' }) {
+function Conversation({ report, pageId, readOnly = false }: { report: Report; pageId: 'P20' | 'P22'; readOnly?: boolean }) {
   const [body, setBody] = useState('')
   const action = useAction(pageId)
   const me = useQuery(sessionQuery()).data?.user.id
@@ -458,7 +458,7 @@ function Conversation({ report, pageId }: { report: Report; pageId: 'P20' | 'P22
       </div>
       {live.isError && <p className="gv-hint" role="status">Can't check for new messages right now. We'll keep trying.</p>}
       <ActionError error={action.error} />
-      {closed ? <Alert tone="neutral" title="This conversation is closed">The report is resolved or closed.</Alert> : <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); if (body.trim()) { stick.current = true; action.mutate({ action: 'sendReportMessage', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) } }}>
+      {closed ? <Alert tone="neutral" title="This conversation is closed">The report is resolved or closed.</Alert> : readOnly ? <p className="gv-hint">Only the office handling this concern writes here.</p> : <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); if (body.trim()) { stick.current = true; action.mutate({ action: 'sendReportMessage', recordId: report.id, payload: { body } }, { onSuccess: () => setBody('') }) } }}>
         <TextArea label={pageId === 'P20' ? 'Message to the handling office' : 'Message to the reporter'} value={body} onChange={setBody} isRequired maxLength={4000} showCount />
         <div><Button type="submit" loading={action.isPending} isDisabled={!body.trim()}>Send message</Button></div>
       </form>}
@@ -528,6 +528,7 @@ function CaseHeader({ report, crumbs, children }: { report: Report; crumbs: Arra
         <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
         <SeverityChip report={report} />
         <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>
+        {report.confidential === true && <StatusChip tone="warn">Marked confidential by the adviser</StatusChip>}
         {children}
       </div>}
     />
@@ -679,11 +680,97 @@ function CaseGlance({ report }: { report: Report }) {
   )
 }
 
+/** The adviser's mark: while a concern is with them, they can limit the Program Chair and the Dean to its status. */
+export function canMarkConfidential(report: Item) {
+  const actions = Array.isArray(report.allowedActions) ? report.allowedActions : []
+  return report.stage === 'adviser' && report.aboutAdvisor !== true && actions.length > 0 && !isClosed(report) && report.readOnly !== true
+}
+
+function ConfidentialControl({ report }: { report: Report }) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const action = useAction('P22')
+  if (!canMarkConfidential(report)) return null
+  const marked = report.confidential === true
+  const save = () => action.mutate(
+    { action: 'setConfidential', recordId: report.id, reason: reason.trim(), payload: { confidential: !marked } },
+    { onSuccess: () => { setOpen(false); setReason('') } },
+  )
+  return (
+    <Panel title="Confidential">
+      <p className="gv-hint">{marked
+        ? 'You marked this concern confidential. The Program Chair and the Dean see only its status.'
+        : 'The Program Chair and the Dean can read this concern. Mark it confidential to limit them to its status.'}</p>
+      <div><Button variant="secondary" icon="lock" onPress={() => { action.reset(); setOpen(true) }}>{marked ? 'Remove confidential mark' : 'Mark confidential'}</Button></div>
+      <Modal role="alertdialog" title={marked ? 'Remove the confidential mark?' : 'Mark this concern confidential?'} isOpen={open} onOpenChange={setOpen}>
+        <ModalBody>
+          <p>{marked ? 'The Program Chair and the Dean will be able to read the whole concern again.' : 'The Program Chair and the Dean will see only its status, office and dates. The student is told.'}</p>
+          <TextArea label="Reason" isRequired maxLength={2000} value={reason} onChange={setReason} description="Kept in the case history." />
+          <ActionError error={action.error} />
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setOpen(false)} isDisabled={action.isPending}>Cancel</Button>
+          <Button loading={action.isPending} isDisabled={!reason.trim()} onPress={save}>{marked ? 'Remove mark' : 'Mark confidential'}</Button>
+        </ModalActions>
+      </Modal>
+    </Panel>
+  )
+}
+
+/** Public status updates only: office, what happened, and when. */
+function StatusTimeline({ entries }: { entries: Item[] }) {
+  if (!entries.length) return <Empty title="No updates yet">Status updates show here.</Empty>
+  return (
+    <ol className="accs-timeline gv-timeline" aria-label="Status updates">
+      {entries.map((entry, index) => (
+        <li key={words(entry.at) + index} data-current={index === entries.length - 1 || undefined}>
+          <p className="gv-ev__head"><strong>{words(entry.action, 'Update recorded')}</strong>{words(entry.office) && <span className="accs-tag gv-cap">{words(entry.office)}</span>}</p>
+          <time className="accs-timeline__time" dateTime={words(entry.at)}>{formatDateTime(entry.at)}</time>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function StatusOnlyView({ report, crumbs }: { report: Report; crumbs: Array<{ label: string; href?: string }> }) {
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="gv-page">
+        <PageHeader
+          crumbs={crumbs}
+          title={'Status of ' + reportReference(report)}
+          description={'Filed ' + formatDate(report.createdAt)}
+          actions={<div className="gv-chips">
+            <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
+            {report.confidential === true && <StatusChip tone="warn">Marked confidential by the adviser</StatusChip>}
+          </div>}
+        />
+        <Alert tone="neutral" title={report.confidential === true ? 'Status only' : 'Following this concern'}>{words(report.statusNotice, 'You can follow the status of this concern here.')}</Alert>
+        <div className="accs-split">
+          <Panel title="Status updates"><StatusTimeline entries={items(report.timeline)} /></Panel>
+          <aside className="accs-stack" aria-label="Status">
+            <Panel title="Where it is">
+              <Facts values={[
+                ['Status', words(report.status, '—')], ['Office', words(report.office, '—')], ['Program', words(report.program, '—')],
+                ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
+              ]} />
+              <Note>The statement, the student, messages and internal notes are not shown here.</Note>
+            </Panel>
+          </aside>
+        </div>
+      </div>
+    </MotionConfig>
+  )
+}
+
 function CaseWorkspace({ page }: { page: PageEnvelope }) {
   const report = object(page.data.record) as Report
   const talkAction = useAction('P22')
   if (!report.id) return <RestrictedView record />
   const crumbs = [{ label: 'Cases', href: '/cases' }, { label: reportReference(report) }]
+  // Status only (MeetingAt10/accs-backend#30, #31): an office the case has moved past, or the Program Chair and the Dean
+  // on a concern the adviser marked confidential. No statement, reporter, messages or notes.
+  if (report.statusOnly === true) return <StatusOnlyView report={report} crumbs={crumbs} />
   // TBD(D-04) / TBD(D-08): previous handlers retain only the API's own-entry summary.
   if (report.historyOnly) {
     return (
@@ -698,21 +785,25 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
       </MotionConfig>
     )
   }
+  // Read only: the Program Chair and the Dean read every concern in their scope but act only when it is with them.
+  const readOnly = report.readOnly === true
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
         <CaseHeader report={report} crumbs={crumbs} />
         {report.bypassed === true && <ConflictNotice />}
+        {readOnly && <Alert tone="neutral" title="Read only">{words(report.office, 'Another office')} is handling this concern. You can read it, but only the office handling it can act on it.</Alert>}
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
             <CaseGlance report={report} />
             <Narrative report={report} title="Student's statement" />
             <HandlerTalk report={report} action={talkAction} />
-            <Panel title="Messages"><Conversation report={report} pageId="P22" /></Panel>
+            <Panel title="Messages"><Conversation report={report} pageId="P22" readOnly={readOnly} /></Panel>
             <Panel title="History"><Timeline report={report} handler /></Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Case details">
-            <CaseActionBar report={report} />
+            {!readOnly && <CaseActionBar report={report} />}
+            {!readOnly && <ConfidentialControl report={report} />}
             <Panel title="Details">
               <Facts values={[
                 ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', words(report.category, '—')], ['Program', words(report.program, '—')],
@@ -723,7 +814,7 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
               <Note>Only authorized handlers can open this record. We record every action.</Note>
             </Panel>
             <AccessPanel access={readAccess(report)} viewer="handler" />
-            <CaseNotes report={report} />
+            {!readOnly && <CaseNotes report={report} />}
           </aside>
         </div>
       </div>
@@ -732,6 +823,11 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
 }
 
 const sortColumns: Array<[string, string]> = [['id', 'Reference'], ['category', 'Case'], ['student', 'Student'], ['severity', 'Severity'], ['createdAt', 'Submitted'], ['updatedAt', 'Updated']]
+
+/** A row the reader acts on: not read-only, not status only, not their own past entries. */
+export const mine = (report: Item) => report.readOnly !== true && report.statusOnly !== true && report.historyOnly !== true
+/** A row the reader can see but not act on. */
+export const following = (report: Item) => report.readOnly === true || report.statusOnly === true
 
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
@@ -754,16 +850,21 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
           : role === 'president' ? [['open', 'Awaiting action'], ['closed', 'Closed']]
             : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
-  const validTab = tabDefs.some(([id]) => id === tab) ? tab : tabDefs[0][0]
+  // Rows this reader can see but not act on (read-only, status only) have their own tab.
+  const followLabel = role === 'chair' ? 'All in program' : role === 'dean' ? 'All concerns' : 'Following'
+  const tabsShown = records.some(following) ? [...tabDefs, ['following', followLabel]] : tabDefs
+  const validTab = tabsShown.some(([id]) => id === tab) ? tab : tabsShown[0][0]
   const sortValue = (report: Item) => sort.column === 'id' ? reportReference(report) : sort.column === 'student' ? studentName(report) : words(report[String(sort.column)])
   const inTab = (report: Item, selected: string) => selected === 'closed' ? isClosed(report)
     : selected === 'history' ? report.historyOnly === true
-      : selected === 'bypassed' ? report.bypassed === true && !report.historyOnly && !isClosed(report)
-        : selected === 'teaching' ? report.stage === 'adviser' && !report.historyOnly && !isClosed(report)
-        : selected === 'waiting' ? words(report.status).toLowerCase().includes('waiting')
-          : selected === 'intake' ? report.stage === 'guidance' && !report.caseFileId && !report.historyOnly && !isClosed(report)
-            : selected === 'active' ? !report.historyOnly && !isClosed(report) && items(report.history).length > 1
-              : !report.historyOnly && !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
+      : selected === 'following' ? following(report) && !isClosed(report)
+        : !mine(report) ? false
+          : selected === 'bypassed' ? report.bypassed === true && !isClosed(report)
+            : selected === 'teaching' ? report.stage === 'adviser' && !isClosed(report)
+              : selected === 'waiting' ? words(report.status).toLowerCase().includes('waiting')
+                : selected === 'intake' ? report.stage === 'guidance' && !report.caseFileId && !isClosed(report)
+                  : selected === 'active' ? !isClosed(report) && items(report.history).length > 1
+                    : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
   const inQueue = records.filter((report) => inTab(report, validTab))
   const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
@@ -775,14 +876,14 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
-        <PageHeader title={title} description={page.scope} actions={<Note>You see only reports routed to you. Every action is recorded.</Note>} />
+        <PageHeader title={title} description={page.scope} actions={<Note>{role === 'chair' || role === 'dean' ? 'You can read every concern in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>} />
         <div className="gv-page accs-stagger">
-          <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabDefs} records={records} inTab={inTab} />
+          <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabsShown} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">
             <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
             <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
-            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
-            <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
             <Select label="Stage" selectedKey={stage} onSelectionChange={(key) => reset(() => setStage(String(key ?? '')))}><SelectOption id="">All stages</SelectOption>{stages.map(([key, name]) => <SelectOption id={key} key={key}>{name + ' (' + inQueue.filter((report) => stageOf(report) === key).length + ')'}</SelectOption>)}</Select>
             <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>
             <div className="gv-sortbar">
@@ -825,11 +926,12 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
                       <tr key={words(report.id)}>
                         <td className="gv-c-ref"><a className="accs-mono gv-ref-link" href={casePath(report)}>{reportReference(report)}</a></td>
                         <td className="gv-c-title">
-                          <span className="gv-title">{words(report.category, 'General concern')}</span>
+                          <span className="gv-title">{report.statusOnly === true ? 'Status only' : words(report.category, 'General concern')}</span>
+                          {report.confidential === true && <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>}
                           {report.bypassed === true && <span className="accs-tag gv-bypass">Adviser bypassed</span>}
                         </td>
                         <td className="gv-c-student" data-label="Student">{studentName(report)}</td>
-                        <td><SeverityChip report={report} /></td>
+                        <td>{report.statusOnly === true ? <span className="gv-hint">—</span> : <SeverityChip report={report} />}</td>
                         <td className="gv-c-time" data-label="Submitted"><span title={formatDateTime(report.createdAt)}>{relativeTime(report.createdAt) || '—'}</span></td>
                         <td className="gv-c-time" data-label="Updated"><span title={formatDateTime(report.updatedAt)}>{relativeTime(report.updatedAt) || '—'}</span></td>
                         <td>{words(report.program) ? <span className="accs-tag">{words(report.program)}</span> : '—'}</td>
