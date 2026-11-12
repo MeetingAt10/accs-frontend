@@ -1,4 +1,5 @@
 import { PagedList } from '@/components/app/paging'
+import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
   Alert,
   Button,
@@ -1381,6 +1382,11 @@ function StudentRecord({
   const tabs: TabDef[] = [
     { id: "overview", label: "Overview" },
     { id: "offenses", label: "Offenses", count: offenses.length },
+    {
+      id: "strikes",
+      label: "Strikes and clearance",
+      count: items(record.strikes).filter((strike) => strikeStatus(strike) === "confirmed" && strike.settled !== true).length,
+    },
     { id: "restrictions", label: "Restrictions", count: activeRestrictions.length },
     ...(canGoodMoral ? [{ id: "good-moral", label: "Good Moral" }] : []),
     ...(accessHistory
@@ -1448,6 +1454,9 @@ function StudentRecord({
           actions={
             <>
               <StandingBadge standing={record.standing} />
+              {object(record.clearanceStatus).status === "on_hold" && (
+                <StatusChip tone="warn">Clearance on hold</StatusChip>
+              )}
               {activeRestrictions.length > 0 && (
                 <StatusChip tone="warn">Restriction active</StatusChip>
               )}
@@ -1487,6 +1496,9 @@ function StudentRecord({
             </div>
           )}
           {selectedTab === "offenses" && <OffenseHistory offenses={offenses} />}
+          {selectedTab === "strikes" && (
+            <StudentStrikes record={record} studentId={word(record.id, studentId)} />
+          )}
           {selectedTab === "restrictions" && (
             <>
               <RestrictionPanel restrictions={restrictions} />

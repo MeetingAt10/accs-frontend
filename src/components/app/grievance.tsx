@@ -16,6 +16,7 @@ import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, als
 import { categoryDetailMax, categoryText, choicePayload, choiceProblems, cleanChoice, readCategoryOptions } from '@/lib/concern-categories'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
+import { CaseStrikes } from '@/components/app/strikes'
 import './grievance.css'
 
 type Item = Record<string, unknown>
@@ -730,6 +731,7 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Case details">
             <CaseActionBar report={report} />
+            <CaseStrikes report={report} />
             <Panel title="Details">
               <Facts values={[
                 ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report, '—')], ['Program', words(report.program, '—')],
