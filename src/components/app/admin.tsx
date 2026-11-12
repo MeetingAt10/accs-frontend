@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
@@ -79,7 +80,6 @@ const roles: Role[] = [
   "student",
   "organization",
   "professor",
-  "staff",
   "chair",
   "dean",
   "administrator",
@@ -91,10 +91,9 @@ const SHORT: Record<string, string> = {
   student: "Student",
   organization: "Student org",
   professor: "Professor",
-  staff: "CCS staff",
   chair: "Chair",
   dean: "Dean",
-  administrator: "Admin",
+  administrator: "System admin",
   guidance: "Guidance",
   osas: "OSAS",
   secretary: "Secretary",
@@ -103,16 +102,15 @@ const FULL: Record<string, string> = {
   student: "Student",
   organization: "CCS student organization",
   professor: "Professor",
-  staff: "CCS staff",
   chair: "Program chair",
   dean: "Dean",
-  administrator: "Administrator / Moderator",
+  administrator: "System Administrator",
   guidance: "Guidance",
   osas: "OSAS",
   secretary: "CCS secretary",
 };
 const roleShort = (role: string) => SHORT[role] ?? cap(role);
-const roleFull = (role: string) => FULL[role] ?? cap(role);
+const roleFull = (role: string) => roleLabelOf(role) || FULL[role] || cap(role);
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 

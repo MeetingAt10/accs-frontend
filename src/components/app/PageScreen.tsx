@@ -1,4 +1,4 @@
-import { Alert, Button, Icon, ViewState } from '@meetingat10/design-system/react'
+import { Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { useState, type ReactNode } from 'react'
@@ -382,12 +382,6 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                   ))}
                 </ol>
               </Panel>
-            )}
-            {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
-            {role === 'staff' && (
-              <Alert tone="neutral" title="Staff view">
-                Staff see CCS-wide material.
-              </Alert>
             )}
           </aside>
         </div>

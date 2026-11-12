@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
@@ -158,8 +159,7 @@ const roleNames: Record<string, string> = {
   dean: 'Dean',
   guidance: 'Guidance',
   osas: 'OSAS',
-  administrator: 'Administrator',
-  staff: 'CCS Staff',
+  administrator: 'System Administrator',
 }
 
 function list<T>(value: unknown): T[] {
@@ -173,7 +173,7 @@ function record<T>(value: unknown): T | undefined {
 }
 
 function personRole(person: Person) {
-  return (person.roles ?? []).map((role) => roleNames[role] ?? role).join(' · ')
+  return (person.roles ?? []).map((role) => roleLabelOf(role) || roleNames[role] || role).join(' · ')
 }
 
 function audienceName(
