@@ -350,3 +350,12 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 /* ---------- Module tiles ---------- */
 /* The design-system cards, three to a row on wide screens so a role's six tasks sit in two even rows. */
 @container (min-width: 48rem) { :root .module-picker__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- People rows ---------- */
+/* Directory rows are two lines (name and roles, then office and title) with a smaller avatar and less padding. */
+:root .ds-next-person-card { padding: 8px 12px; gap: 12px; align-items: center; }
+:root .ds-next-person-card__avatar { width: 32px; height: 32px; font-size: 0.75rem; }
+:root .ds-next-person-card__body { gap: 2px; }
+:root .ds-next-person-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+:root .ds-next-person-card__name { font-family: var(--accs-font-body); font-size: 0.9375rem; font-weight: 600; }
+:root .ds-next-person-card__line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
