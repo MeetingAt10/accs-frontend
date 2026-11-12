@@ -101,7 +101,7 @@ export function AboutPanel({ session }: { session: Session }) {
         )}
         <p className="ch-about ch-about--meta">
           <Icon name="lock" size={16} />
-          Concerns you file are confidential. Only the people you allow can read them.
+          Concerns you file are read by your adviser, your Program Chair and the Dean, and no one else.
         </p>
         {links.length > 0 && (
           <ul className="ch-links" role="list">
