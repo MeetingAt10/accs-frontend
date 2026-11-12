@@ -19,9 +19,9 @@ const samplePaths: Record<string, string> = {
 }
 
 describe('module sites follow DOC003', () => {
-  it('assigns each of the 56 inventory modules to exactly one site', () => {
+  it('assigns each of the 55 inventory modules to exactly one site', () => {
     const assigned = sites.flatMap((site) => site.modules)
-    expect(inventory.modules).toHaveLength(56)
+    expect(inventory.modules).toHaveLength(55)
     expect([...assigned].sort()).toEqual(inventory.modules.map((m) => m.id).sort())
   })
 
@@ -107,5 +107,16 @@ describe('accounts page', () => {
 
   it('sends temporary sign-in details to the first-login page', () => {
     expect(landingFor({ ...secretary, user: { roles: ['secretary'], mustChangeCredentials: true } })).toBe('/first-login')
+  })
+})
+
+describe('role names', () => {
+  it('come from the session, with the API names before it loads', async () => {
+    const { rememberRoleLabels, roleLabelOf } = await import('./role-labels')
+    expect(roleLabelOf('administrator')).toBe('System Administrator')
+    rememberRoleLabels({ administrator: 'Sys Admin', bad: 3 })
+    expect(roleLabelOf('administrator')).toBe('Sys Admin')
+    expect(roleLabelOf('bad')).toBe('Bad')
+    rememberRoleLabels({ administrator: 'System Administrator' })
   })
 })

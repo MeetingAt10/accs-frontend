@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import { pageAllowed, pageIdForPath } from '@/lib/page-catalog'
 import type { Role } from '@/lib/api'
 
@@ -29,7 +30,7 @@ export const sites: Site[] = [
     lane: 'navy',
     prefixes: ['/home', '/notifications', '/assistant', '/help', '/settings', '/profile', '/standing'],
     landings: ['/home', '/notifications'],
-    modules: ['ALL-01', 'ALL-04', 'ALL-05', 'STU-11', 'STU-12', 'STF-01', 'CHR-01', 'DEAN-01'],
+    modules: ['ALL-01', 'ALL-04', 'ALL-05', 'STU-11', 'STU-12', 'CHR-01', 'DEAN-01'],
   },
   {
     id: 'forums',
@@ -138,12 +139,9 @@ export const canOpenPath = (session: Access, path: string) => allowsPath(session
 
 const roleLabels: Partial<Record<string, string>> = {
   professor: 'Faculty',
-  staff: 'CCS staff',
-  secretary: 'CCS secretary',
-  osas: 'OSAS',
 }
 
-export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)
+export const roleLabel = (role: string) => roleLabels[role] ?? roleLabelOf(role)
 
 /** Where a signed-in person lands: Home (Admin for administrators). Temporary sign-in details come first. */
 export function landingFor(session: Access) {

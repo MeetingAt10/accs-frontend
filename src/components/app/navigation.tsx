@@ -243,21 +243,6 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
-  staff: [
-    {
-      label: "Workspace",
-      entries: [
-        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
-        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-        {
-          label: "Organizations",
-          href: "/organizations",
-          pageId: "P09",
-          icon: "flag",
-        },
-      ],
-    },
-  ],
   chair: [
     {
       label: "Workspace",

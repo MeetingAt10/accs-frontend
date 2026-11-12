@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
@@ -65,7 +66,7 @@ function useAction(pageId: string) {
 const roleTags = (roles: string[]) =>
   roles.map((role) => (
     <span className="accs-tag pa-role" key={role}>
-      {role}
+      {roleLabelOf(role)}
     </span>
   ));
 
@@ -149,7 +150,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             { id: "All", label: "Everyone" },
             ...roleOptions.map((value) => ({
               id: value,
-              label: <span className="pa-role">{value}</span>,
+              label: <span className="pa-role">{roleLabelOf(value)}</span>,
             })),
           ]}
         />

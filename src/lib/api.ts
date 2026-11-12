@@ -2,7 +2,6 @@ export type Role =
   | 'student'
   | 'organization'
   | 'professor'
-  | 'staff'
   | 'chair'
   | 'dean'
   | 'administrator'
@@ -30,6 +29,8 @@ export interface Session {
   user: SessionUser
   permissions: string[]
   allowedPages: string[]
+  /** The name of each role, for example "System Administrator". */
+  roleLabels?: Record<string, string>
   sampleData: true
 }
 
