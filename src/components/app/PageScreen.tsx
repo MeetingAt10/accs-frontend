@@ -123,8 +123,8 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
   const me = session.data?.user.id
   const community = isCommunityRole(role)
   const stats = dashboardStats(asItems(data.stats), role)
-  // Each list on the home shows its three newest items; "View all" opens the rest.
-  const top = (items: Item[]) => items.slice(0, 3)
+  // Each list on the home shows its five newest items; "View all" opens the rest.
+  const top = (items: Item[]) => items.slice(0, 5)
   const announcements = top(asItems(data.announcements))
   // A post already listed as an announcement is not repeated under "From your spaces".
   const announced = new Set(asItems(data.announcements).map((item) => text(item.id)))

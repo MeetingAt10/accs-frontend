@@ -289,6 +289,17 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .ch-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
 :root .ch-head__title { margin: 0; font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
 :root .ch-head__eyebrow { margin: 8px 0 0; }
+/* The home fills the screen at a readable scale: a larger greeting with clear space under it, larger section headings
+   and rows, so the page does not look small with an empty half below. */
+:root .ch-head { margin-bottom: 16px; }
+:root .ch-head__title { font-size: clamp(1.75rem, 1.35rem + 1vw, 2.375rem); }
+:root .ch-head__eyebrow { font-size: 0.9375rem; }
+:root:has(.ch-head) .shell-content :is(.accs-panel__title) { font-size: 1.125rem; }
+:root:has(.ch-head) .shell-content .accs-panel > .accs-panel__head { padding-bottom: 14px; }
+:root:has(.ch-head) .shell-content .accs-row { padding: 18px 14px; }
+:root:has(.ch-head) .shell-content .pt-row__title { font-size: 1.0625rem; }
+:root:has(.ch-head) .shell-content .pt-row__sub { font-size: 0.875rem; margin-top: 4px; }
+:root:has(.ch-head) .shell-content .accs-row .accs-avatar { width: 40px; height: 40px; }
 
 /* ---------- Spacing: room to breathe, without the old boxes ---------- */
 :root .shell-content__inner { padding: 20px 16px 40px; }
