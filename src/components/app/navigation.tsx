@@ -509,26 +509,6 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
-  president: [
-    {
-      label: "Workspace",
-      entries: [
-        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
-        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-      ],
-    },
-    {
-      label: "Cases",
-      entries: [
-        {
-          label: "Executive cases",
-          href: "/cases",
-          pageId: "P21",
-          icon: "tray",
-        },
-      ],
-    },
-  ],
   secretary: [
     {
       label: "Workspace",
@@ -855,7 +835,6 @@ export function AppChrome({
       "dean",
       "guidance",
       "osas",
-      "president",
     ].includes(role),
   )
     ? "compact"

@@ -763,7 +763,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 
 /* ---------- Analytics ---------- */
 
-const stages = ["adviser", "chair", "dean", "guidance", "osas", "executive"];
+const stages = ["adviser", "chair", "dean", "guidance", "osas"];
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 function Analytics({ page }: { page: PageEnvelope }) {
