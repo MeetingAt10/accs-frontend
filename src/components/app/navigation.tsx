@@ -307,6 +307,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P33",
           icon: "archive",
         },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
       ],
     },
   ],
@@ -352,6 +358,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/records",
           pageId: "P33",
           icon: "archive",
+        },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },
@@ -501,6 +513,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "archive",
         },
         {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
+        {
           label: "Restrictions",
           href: "/restrictions",
           pageId: "P35",
@@ -521,6 +539,17 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/organizations",
           pageId: "P09",
           icon: "flag",
+        },
+      ],
+    },
+    {
+      label: "Records",
+      entries: [
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },

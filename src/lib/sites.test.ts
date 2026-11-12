@@ -15,7 +15,7 @@ const samplePaths: Record<string, string> = {
   P34: '/records/S-1', P35: '/restrictions', P36: '/standing', P37: '/directory', P38: '/people/U-1', P39: '/profile',
   P40: '/notifications', P41: '/assistant', P42: '/help', P43: '/settings', P44: '/settings/notifications', P45: '/admin',
   P46: '/admin/users', P47: '/admin/users/U-1', P48: '/admin/roles', P49: '/admin/moderation', P50: '/admin/moderation/M-1',
-  P51: '/admin/audit', P52: '/admin/monitoring',
+  P51: '/admin/audit', P52: '/admin/monitoring', P53: '/clearance',
 }
 
 describe('module sites follow DOC003', () => {
