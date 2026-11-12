@@ -579,6 +579,42 @@ function useSignOut() {
   });
 }
 
+/** The theme a saved setting resolves to right now ("system" follows the device). */
+function resolvedTheme(theme: string) {
+  if (theme === "light" || theme === "dark") return theme;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Light / dark switch in the top bar. It applies at once and saves the choice with the same settings action as the
+ * Settings page (Settings keeps "Match my device" for following the device again).
+ */
+function ThemeToggle() {
+  const queryClient = useQueryClient();
+  const appearance = useQuery(pageQuery("P43"));
+  const settings = appearance.data?.data.settings as { theme?: unknown; density?: unknown } | undefined;
+  const saved = typeof settings?.theme === "string" ? settings.theme : "system";
+  const density = typeof settings?.density === "string" ? settings.density : "comfortable";
+  const [current, setCurrent] = useState(() => resolvedTheme(saved));
+  useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
+  const save = useMutation({
+    mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
+  });
+  const next = current === "dark" ? "light" : "dark";
+  return (
+    <IconButton
+      icon={current === "dark" ? "sun" : "moon"}
+      label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
+      onPress={() => {
+        document.documentElement.setAttribute("data-theme", next);
+        setCurrent(next);
+        save.mutate(next);
+      }}
+    />
+  );
+}
+
 function Topbar({
   title,
   site,
@@ -674,6 +710,7 @@ function Topbar({
               onChange={setSearch}
             />
           </form>
+          <ThemeToggle />
           <IconButton
             icon="chat"
             label="Assistant"
