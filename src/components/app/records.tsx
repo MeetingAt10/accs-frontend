@@ -775,6 +775,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const stageRows = items(page.data.byStage);
   const categories = items(page.data.byCategory);
   const trend = items(page.data.trend);
+  const waiting = items(page.data.waitingByStage);
   const cases = items(page.data.cases);
   const updateFilter = (name: string, value: string) => {
     const next = new URLSearchParams(location.searchStr);
@@ -921,6 +922,21 @@ function Analytics({ page }: { page: PageEnvelope }) {
             Categories with too few cases show as suppressed.
           </p>
         </Panel>
+        {waiting.length > 0 && (
+          <Panel title="Median days waiting by stage" className="rc-span">
+            <BarChart
+              title="Median days waiting by stage"
+              hideTitle
+              data={waiting.map((row) => ({
+                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
+                value: Number(row.value ?? 0),
+              }))}
+            />
+            <p className="rc-policy">
+              Days since each open concern reached its current stage, as the median for that stage.
+            </p>
+          </Panel>
+        )}
         <Panel title="Opened and resolved reports" className="rc-span">
           <TrendChart
             title="Opened and resolved reports"
