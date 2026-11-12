@@ -40,12 +40,14 @@ describe('module picker tiles', () => {
     expect(moduleTiles(noMessages).map((tile) => tile.id)).toEqual(['file-concern', 'my-concerns'])
   })
 
-  it('gives the dean the oversight tiles', () => {
-    expect(links(session(['dean'], ['/home', '/cases', '/records', '/notifications'], accounts))).toEqual([
+  it('gives the dean six oversight tiles, without Notifications (the bell has them)', () => {
+    expect(links(session(['dean'], ['/home', '/cases', '/records', '/analytics', '/evaluations/cycles', '/evaluations/results', '/notifications'], accounts))).toEqual([
       ['dean-accounts', '/accounts'],
       ['dean-cases', '/cases'],
       ['dean-records', '/records'],
-      ['dean-notifications', '/notifications'],
+      ['dean-analytics', '/analytics'],
+      ['dean-cycles', '/evaluations/cycles'],
+      ['dean-results', '/evaluations/results'],
     ])
   })
 
@@ -72,21 +74,25 @@ describe('module picker tiles', () => {
     ])
   })
 
-  it('gives Guidance the case tiles, each a link', () => {
-    expect(links(session(['guidance'], [...own, '/cases', '/records']))).toEqual([
+  it('gives Guidance six case tiles, each a link', () => {
+    expect(links(session(['guidance'], [...own, '/cases', '/records', '/restrictions', '/directory']))).toEqual([
       ['guidance-cases', '/cases'],
       ['guidance-records', '/records'],
       ['guidance-messages', '/messages'],
-      ['guidance-notifications', '/notifications'],
+      ['guidance-restrictions', '/restrictions'],
+      ['guidance-calendar', '/calendar'],
+      ['guidance-directory', '/directory'],
     ])
   })
 
-  it('gives OSAS the case and record tiles, each a link', () => {
-    expect(links(session(['osas'], [...own, '/cases', '/records', '/restrictions']))).toEqual([
+  it('gives OSAS six case and record tiles, each a link', () => {
+    expect(links(session(['osas'], [...own, '/cases', '/records', '/restrictions', '/directory']))).toEqual([
       ['osas-cases', '/cases'],
       ['osas-records', '/records'],
       ['osas-restrictions', '/restrictions'],
-      ['osas-notifications', '/notifications'],
+      ['osas-messages', '/messages'],
+      ['osas-calendar', '/calendar'],
+      ['osas-directory', '/directory'],
     ])
   })
 
@@ -103,14 +109,27 @@ describe('module picker tiles', () => {
       'dean-accounts',
       'dean-cases',
       'dean-records',
-      'dean-notifications',
       'assigned-concerns',
       'faculty-schedule',
       'availability',
       'faculty-messages',
       'chair-cases',
       'chair-records',
+      'chair-messages',
+      'chair-calendar',
     ])
+  })
+
+  it('gives students and faculty six tiles when they may open every page, and no Notifications tile to anyone', () => {
+    const student = session(['student'], [...own, '/reports', '/reports/new', '/consultations', '/evaluations', '/standing'])
+    expect(moduleTiles(student).map((tile) => tile.id)).toEqual(['file-concern', 'my-concerns', 'student-consultations', 'student-messages', 'student-evaluations', 'student-standing'])
+    const professor = session(['professor'], [...own, '/cases', '/consultations', '/consultations/availability', '/evaluations/results', '/spaces'])
+    expect(moduleTiles(professor).map((tile) => tile.id)).toEqual(['assigned-concerns', 'faculty-schedule', 'availability', 'faculty-messages', 'faculty-results', 'faculty-classes'])
+    const chair = session(['chair'], [...own, '/cases', '/records', '/analytics', '/evaluations/results'])
+    expect(moduleTiles(chair)).toHaveLength(6)
+    for (const role of ['dean', 'guidance', 'osas', 'chair', 'student', 'professor']) {
+      expect(moduleTiles(session([role], [...own, '/cases', '/records'], accounts)).some((tile) => tile.href === '/notifications'), role).toBe(false)
+    }
   })
 
   it.each(['administrator', 'organization', 'staff'])('shows %s no tiles', (role) => {

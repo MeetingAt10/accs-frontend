@@ -252,7 +252,7 @@ a.ds-next-conversation[aria-current='page'] {
 .ds-next-message-bubble--own .ds-next-message-bubble__text {
   border-radius: 18px 18px 6px 18px;
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
 }
 
 .ds-next-message-bubble p {

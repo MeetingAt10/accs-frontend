@@ -1,3 +1,4 @@
+import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
@@ -1109,56 +1110,60 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
       </div>
       {responses > 0 ? (
         filtered.length ? (
-          <div className="accs-table-wrap">
-            <table className="accs-table" aria-label="Faculty evaluation results">
-              <thead>
-                <tr>
-                  <th scope="col">Faculty</th>
-                  <th scope="col">Program</th>
-                  <th scope="col" className="accs-num">
-                    Responses
-                  </th>
-                  <th scope="col">Overall average</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((result, index) => {
-                  const faculty = object(result.faculty);
-                  const name = words(faculty.name);
-                  return (
-                    <tr key={words(result.id)}>
-                      <td>
-                        <div className="ev-person">
-                          <Link
-                            href={
-                              "/evaluations/results/" +
-                              encodeURIComponent(words(result.id))
-                            }
-                          >
-                            {name}
-                          </Link>
-                        </div>
-                      </td>
-                      <td>{words(faculty.program, "CCS")}</td>
-                      <td className="accs-num">{number(result.responses)}</td>
-                      <td>
-                        <div className="ev-avg">
-                          <span className="accs-num">
-                            {number(result.average).toFixed(2)}
-                          </span>
-                          <Bar
-                            value={number(result.average)}
-                            max={5}
-                            index={Math.min(index, 8)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <PagedList items={filtered} noun="faculty">
+            {(filtered) => (
+            <div className="accs-table-wrap">
+              <table className="accs-table" aria-label="Faculty evaluation results">
+                <thead>
+                  <tr>
+                    <th scope="col">Faculty</th>
+                    <th scope="col">Program</th>
+                    <th scope="col" className="accs-num">
+                      Responses
+                    </th>
+                    <th scope="col">Overall average</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((result, index) => {
+                    const faculty = object(result.faculty);
+                    const name = words(faculty.name);
+                    return (
+                      <tr key={words(result.id)}>
+                        <td>
+                          <div className="ev-person">
+                            <Link
+                              href={
+                                "/evaluations/results/" +
+                                encodeURIComponent(words(result.id))
+                              }
+                            >
+                              {name}
+                            </Link>
+                          </div>
+                        </td>
+                        <td>{words(faculty.program, "CCS")}</td>
+                        <td className="accs-num">{number(result.responses)}</td>
+                        <td>
+                          <div className="ev-avg">
+                            <span className="accs-num">
+                              {number(result.average).toFixed(2)}
+                            </span>
+                            <Bar
+                              value={number(result.average)}
+                              max={5}
+                              index={Math.min(index, 8)}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Panel>
             <Empty title="No faculty match">Try a different name.</Empty>
@@ -1249,64 +1254,68 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
       )}
       {cycles.length ? (
         visible.length ? (
-          <div className="accs-table-wrap">
-            <table className="accs-table" aria-label="Evaluation cycles">
-              <thead>
-                <tr>
-                  <th scope="col">Cycle</th>
-                  <th scope="col">Term</th>
-                  <th scope="col">Dates</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Responses</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((cycle) => (
-                  <tr key={words(cycle.id)}>
-                    <td>
-                      <p className="ev-table-title">
-                        <Link
-                          href={
-                            "/evaluations/cycles/" +
-                            encodeURIComponent(words(cycle.id))
-                          }
-                        >
-                          {words(cycle.title)}
-                        </Link>
-                      </p>
-                      <p className="ev-table-sub">
-                        {strings(cycle.forms)
-                          .map(
-                            (form) => formLabels[form as EvaluationForm] ?? form,
-                          )
-                          .join(", ") || "No forms chosen"}
-                      </p>
-                    </td>
-                    <td>{words(cycle.term, "—")}</td>
-                    <td className="ev-dates">
-                      {formatDate(cycle.opens)} to {formatDate(cycle.closes)}
-                    </td>
-                    <td>
-                      <StatusChip tone={cycleTone(words(cycle.status))}>
-                        {words(cycle.status, "—")}
-                      </StatusChip>
-                    </td>
-                    <td>
-                      <div className="ev-comp">
-                        <Bar
-                          value={number(cycle.completion)}
-                          max={Math.max(1, number(cycle.assigned))}
-                        />
-                        <span>
-                          {number(cycle.completion)} of {number(cycle.assigned)}
-                        </span>
-                      </div>
-                    </td>
+          <PagedList items={visible} noun="cycles">
+            {(visible) => (
+            <div className="accs-table-wrap">
+              <table className="accs-table" aria-label="Evaluation cycles">
+                <thead>
+                  <tr>
+                    <th scope="col">Cycle</th>
+                    <th scope="col">Term</th>
+                    <th scope="col">Dates</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Responses</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visible.map((cycle) => (
+                    <tr key={words(cycle.id)}>
+                      <td>
+                        <p className="ev-table-title">
+                          <Link
+                            href={
+                              "/evaluations/cycles/" +
+                              encodeURIComponent(words(cycle.id))
+                            }
+                          >
+                            {words(cycle.title)}
+                          </Link>
+                        </p>
+                        <p className="ev-table-sub">
+                          {strings(cycle.forms)
+                            .map(
+                              (form) => formLabels[form as EvaluationForm] ?? form,
+                            )
+                            .join(", ") || "No forms chosen"}
+                        </p>
+                      </td>
+                      <td>{words(cycle.term, "—")}</td>
+                      <td className="ev-dates">
+                        {formatDate(cycle.opens)} to {formatDate(cycle.closes)}
+                      </td>
+                      <td>
+                        <StatusChip tone={cycleTone(words(cycle.status))}>
+                          {words(cycle.status, "—")}
+                        </StatusChip>
+                      </td>
+                      <td>
+                        <div className="ev-comp">
+                          <Bar
+                            value={number(cycle.completion)}
+                            max={Math.max(1, number(cycle.assigned))}
+                          />
+                          <span>
+                            {number(cycle.completion)} of {number(cycle.assigned)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Panel>
             <Empty title="No cycles match">Change the search or status.</Empty>
@@ -1561,44 +1570,48 @@ function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
   return (
     <Panel flush title={title}>
       {rows.length ? (
-        <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
-          <table className="accs-table" aria-label={title}>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Program</th>
-                <th scope="col" className="accs-num">
-                  Assigned
-                </th>
-                <th scope="col" className="accs-num">
-                  Submitted
-                </th>
-                <th scope="col">Completion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((entry) => (
-                <tr key={words(entry.id)}>
-                  <td>{words(entry.title, words(entry.name))}</td>
-                  <td>{words(entry.program, "CCS")}</td>
-                  <td className="accs-num">{number(entry.assigned)}</td>
-                  <td className="accs-num">{number(entry.submitted)}</td>
-                  <td>
-                    <div className="ev-comp">
-                      <Bar
-                        value={number(entry.submitted)}
-                        max={Math.max(1, number(entry.assigned))}
-                      />
-                      <span>
-                        {number(entry.submitted)} of {number(entry.assigned)}
-                      </span>
-                    </div>
-                  </td>
+        <PagedList items={rows} noun="students">
+          {(rows) => (
+          <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
+            <table className="accs-table" aria-label={title}>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Program</th>
+                  <th scope="col" className="accs-num">
+                    Assigned
+                  </th>
+                  <th scope="col" className="accs-num">
+                    Submitted
+                  </th>
+                  <th scope="col">Completion</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((entry) => (
+                  <tr key={words(entry.id)}>
+                    <td>{words(entry.title, words(entry.name))}</td>
+                    <td>{words(entry.program, "CCS")}</td>
+                    <td className="accs-num">{number(entry.assigned)}</td>
+                    <td className="accs-num">{number(entry.submitted)}</td>
+                    <td>
+                      <div className="ev-comp">
+                        <Bar
+                          value={number(entry.submitted)}
+                          max={Math.max(1, number(entry.assigned))}
+                        />
+                        <span>
+                          {number(entry.submitted)} of {number(entry.assigned)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No assignments in this scope" />
       )}

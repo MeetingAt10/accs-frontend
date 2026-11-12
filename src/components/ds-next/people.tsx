@@ -30,19 +30,23 @@ export function PersonCard({
       <span className="accs-avatar ds-next-person-card__avatar" aria-hidden>
         {initials(name)}
       </span>
+      {/* Two lines: the name with its roles, then office and title together. */}
       <div className="ds-next-person-card__body">
-        <h3 className="ds-next-person-card__name">
-          {href ? (
-            <Link href={href} className="ds-next-person-card__link">
-              {name}
-            </Link>
-          ) : (
-            name
-          )}
-        </h3>
-        {role && <div className="ds-next-person-card__roles">{role}</div>}
-        {office && <p className="ds-next-person-card__line">{office}</p>}
-        {description && <p className="ds-next-person-card__line">{description}</p>}
+        <div className="ds-next-person-card__top">
+          <h3 className="ds-next-person-card__name">
+            {href ? (
+              <Link href={href} className="ds-next-person-card__link">
+                {name}
+              </Link>
+            ) : (
+              name
+            )}
+          </h3>
+          {role && <div className="ds-next-person-card__roles">{role}</div>}
+        </div>
+        {(office || description) && (
+          <p className="ds-next-person-card__line">{office}{office && description ? ' · ' : null}{description}</p>
+        )}
       </div>
       {(meta || actions) && (
         <div className="ds-next-person-card__meta">

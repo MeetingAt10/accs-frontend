@@ -14,6 +14,7 @@ import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format
 import { RestrictedView } from '@/components/app/guards'
 import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, modeLabel, readAccess, readTalk, readWording, type Sharing } from '@/components/app/concern-talk'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
+import { PagedList } from '@/components/app/paging'
 import './grievance.css'
 
 type Item = Record<string, unknown>
@@ -481,29 +482,33 @@ function ReportList({ page }: { page: PageEnvelope }) {
           </div>
           {records.length ? (
             <Panel flush>
-              <ul className="accs-rows">
-                {records.map((report) => {
-                  const step = stageStep(report)
-                  return (
-                    <li key={words(report.id)}>
-                      <a className="accs-row gv-row" href={reportPath(report)}>
-                        <span className="accs-mono gv-row__ref">{reportReference(report)}</span>
-                        <span className="gv-row__main">
-                          <span className="accs-row__title">{words(report.category, 'General concern')}</span>
-                          <span className="accs-row__sub">{words(report.office, '—')}</span>
-                        </span>
-                        <span className="gv-row__progress">
-                          <span className="accs-progress" role="progressbar" aria-label={'Stage ' + step + ' of 6'} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step}><span style={{ width: (step / 6) * 100 + '%' }} /></span>
-                          <span className="gv-row__stage">Stage {step} of 6 · {stageLabel(report)}</span>
-                        </span>
-                        <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
-                        <span className="gv-row__time">{relativeTime(report.updatedAt) || '—'}</span>
-                        <span className="gv-row__go" aria-hidden><Icon name="caret-right" size={16} /></span>
-                      </a>
-                    </li>
-                  )
-                })}
-              </ul>
+              <PagedList items={records} noun="reports">
+                {(records) => (
+                <ul className="accs-rows">
+                  {records.map((report) => {
+                    const step = stageStep(report)
+                    return (
+                      <li key={words(report.id)}>
+                        <a className="accs-row gv-row" href={reportPath(report)}>
+                          <span className="accs-mono gv-row__ref">{reportReference(report)}</span>
+                          <span className="gv-row__main">
+                            <span className="accs-row__title">{words(report.category, 'General concern')}</span>
+                            <span className="accs-row__sub">{words(report.office, '—')}</span>
+                          </span>
+                          <span className="gv-row__progress">
+                            <span className="accs-progress" role="progressbar" aria-label={'Stage ' + step + ' of 6'} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step}><span style={{ width: (step / 6) * 100 + '%' }} /></span>
+                            <span className="gv-row__stage">Stage {step} of 6 · {stageLabel(report)}</span>
+                          </span>
+                          <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
+                          <span className="gv-row__time">{relativeTime(report.updatedAt) || '—'}</span>
+                          <span className="gv-row__go" aria-hidden><Icon name="caret-right" size={16} /></span>
+                        </a>
+                      </li>
+                    )
+                  })}
+                </ul>
+                )}
+              </PagedList>
             </Panel>
           ) : <Panel><Empty title={view === 'closed' ? 'No closed reports' : 'No reports yet'} action={view === 'active' ? <Button href="/reports/new">New report</Button> : undefined}>You haven't filed a report. Start one when you want an office to look into something.</Empty></Panel>}
         </div>

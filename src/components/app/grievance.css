@@ -193,7 +193,7 @@
   transition: background 240ms var(--accs-ease-out), border-color 240ms var(--accs-ease-out), color 240ms var(--accs-ease-out), box-shadow 240ms var(--accs-ease-out);
 }
 .gv-steps__item[data-state='current'] .gv-steps__dot { border-color: var(--site-accent); color: var(--site-accent-ink); box-shadow: 0 0 0 4px var(--site-accent-wash); }
-.gv-steps__item[data-state='done'] .gv-steps__dot { border-color: var(--accs-ink); background: var(--accs-ink); color: #fff; }
+.gv-steps__item[data-state='done'] .gv-steps__dot { border-color: var(--accs-ink); background: var(--accs-ink); color: var(--accs-on-accent); }
 .gv-steps__name { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
 .gv-steps__item[data-state='current'] .gv-steps__name, .gv-steps__item[data-state='done'] .gv-steps__name { color: var(--accs-ink); }
 .gv-steps__line { position: relative; flex: 1 1 16px; height: 2px; margin-inline: 4px; border-radius: 2px; background: var(--accs-line); overflow: hidden; }

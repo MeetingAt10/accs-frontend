@@ -1,0 +1,373 @@
+/* ==========================================================================
+   ACCS neutral theme (2026-11-12).
+   A shadcn-style look: neutral (zinc) surfaces, near-black primary in light mode and near-white in dark mode, thin
+   borders, small radii, no drop shadows, and fewer boxes. Loaded after styles.css, it overrides the app tokens
+   (--accs-*, --site-*) and the design-system tokens (--ds-*) so every module and component follows it.
+
+   Fonts: Geist for all interface text, Geist Mono for IDs, codes and numbers, and Poppins for page titles
+   only. Geist carries everything; Geist Mono and Poppins are used sparingly so the type stays uniform.
+   ========================================================================== */
+
+:root {
+  --accs-font-body: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --accs-font-display: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --accs-font-title: 'Poppins', var(--accs-font-body);
+  --accs-font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ds-font-family-body: var(--accs-font-body);
+  --ds-font-family-display: var(--accs-font-display);
+  --ds-font-family-mono: var(--accs-font-mono);
+
+  --accs-radius-card: 10px;
+  --accs-radius-control: 8px;
+  --accs-shadow-hover: none;
+  --accs-shadow-pop: 0 1px 2px rgb(0 0 0 / 6%), 0 12px 32px -12px rgb(0 0 0 / 20%);
+  /* Text on the accent color: light on the near-black accent, dark on the near-white one in dark mode. */
+  --accs-on-accent: var(--accs-paper);
+  --ds-radius-block: 10px;
+  --ds-radius-control: 8px;
+  --ds-radius-sheet: 12px;
+  --ds-radius-overlay: 12px;
+  --ds-shadow-lift: none;
+  --ds-shadow-lift-dark: none;
+}
+
+/* The design system's gray scale is a cool slate; these zinc grays keep chips, badges and dividers neutral in both themes. */
+:root {
+  --ds-neutral-0: #ffffff; --ds-neutral-50: #fafafa; --ds-neutral-100: #f4f4f5; --ds-neutral-200: #e4e4e7;
+  --ds-neutral-500: #71717a; --ds-neutral-700: #3f3f46; --ds-neutral-900: #18181b; --ds-neutral-950: #09090b;
+  --ds-neutral-dark-raised: #18181b; --ds-neutral-dark-border: #27272a; --ds-neutral-dark-secondary: #a1a1aa;
+}
+
+/* ---------- Light (default) ---------- */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --accs-ink: #09090b;
+  --accs-ink-2: #27272a;
+  --accs-muted: #71717a;
+  --accs-faint: #a1a1aa;
+  --accs-paper: #ffffff;
+  --accs-surface: #ffffff;
+  --accs-sunken: #f4f4f5;
+  --accs-line: #e4e4e7;
+  --accs-line-strong: #d4d4d8;
+  /* The old navy becomes the primary: near-black, used for primary buttons and focus. */
+  --accs-navy: #18181b;
+  --accs-navy-deep: #09090b;
+  --accs-navy-rail: #fafafa;
+  --accs-gold: #a16207;
+
+  --accs-ok: #15803d;
+  --accs-ok-bg: #f0fdf4;
+  --accs-warn: #a16207;
+  --accs-warn-bg: #fefce8;
+  --accs-danger: #b91c1c;
+  --accs-danger-bg: #fef2f2;
+  --accs-info: #3f3f46;
+  --accs-info-bg: #f4f4f5;
+
+  --ds-canvas: #ffffff;
+  --ds-surface: #ffffff;
+  --ds-raised: #ffffff;
+  --ds-text-primary: #09090b;
+  --ds-text-secondary: #71717a;
+  --ds-border-subtle: #e4e4e7;
+  --ds-border-default: #e4e4e7;
+  --ds-border-strong: #d4d4d8;
+  --ds-action-default: #18181b;
+  --ds-action-hover: #27272a;
+  --ds-action-pressed: #09090b;
+  --ds-on-action: #fafafa;
+  --ds-accent-default: #18181b;
+  --ds-accent-hover: #27272a;
+  --ds-accent-pressed: #09090b;
+  --ds-accent-on-solid: #fafafa;
+  --ds-accent-bg: #f4f4f5;
+  --ds-accent-fg: #18181b;
+  --ds-accent-border: #d4d4d8;
+  --ds-secondary-default: #f4f4f5;
+  --ds-secondary-hover: #e4e4e7;
+  --ds-secondary-pressed: #d4d4d8;
+  --ds-secondary-on-solid: #18181b;
+  --ds-secondary-bg: #f4f4f5;
+  --ds-secondary-fg: #18181b;
+  --ds-secondary-border: #e4e4e7;
+  --ds-info-bg: #f4f4f5;
+  --ds-info-fg: #3f3f46;
+  --ds-success-bg: #f0fdf4;
+  --ds-success-fg: #15803d;
+  --ds-warning-bg: #fefce8;
+  --ds-warning-fg: #a16207;
+  --ds-danger-bg: #fef2f2;
+  --ds-danger-fg: #b91c1c;
+  --ds-focus: #a1a1aa;
+  --ds-disabled-bg: #f4f4f5;
+  --ds-disabled-fg: #a1a1aa;
+  --ds-inverse-bg: #18181b;
+  --ds-inverse-fg: #fafafa;
+}
+
+/* Every site uses the same neutral accent, so buttons and active marks are black (white in dark mode). Status colors stay. */
+:root { --site-accent: #18181b; --site-accent-ink: #18181b; --site-accent-wash: #f4f4f5; }
+[data-site='portal'] { --site-accent: #18181b; --site-accent-ink: #18181b; --site-accent-wash: #f4f4f5; }
+[data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+[data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+[data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+[data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+[data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+[data-site='admin'] { --site-accent: #3f3f46; --site-accent-ink: #27272a; --site-accent-wash: #f4f4f5; }
+
+/* ---------- Dark ---------- */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --accs-ink: #fafafa;
+  --accs-ink-2: #e4e4e7;
+  --accs-muted: #a1a1aa;
+  --accs-faint: #71717a;
+  --accs-paper: #09090b;
+  --accs-surface: #09090b;
+  --accs-sunken: #18181b;
+  --accs-line: #27272a;
+  --accs-line-strong: #3f3f46;
+  --accs-navy: #fafafa;
+  --accs-navy-deep: #e4e4e7;
+  --accs-navy-rail: #0c0c0e;
+  --accs-gold: #eab308;
+  --accs-ok: #4ade80;
+  --accs-ok-bg: #052e16;
+  --accs-warn: #facc15;
+  --accs-warn-bg: #2a2205;
+  --accs-danger: #f87171;
+  --accs-danger-bg: #2c0b0b;
+  --accs-info: #d4d4d8;
+  --accs-info-bg: #18181b;
+
+  --ds-canvas: #09090b;
+  --ds-surface: #09090b;
+  --ds-raised: #18181b;
+  --ds-text-primary: #fafafa;
+  --ds-text-secondary: #a1a1aa;
+  --ds-border-subtle: #27272a;
+  --ds-border-default: #27272a;
+  --ds-border-strong: #3f3f46;
+  --ds-action-default: #fafafa;
+  --ds-action-hover: #e4e4e7;
+  --ds-action-pressed: #d4d4d8;
+  --ds-on-action: #18181b;
+  --ds-accent-default: #fafafa;
+  --ds-accent-hover: #e4e4e7;
+  --ds-accent-pressed: #d4d4d8;
+  --ds-accent-on-solid: #18181b;
+  --ds-accent-bg: #18181b;
+  --ds-accent-fg: #fafafa;
+  --ds-accent-border: #3f3f46;
+  --ds-secondary-default: #27272a;
+  --ds-secondary-hover: #3f3f46;
+  --ds-secondary-pressed: #52525b;
+  --ds-secondary-on-solid: #fafafa;
+  --ds-secondary-bg: #18181b;
+  --ds-secondary-fg: #fafafa;
+  --ds-secondary-border: #27272a;
+  --ds-info-bg: #18181b;
+  --ds-info-fg: #d4d4d8;
+  --ds-success-bg: #052e16;
+  --ds-success-fg: #4ade80;
+  --ds-warning-bg: #2a2205;
+  --ds-warning-fg: #facc15;
+  --ds-danger-bg: #2c0b0b;
+  --ds-danger-fg: #f87171;
+  --ds-focus: #71717a;
+  --ds-disabled-bg: #18181b;
+  --ds-disabled-fg: #52525b;
+  --ds-inverse-bg: #fafafa;
+  --ds-inverse-fg: #18181b;
+}
+:root[data-theme='dark'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
+:root[data-theme='dark'] [data-site='portal'], :root[data-theme='dark'] [data-site='admin'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
+:root[data-theme='dark'] [data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+:root[data-theme='dark'] [data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+:root[data-theme='dark'] [data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+:root[data-theme='dark'] [data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+:root[data-theme='dark'] [data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+
+/* The system preference applies until the user picks a theme (data-theme set). Same values as above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --accs-ink: #fafafa; --accs-ink-2: #e4e4e7; --accs-muted: #a1a1aa; --accs-faint: #71717a;
+    --accs-paper: #09090b; --accs-surface: #09090b; --accs-sunken: #18181b; --accs-line: #27272a; --accs-line-strong: #3f3f46;
+    --accs-navy: #fafafa; --accs-navy-deep: #e4e4e7; --accs-navy-rail: #0c0c0e; --accs-gold: #eab308;
+    --accs-ok: #4ade80; --accs-ok-bg: #052e16; --accs-warn: #facc15; --accs-warn-bg: #2a2205; --accs-danger: #f87171; --accs-danger-bg: #2c0b0b; --accs-info: #d4d4d8; --accs-info-bg: #18181b;
+    --ds-canvas: #09090b; --ds-surface: #09090b; --ds-raised: #18181b; --ds-text-primary: #fafafa; --ds-text-secondary: #a1a1aa;
+    --ds-border-subtle: #27272a; --ds-border-default: #27272a; --ds-border-strong: #3f3f46;
+    --ds-action-default: #fafafa; --ds-action-hover: #e4e4e7; --ds-action-pressed: #d4d4d8; --ds-on-action: #18181b;
+    --ds-accent-default: #fafafa; --ds-accent-hover: #e4e4e7; --ds-accent-pressed: #d4d4d8; --ds-accent-on-solid: #18181b; --ds-accent-bg: #18181b; --ds-accent-fg: #fafafa; --ds-accent-border: #3f3f46;
+    --ds-secondary-default: #27272a; --ds-secondary-hover: #3f3f46; --ds-secondary-pressed: #52525b; --ds-secondary-on-solid: #fafafa; --ds-secondary-bg: #18181b; --ds-secondary-fg: #fafafa; --ds-secondary-border: #27272a;
+    --ds-info-bg: #18181b; --ds-info-fg: #d4d4d8; --ds-success-bg: #052e16; --ds-success-fg: #4ade80; --ds-warning-bg: #2a2205; --ds-warning-fg: #facc15; --ds-danger-bg: #2c0b0b; --ds-danger-fg: #f87171;
+    --ds-focus: #71717a; --ds-disabled-bg: #18181b; --ds-disabled-fg: #52525b; --ds-inverse-bg: #fafafa; --ds-inverse-fg: #18181b;
+    --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b;
+  }
+  :root:not([data-theme]) [data-site='portal'], :root:not([data-theme]) [data-site='admin'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
+  :root:not([data-theme]) [data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+  :root:not([data-theme]) [data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+  :root:not([data-theme]) [data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+  :root:not([data-theme]) [data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+  :root:not([data-theme]) [data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+}
+
+/* ---------- Type ---------- */
+html, body { font-family: var(--accs-font-body); font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; }
+body { background: var(--accs-paper); color: var(--accs-ink); }
+code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feature-settings: normal; }
+/* Page titles use Poppins; everything else stays in Geist. */
+:root .accs-page-title { font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
+.accs-page-title, .accs-page-header h1, :root .ch-head__title { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
+:focus-visible { outline: 2px solid var(--accs-faint); outline-offset: 2px; }
+
+/* ---------- Fewer boxes ----------
+   Overrides are scoped under :root so they beat module stylesheets, which load later with each page. */
+/* A panel is a section, not a card: no border or fill, a heading and a thin divider below it. */
+:root .accs-panel { padding: 0; border: 0; border-radius: 0; background: transparent; gap: 12px; }
+:root .accs-panel > .accs-panel__head { padding: 0 0 10px; border-bottom: 1px solid var(--accs-line); }
+:root .accs-panel__title { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.005em; }
+/* Lists in flush panels are rows split by thin lines, with no outer box. Only a table keeps one light outline. */
+:root .accs-panel--flush { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+:root .accs-panel--flush > .accs-panel__head { padding: 0 0 10px; }
+:root .accs-panel--flush:has(table) { border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); overflow: hidden; }
+:root .accs-panel--flush:has(table) > .accs-panel__head { padding: 12px 16px; }
+/* Clickable panels change background on hover instead of lifting. */
+:root .accs-panel--interactive { border-radius: var(--accs-radius-card); padding: 12px; margin: -12px; transition: background-color 150ms var(--accs-ease); }
+:root .accs-panel--interactive:hover { background: var(--accs-sunken); box-shadow: none; transform: none; }
+
+/* ---------- Module tiles and design-system cards ---------- */
+:root .ds-card { --ds-sheet-rule: var(--accs-line); box-shadow: none; }
+:root .ds-card__title { font-family: var(--accs-font-body); font-weight: 600; letter-spacing: -0.01em; }
+/* Icon squares are all the same quiet neutral; no solid black or colored blocks. */
+:root :is(.ds-tile, .ds-tile--neutral, .ds-tile--community, .ds-tile--consult, .ds-tile--restricted, .ds-tile--success, .ds-tile--warning, .ds-tile--danger) {
+  width: 36px; height: 36px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control); background: var(--accs-surface); color: var(--accs-ink);
+}
+
+/* ---------- Logo mark ---------- */
+:root .shell-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--accs-navy); box-shadow: none; color: var(--accs-paper); font-family: var(--accs-font-body); font-size: 0.95rem; font-weight: 700; }
+
+/* ---------- Filter bars, composers and page heads ---------- */
+/* Search and filters sit on the page, not in a box. Sticky bars keep the page color so rows scroll under them cleanly. */
+:root :is(.accs-toolbar, .fx-toolbar, .pa-toolbar, .gv-toolbar) { padding: 0 0 4px; border: 0; border-radius: 0; background: var(--accs-paper); backdrop-filter: none; box-shadow: none; }
+/* The student home header and the forum composer are part of the page, not cards. */
+:root .ch-head { padding: 0; border: 0; border-radius: 0; background: transparent; }
+:root :is(.fx-page a.fx-compose, .fx-compose--button, .fx-compose) { border: 0; border-bottom: 1px solid var(--accs-line); border-radius: 0; background: transparent; padding-inline: 0; }
+
+/* ---------- Toggles and tabs (shadcn tabs) ---------- */
+/* A muted track; the chosen option is a raised chip in the page color, so its label reads in both themes. */
+:root .pt-pills { padding: 3px; gap: 2px; border: 0; border-radius: var(--accs-radius-control); background: var(--accs-sunken); box-shadow: none; }
+:root .pt-pill { min-height: 32px; border-radius: calc(var(--accs-radius-control) - 2px); color: var(--accs-muted); }
+:root .pt-pill:hover { background: transparent; color: var(--accs-ink); }
+:root .pt-pill[aria-pressed='true'] { color: var(--accs-ink); }
+:root .pt-pill__indicator { background: var(--accs-surface); box-shadow: 0 1px 2px rgb(0 0 0 / 10%), 0 0 0 1px var(--accs-line); }
+:root .adm-nav { padding: 3px; border: 0; border-radius: var(--accs-radius-control); background: var(--accs-sunken); box-shadow: none; }
+
+/* The calendar's month bar sits on the page, not in a floating box. */
+:root .sc-bar { padding: 4px 0; border: 0; border-radius: 0; background: var(--accs-paper); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+
+/* ---------- Sign-in brand panel ---------- */
+/* Always a dark zinc panel with white text, whatever the theme: the old navy tokens now follow the theme. */
+:root { --ds-plate-bg: var(--accs-ink); --ds-plate-fg: var(--accs-paper); }
+:root .au-brand { color: #fafafa; background: radial-gradient(110% 80% at 0% 0%, rgb(255 255 255 / 7%), transparent 65%), #09090b; --ds-plate-bg: #fafafa; --ds-plate-fg: #09090b; }
+:root .au-brand::before { background: radial-gradient(40% 40% at 25% 30%, rgb(255 255 255 / 5%), transparent 70%), radial-gradient(35% 35% at 75% 75%, rgb(161 161 170 / 8%), transparent 70%); }
+:root .au-brand__line { color: rgb(250 250 250 / 65%); }
+:root .au-brand__headline { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
+:root .au-brand__facts li { border-inline-start-color: rgb(250 250 250 / 30%); }
+
+/* ---------- Home: short and scannable ---------- */
+/* Getting started is one line that opens. */
+:root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 16px; }
+:root .getting-started-box > summary { cursor: pointer; color: var(--accs-muted); font-size: 0.875rem; font-weight: 500; list-style-position: inside; }
+:root .getting-started-box > summary:hover { color: var(--accs-ink); }
+:root .getting-started-box__count { margin-inline-start: 6px; color: var(--accs-faint); font-weight: 400; }
+:root .getting-started-box[open] > .getting-started { margin-top: 10px; }
+/* Student and faculty home head: greeting as the title, the date under it, actions beside it on wide screens. */
+:root .ch-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+:root .ch-head__title { margin: 0; font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
+:root .ch-head__eyebrow { margin: 8px 0 0; }
+/* The home fills the screen at a readable scale: a larger greeting with clear space under it, larger section headings
+   and rows, so the page does not look small with an empty half below. */
+:root .ch-head { margin-bottom: 16px; }
+:root .ch-head__title { font-size: clamp(1.75rem, 1.35rem + 1vw, 2.375rem); }
+:root .ch-head__eyebrow { font-size: 0.9375rem; }
+:root:has(.ch-head) .shell-content :is(.accs-panel__title) { font-size: 1.125rem; }
+:root:has(.ch-head) .shell-content .accs-panel > .accs-panel__head { padding-bottom: 14px; }
+:root:has(.ch-head) .shell-content .accs-row { padding: 18px 14px; }
+:root:has(.ch-head) .shell-content .pt-row__title { font-size: 1.0625rem; }
+:root:has(.ch-head) .shell-content .pt-row__sub { font-size: 0.875rem; margin-top: 4px; }
+:root:has(.ch-head) .shell-content .accs-row .accs-avatar { width: 40px; height: 40px; }
+
+/* ---------- Spacing: room to breathe, without the old boxes ---------- */
+:root .shell-content__inner { padding: 20px 16px 40px; }
+@media (min-width: 768px) { :root .shell-content__inner { padding: 32px 40px 48px; } }
+:root .shell-page { gap: 32px; }
+:root .accs-stack { gap: 32px; }
+:root .accs-stack--tight { gap: 12px; }
+:root .accs-split { gap: 40px; }
+:root .accs-page-head { gap: 16px 24px; }
+:root .accs-panel { gap: 8px; }
+:root .accs-panel > .accs-panel__head { padding-bottom: 12px; }
+/* Rows line up with their heading and change background on hover. */
+:root .accs-row { padding: 14px 12px; gap: 12px; border-radius: 8px; }
+:root .accs-kpi { padding: 16px 20px; }
+:root .accs-table th { padding: 10px 14px; }
+:root .accs-table td { padding: 12px 14px; }
+
+/* ---------- Pagers ---------- */
+:root .accs-pager { margin-top: 16px; }
+:root :is(.accs-pager, .ds-pagination) [aria-current="page"] { color: var(--accs-on-accent); }
+
+/* ---------- Use the width of the screen ---------- */
+/* Pages fill the space beside the sidebar instead of a centered 1280px column with empty margins on wide screens. */
+:root .shell-content__inner { max-width: none; margin: 0; }
+/* The side column grows a little on wide screens so the two columns stay balanced. */
+@media (min-width: 1024px) {
+  :root .accs-split { grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 420px); }
+  :root .accs-split--wide-rail { grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 480px); }
+}
+/* A post page and the concern form get room to breathe instead of a narrow column. */
+:root .fx-thread-page { max-width: 72rem; }
+:root .gv-wizard { max-width: none; }
+
+/* ---------- Charts ---------- */
+/* Line charts keep a readable size on wide pages instead of growing with the page; series get distinct colors. */
+:root { --accs-chart-1: #18181b; --accs-chart-2: #0d9488; --accs-chart-3: #d97706; --accs-chart-4: #a1a1aa; }
+:root[data-theme='dark'] { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; } }
+:root .ch-plot { height: 240px; }
+
+/* ---------- Messages and settings use the space ---------- */
+/* The two-pane messenger fills the window height below the header, like a chat app, instead of stopping halfway. */
+@media (min-width: 1024px) {
+  :root .ds-cols.communications-messages { height: calc(100dvh - 12rem); min-height: 28rem; }
+  :root .communications-messages__inbox { max-height: none; }
+  :root .communications-messages__thread { display: flex; flex-direction: column; min-height: 0; }
+  :root .communications-messages__thread > * { flex: 0 0 auto; }
+  /* An open conversation keeps its message box at the bottom; with none open, the empty state sits in the middle. */
+  :root .communications-messages__thread > :last-child:not(.ds-empty) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  :root .communications-messages__thread > :last-child:not(.ds-empty) > :last-child { margin-top: auto; }
+  :root .communications-messages__thread:has(> .ds-empty) { justify-content: center; }
+  :root .cm-chat-panel { height: calc(100dvh - 12rem); max-height: none; }
+}
+/* Settings: the password fields fill their column. */
+:root .pa-pw { max-width: none; }
+
+/* Avatars: one quiet neutral, not the design system's blue and purple fills. */
+:root :is(.ds-avatar, .ds-avatar--community, .ds-avatar--consult, .ds-avatar--neutral) { background: var(--accs-sunken); color: var(--accs-ink); }
+
+/* ---------- Module tiles ---------- */
+/* The design-system cards, three to a row on wide screens so a role's six tasks sit in two even rows. */
+@container (min-width: 48rem) { :root .module-picker__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- People rows ---------- */
+/* Directory rows are two lines (name and roles, then office and title) with a smaller avatar and less padding. */
+:root .ds-next-person-card { padding: 12px 14px; gap: 14px; align-items: center; }
+:root .ds-next-person-card__avatar { width: 32px; height: 32px; font-size: 0.75rem; }
+:root .ds-next-person-card__body { gap: 2px; }
+:root .ds-next-person-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+:root .ds-next-person-card__name { font-family: var(--accs-font-body); font-size: 0.9375rem; font-weight: 600; }
+:root .ds-next-person-card__line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

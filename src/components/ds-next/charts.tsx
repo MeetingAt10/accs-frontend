@@ -244,11 +244,12 @@ export function BarChart({
   );
 }
 
+// Series colors from the theme (theme.css): distinct from each other in both light and dark mode.
 const colors = [
-  "var(--site-accent)",
-  "var(--accs-ink-2)",
-  "var(--accs-faint)",
-  "var(--accs-warn)",
+  "var(--accs-chart-1)",
+  "var(--accs-chart-2)",
+  "var(--accs-chart-3)",
+  "var(--accs-chart-4)",
 ];
 
 function niceTop(maxValue: number) {
@@ -262,10 +263,10 @@ function niceTop(maxValue: number) {
   return { step, top: Math.max(step, Math.ceil(maxValue / step) * step) };
 }
 
-const W = 640;
+// The plot is drawn at the width it gets (measured below) and a fixed height, so lines and labels keep their size on
+// wide pages instead of the whole chart scaling up.
 const H = 240;
 const pad = { l: 40, r: 16, t: 16, b: 30 };
-const pw = W - pad.l - pad.r;
 const ph = H - pad.t - pad.b;
 
 export function TrendChart({
@@ -278,6 +279,15 @@ export function TrendChart({
   const gradient = "g" + useId().replace(/:/g, "");
   const reduce = useReducedMotion();
   const [active, setActive] = useState<number | null>(null);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [W, setW] = useState(640);
+  useEffect(() => {
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setW(Math.max(480, Math.round(entry.contentRect.width))));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [box]);
+  const pw = W - pad.l - pad.r;
   const count = data.length;
   const { step, top } = niceTop(
     Math.max(
@@ -336,7 +346,7 @@ export function TrendChart({
               </li>
             ))}
           </ul>
-          <div className="rc-scroll">
+          <div className="rc-scroll" ref={setBox}>
             <svg
               className="ch-plot"
               viewBox={`0 0 ${W} ${H}`}

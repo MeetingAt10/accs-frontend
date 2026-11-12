@@ -201,7 +201,7 @@ a.accs-kpi:hover { background: var(--accs-sunken); }
 .accs-pill[aria-pressed='true'], .accs-pill[aria-current='page'], .accs-pill[aria-selected='true'] {
   border-color: var(--accs-ink);
   background: var(--accs-ink);
-  color: #fff;
+  color: var(--accs-on-accent);
 }
 .accs-pill__count { font-variant-numeric: tabular-nums; opacity: 0.7; }
 

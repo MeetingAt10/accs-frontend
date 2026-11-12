@@ -59,7 +59,7 @@
   transition: color 160ms var(--accs-ease);
 }
 .rc-seg__btn:hover { color: var(--accs-ink); }
-.rc-seg__btn[aria-pressed='true'] { color: #fff; }
+.rc-seg__btn[aria-pressed='true'] { color: var(--accs-on-accent); }
 .rc-seg__thumb {
   position: absolute;
   inset: 0;
@@ -238,7 +238,7 @@
   color: transparent;
   transition: background-color 160ms var(--accs-ease), color 160ms var(--accs-ease), transform 280ms var(--accs-ease-spring, var(--accs-ease));
 }
-.rc-choice:has(input:checked) .rc-choice__check { background: var(--site-accent); color: #fff; transform: scale(1.1); }
+.rc-choice:has(input:checked) .rc-choice__check { background: var(--site-accent); color: var(--accs-on-accent); transform: scale(1.1); }
 
 /* ---------- Clusters ---------- */
 .rc-cluster { position: relative; }

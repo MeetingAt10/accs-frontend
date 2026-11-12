@@ -46,7 +46,7 @@
   height: 80px;
   border-radius: 20px;
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
   font-family: var(--accs-font-display);
   font-size: 1.75rem;
   font-weight: 800;

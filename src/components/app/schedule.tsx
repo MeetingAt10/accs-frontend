@@ -33,6 +33,7 @@ import {
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 import { RestrictedView } from '@/components/app/guards'
+import { PagedList } from '@/components/app/paging'
 import {
   Empty,
   PageHeader,
@@ -713,30 +714,34 @@ function CalendarPage({
             </Panel>
             <Panel flush title="Upcoming">
               {upcoming.length ? (
-                <ul className="accs-rows">
-                  {upcoming.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        className="accs-row accs-row--link sc-up"
-                        onClick={() => setSelectedEntry(entry)}
-                      >
-                        <DateTile value={entry.date} />
-                        <span>
-                          <span className="accs-row__title">{entry.title}</span>
-                          <span className="accs-row__sub">
-                            {entry.allDay ? 'All day' : entry.time}
+                <PagedList items={upcoming} noun="events">
+                  {(upcoming) => (
+                  <ul className="accs-rows">
+                    {upcoming.map((entry) => (
+                      <li key={entry.id}>
+                        <button
+                          type="button"
+                          className="accs-row accs-row--link sc-up"
+                          onClick={() => setSelectedEntry(entry)}
+                        >
+                          <DateTile value={entry.date} />
+                          <span>
+                            <span className="accs-row__title">{entry.title}</span>
+                            <span className="accs-row__sub">
+                              {entry.allDay ? 'All day' : entry.time}
+                            </span>
                           </span>
-                        </span>
-                        <i
-                          className="ec-dot"
-                          data-etone={entry.tone}
-                          aria-hidden
-                        />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                          <i
+                            className="ec-dot"
+                            data-etone={entry.tone}
+                            aria-hidden
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  )}
+                </PagedList>
               ) : (
                 <Empty title="Nothing coming up">
                   No events in the layers you selected.

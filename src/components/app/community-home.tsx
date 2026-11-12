@@ -40,18 +40,13 @@ export function communityTabs(session: Access): Tab[] {
 export function CommunityHeader({ session, greeting, date }: { session: Session; greeting: string; date: string }) {
   const faculty = session.user.roles.includes('professor')
   // The module tiles are already the role's tasks in order: the first is the main one, the rest sit beside it.
-  const actions = moduleTiles(session).filter((tile) => tile.href)
+  const actions = moduleTiles(session).filter((tile) => tile.href).slice(0, 4)
   return (
     <header className="ch-head">
       <div>
+        <h1 className="ch-head__title">{greeting}</h1>
         <p className="ch-head__eyebrow">
-          {greeting} · {date}
-        </p>
-        <h1 className="ch-head__title">College of Computer Studies Community</h1>
-        <p className="ch-head__about">
-          {faculty
-            ? 'Announcements, discussions, consultations, and student concerns for CCS faculty and students.'
-            : 'Announcements, discussions, consultations, and support for CCS students and faculty.'}
+          {date} · {faculty ? 'CCS faculty' : 'College of Computer Studies'}
         </p>
       </div>
       {actions.length > 0 && (
@@ -63,19 +58,6 @@ export function CommunityHeader({ session, greeting, date }: { session: Session;
           ))}
         </div>
       )}
-      <nav className="ch-tabs" aria-label="Community sections">
-        {communityTabs(session).map((tab) =>
-          tab.href ? (
-            <NavLink key={tab.id} href={tab.href} className="ch-tab">
-              {tab.label}
-            </NavLink>
-          ) : (
-            <span key={tab.id} className="ch-tab" aria-current="page">
-              {tab.label}
-            </span>
-          ),
-        )}
-      </nav>
     </header>
   )
 }

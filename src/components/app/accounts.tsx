@@ -30,6 +30,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 
 import { RequirePermission } from '@/components/app/guards'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
+import { PagedList } from '@/components/app/paging'
 import {
   chunk,
   columnLabels,
@@ -1329,39 +1330,43 @@ function StudentsTab() {
                   Fix the problems listed below in the file and upload it again.
                 </Alert>
               )}
-              <div className="acct-scroll acct-scroll--tall">
-                <table className="accs-table acct-table acct-stack" aria-label="Class list">
-                  <thead>
-                    <tr>
-                      <th scope="col">Row</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Student ID</th>
-                      <th scope="col">Program</th>
-                      <th scope="col">Year</th>
-                      <th scope="col">Section</th>
-                      <th scope="col">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((student) => (
-                      <tr key={student.row}>
-                        <td data-label="Row" className="accs-num">
-                          {student.row}
-                        </td>
-                        {(['name', 'email', 'studentId', 'program', 'year', 'section'] as const).map((field) => (
-                          <td key={field} data-label={columnLabels[field]} data-bad={student.problems[field] ? true : undefined}>
-                            {student.draft[field] || '—'}
-                          </td>
-                        ))}
-                        <td data-label="Result">
-                          <ResultCell problems={student.problems} outcome={outcome[student.row]} running={running} />
-                        </td>
+              <PagedList items={students} noun="rows">
+                {(students) => (
+                <div className="acct-scroll acct-scroll--tall">
+                  <table className="accs-table acct-table acct-stack" aria-label="Class list">
+                    <thead>
+                      <tr>
+                        <th scope="col">Row</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Student ID</th>
+                        <th scope="col">Program</th>
+                        <th scope="col">Year</th>
+                        <th scope="col">Section</th>
+                        <th scope="col">Result</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {students.map((student) => (
+                        <tr key={student.row}>
+                          <td data-label="Row" className="accs-num">
+                            {student.row}
+                          </td>
+                          {(['name', 'email', 'studentId', 'program', 'year', 'section'] as const).map((field) => (
+                            <td key={field} data-label={columnLabels[field]} data-bad={student.problems[field] ? true : undefined}>
+                              {student.draft[field] || '—'}
+                            </td>
+                          ))}
+                          <td data-label="Result">
+                            <ResultCell problems={student.problems} outcome={outcome[student.row]} running={running} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                )}
+              </PagedList>
               {!started && ready.length > 0 && (
                 <div className="acct-actions">
                   <Button onPress={() => void send(ready)}>Create {plural(ready.length, 'account')}</Button>
@@ -1463,40 +1468,44 @@ function StatusTab() {
   return (
     <Gate queries={[types]} what="account status">
       <Panel flush title="Setup progress">
-        <div className="acct-scroll">
-          <table className="accs-table acct-table acct-stack" aria-label="Setup progress">
-            <thead>
-              <tr>
-                <th scope="col">Account type</th>
-                <th scope="col" className="accs-num">
-                  Active
-                </th>
-                <th scope="col" className="accs-num">
-                  Not active
-                </th>
-                <th scope="col">Setup</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.type}>
-                  <td className="acct-main">
-                    <strong>{row.label}</strong>
-                  </td>
-                  <td data-label="Active" className="accs-num">
-                    {row.active}
-                  </td>
-                  <td data-label="Not active" className="accs-num">
-                    {row.inactive}
-                  </td>
-                  <td data-label="Setup">
-                    <StatusChip tone={row.active > 0 ? 'ok' : 'neutral'}>{row.active > 0 ? 'Done' : 'To do'}</StatusChip>
-                  </td>
+        <PagedList items={rows} noun="accounts">
+          {(rows) => (
+          <div className="acct-scroll">
+            <table className="accs-table acct-table acct-stack" aria-label="Setup progress">
+              <thead>
+                <tr>
+                  <th scope="col">Account type</th>
+                  <th scope="col" className="accs-num">
+                    Active
+                  </th>
+                  <th scope="col" className="accs-num">
+                    Not active
+                  </th>
+                  <th scope="col">Setup</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.type}>
+                    <td className="acct-main">
+                      <strong>{row.label}</strong>
+                    </td>
+                    <td data-label="Active" className="accs-num">
+                      {row.active}
+                    </td>
+                    <td data-label="Not active" className="accs-num">
+                      {row.inactive}
+                    </td>
+                    <td data-label="Setup">
+                      <StatusChip tone={row.active > 0 ? 'ok' : 'neutral'}>{row.active > 0 ? 'Done' : 'To do'}</StatusChip>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
         <p className="acct-foot">Switch one account on or off from its row in the Faculty or Students tab.</p>
       </Panel>
     </Gate>

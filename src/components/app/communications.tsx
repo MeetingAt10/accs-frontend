@@ -1,3 +1,4 @@
+import { Pager, usePaged } from '@/components/app/paging'
 import {
   Alert,
   Avatar,
@@ -624,7 +625,6 @@ const dayOf = (value: unknown) => {
 function NotificationsPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const [filter, setFilter] = useState("all");
-  const [shown, setShown] = useState(10);
   const [restrictedSource, setRestrictedSource] = useState(false);
   const action = useCommunicationAction("P40", false);
   const today = dayOf(new Date().toISOString());
@@ -643,7 +643,9 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
       (filter === "unread" && notice.read !== true) ||
       filter === "kind:" + words(notice.kind),
   );
-  const visible = filtered.slice(0, shown);
+  // Ten notifications a page; a new filter starts again at page 1.
+  const paged = usePaged(filtered, 10, filter);
+  const visible = paged.shown;
   const rows: ReactNode[] = [];
   visible.forEach((notice, index) => {
     const group = dayOf(notice.at) === today ? "Today" : "Earlier";
@@ -730,7 +732,6 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         value={filter}
         onChange={(next) => {
           setFilter(next);
-          setShown(10);
         }}
         options={[
           { id: "all", label: "All" },
@@ -755,14 +756,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
           </Empty>
         )}
       </Panel>
-      {filtered.length > shown && (
-        <Button
-          variant="secondary"
-          onPress={() => setShown((count) => count + 10)}
-        >
-          Load more
-        </Button>
-      )}
+      <Pager paged={paged} noun="notifications" />
     </div>
   );
 }
