@@ -36,6 +36,7 @@ import { useRef, useState, type FormEvent } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
 import { RestrictedView } from '@/components/app/guards'
+import { PagedList } from '@/components/app/paging'
 import {
   DateTile,
   Empty,
@@ -2122,31 +2123,35 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
       </div>
       {organizations.length ? (
         <Panel flush>
-          <ul className="accs-rows" aria-label="Organizations">
-            {organizations.map((organization) => (
-              <li key={organization.id}>
-                <div className="accs-row fx-row">
-                  <div>
-                    <p className="accs-row__title">
-                      <Link
-                        variant="quiet"
-                        className="fx-table-link"
-                        href={`/organizations/${encodeURIComponent(organization.id)}`}
-                      >
-                        {organization.name}
-                      </Link>
-                    </p>
-                    <p className="accs-row__sub">{organization.description}</p>
+          <PagedList items={organizations} noun="organizations">
+            {(organizations) => (
+            <ul className="accs-rows" aria-label="Organizations">
+              {organizations.map((organization) => (
+                <li key={organization.id}>
+                  <div className="accs-row fx-row">
+                    <div>
+                      <p className="accs-row__title">
+                        <Link
+                          variant="quiet"
+                          className="fx-table-link"
+                          href={`/organizations/${encodeURIComponent(organization.id)}`}
+                        >
+                          {organization.name}
+                        </Link>
+                      </p>
+                      <p className="accs-row__sub">{organization.description}</p>
+                    </div>
+                    <span className="fx-count-label">
+                      <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
+                      members
+                      {organization.member ? ' · Member' : ''}
+                    </span>
                   </div>
-                  <span className="fx-count-label">
-                    <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
-                    members
-                    {organization.member ? ' · Member' : ''}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            )}
+          </PagedList>
         </Panel>
       ) : (
         <Panel>

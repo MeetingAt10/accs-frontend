@@ -1,3 +1,4 @@
+import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
@@ -651,34 +652,38 @@ const NAV: Array<{ href: string; label: string }> = [
 
 function AuditTable({ rows }: { rows: Item[] }) {
   return (
-    <div className="adm-scroll">
-      <table className="accs-table adm-stack adm-table">
-        <thead>
-          <tr>
-            <th scope="col">Time</th>
-            <th scope="col">Actor</th>
-            <th scope="col">Action</th>
-            <th scope="col">Module</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((entry, index) => (
-            <tr key={word(entry.id, String(index))}>
-              <td data-label="Time">
-                <Time value={entry.at} />
-              </td>
-              <td data-label="Actor">
-                {word(object(entry.actor).name, "System")}
-              </td>
-              <td data-label="Action">{word(entry.action)}</td>
-              <td data-label="Module">
-                <span className="accs-tag">{word(entry.module, "—")}</span>
-              </td>
+    <PagedList items={rows} noun="events">
+      {(rows) => (
+      <div className="adm-scroll">
+        <table className="accs-table adm-stack adm-table">
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Actor</th>
+              <th scope="col">Action</th>
+              <th scope="col">Module</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((entry, index) => (
+              <tr key={word(entry.id, String(index))}>
+                <td data-label="Time">
+                  <Time value={entry.at} />
+                </td>
+                <td data-label="Actor">
+                  {word(object(entry.actor).name, "System")}
+                </td>
+                <td data-label="Action">{word(entry.action)}</td>
+                <td data-label="Module">
+                  <span className="accs-tag">{word(entry.module, "—")}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      )}
+    </PagedList>
   );
 }
 
@@ -906,60 +911,64 @@ function UsersPage({ page }: { page: PageEnvelope }) {
         </span>
       </div>
       {results.length ? (
-        <div className="accs-table-wrap">
-          <table className="accs-table adm-stack adm-table">
-            <thead>
-              <tr>
-                <th scope="col">User</th>
-                <th scope="col">Email</th>
-                <th scope="col">Roles</th>
-                <th scope="col">Program</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((user) => {
-                const name = word(user.name, "Unnamed account");
-                const active = user.active !== false;
-                return (
-                  <tr key={word(user.id)}>
-                    <td>
-                      <div className="adm-person">
-                        <span className="accs-avatar" aria-hidden>
-                          {initials(name)}
-                        </span>
-                        <span className="adm-person__text">
-                          <Link
-                            className="adm-link"
-                            variant="quiet"
-                            href={`/admin/users/${encodeURIComponent(word(user.id))}`}
-                          >
-                            {name}
-                          </Link>
-                          <span className="adm-person__sub accs-mono">
-                            {word(user.id)}
+        <PagedList items={results} noun="users">
+          {(results) => (
+          <div className="accs-table-wrap">
+            <table className="accs-table adm-stack adm-table">
+              <thead>
+                <tr>
+                  <th scope="col">User</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Roles</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((user) => {
+                  const name = word(user.name, "Unnamed account");
+                  const active = user.active !== false;
+                  return (
+                    <tr key={word(user.id)}>
+                      <td>
+                        <div className="adm-person">
+                          <span className="accs-avatar" aria-hidden>
+                            {initials(name)}
                           </span>
-                        </span>
-                      </div>
-                    </td>
-                    <td data-label="Email">{word(user.email, "—")}</td>
-                    <td data-label="Roles">
-                      <Tags values={strings(user.roles)} />
-                    </td>
-                    <td data-label="Program">
-                      {word(user.program, word(user.office, "—"))}
-                    </td>
-                    <td data-label="Status">
-                      <StatusChip tone={active ? "ok" : "neutral"}>
-                        {active ? "Active" : "Inactive"}
-                      </StatusChip>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                          <span className="adm-person__text">
+                            <Link
+                              className="adm-link"
+                              variant="quiet"
+                              href={`/admin/users/${encodeURIComponent(word(user.id))}`}
+                            >
+                              {name}
+                            </Link>
+                            <span className="adm-person__sub accs-mono">
+                              {word(user.id)}
+                            </span>
+                          </span>
+                        </div>
+                      </td>
+                      <td data-label="Email">{word(user.email, "—")}</td>
+                      <td data-label="Roles">
+                        <Tags values={strings(user.roles)} />
+                      </td>
+                      <td data-label="Program">
+                        {word(user.program, word(user.office, "—"))}
+                      </td>
+                      <td data-label="Status">
+                        <StatusChip tone={active ? "ok" : "neutral"}>
+                          {active ? "Active" : "Inactive"}
+                        </StatusChip>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <div className="accs-panel">
           <Empty
@@ -1254,59 +1263,63 @@ function ModerationQueue({ page }: { page: PageEnvelope }) {
         </span>
       </div>
       {visible.length ? (
-        <div className="accs-table-wrap">
-          <table className="accs-table adm-stack adm-table">
-            <thead>
-              <tr>
-                <th scope="col">Content</th>
-                <th scope="col">Type</th>
-                <th scope="col">Reason</th>
-                <th scope="col">Source</th>
-                <th scope="col">Status</th>
-                <th scope="col">Reported</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((item) => (
-                <tr key={word(item.id)}>
-                  <td>
-                    <span className="adm-person__text">
-                      <Link
-                        className="adm-link"
-                        variant="quiet"
-                        href={`/admin/moderation/${encodeURIComponent(word(item.id))}`}
-                      >
-                        <span className="adm-trunc adm-trunc--wide">
-                          {word(item.excerpt, cap(word(item.itemType, "Item")))}
-                        </span>
-                      </Link>
-                      <span className="adm-person__sub accs-mono">
-                        {word(item.id)}
-                      </span>
-                    </span>
-                  </td>
-                  <td data-label="Type">
-                    <span className="accs-tag">
-                      {cap(word(item.itemType, "—"))}
-                    </span>
-                  </td>
-                  <td data-label="Reason">{word(item.reason, "—")}</td>
-                  <td data-label="Source">{word(item.source, "—")}</td>
-                  <td data-label="Status">
-                    <StatusChip tone={modTone(word(item.status))}>
-                      {word(item.status, "—")}
-                    </StatusChip>
-                  </td>
-                  <td data-label="Reported">
-                    <span className="adm-time" title={formatDateTime(item.at)}>
-                      {relativeTime(item.at)}
-                    </span>
-                  </td>
+        <PagedList items={visible} noun="items">
+          {(visible) => (
+          <div className="accs-table-wrap">
+            <table className="accs-table adm-stack adm-table">
+              <thead>
+                <tr>
+                  <th scope="col">Content</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Reported</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visible.map((item) => (
+                  <tr key={word(item.id)}>
+                    <td>
+                      <span className="adm-person__text">
+                        <Link
+                          className="adm-link"
+                          variant="quiet"
+                          href={`/admin/moderation/${encodeURIComponent(word(item.id))}`}
+                        >
+                          <span className="adm-trunc adm-trunc--wide">
+                            {word(item.excerpt, cap(word(item.itemType, "Item")))}
+                          </span>
+                        </Link>
+                        <span className="adm-person__sub accs-mono">
+                          {word(item.id)}
+                        </span>
+                      </span>
+                    </td>
+                    <td data-label="Type">
+                      <span className="accs-tag">
+                        {cap(word(item.itemType, "—"))}
+                      </span>
+                    </td>
+                    <td data-label="Reason">{word(item.reason, "—")}</td>
+                    <td data-label="Source">{word(item.source, "—")}</td>
+                    <td data-label="Status">
+                      <StatusChip tone={modTone(word(item.status))}>
+                        {word(item.status, "—")}
+                      </StatusChip>
+                    </td>
+                    <td data-label="Reported">
+                      <span className="adm-time" title={formatDateTime(item.at)}>
+                        {relativeTime(item.at)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <div className="accs-panel">
           <Empty title="Nothing to review">

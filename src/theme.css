@@ -320,3 +320,7 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .accs-kpi { padding: 12px 16px; }
 :root .accs-table th { padding: 8px 12px; }
 :root .accs-table td { padding: 9px 12px; }
+
+/* ---------- Pagers ---------- */
+:root .accs-pager { margin-top: 8px; }
+:root :is(.accs-pager, .ds-pagination) [aria-current="page"] { color: var(--accs-on-accent); }

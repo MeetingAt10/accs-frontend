@@ -1,3 +1,4 @@
+import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
@@ -392,45 +393,49 @@ export function RestrictionPanel({
   return (
     <Panel flush title={title}>
       {ordered.length ? (
-        <ul className="accs-rows">
-          {ordered.map((restriction, index) => (
-            <li key={word(restriction.id, String(index))}>
-              <div className="accs-row rc-row">
-                <div>
-                  <p className="accs-row__title">
-                    {features(restriction).join(", ") || "Restricted features"}
-                  </p>
-                  <p className="accs-row__sub">
-                    {word(restriction.basis, "No basis given")}
-                    {Boolean(restriction.decisionReference) && (
-                      <>
-                        {" · "}
-                        <span className="accs-mono">
-                          {word(restriction.decisionReference)}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                  <p className="accs-row__sub">
-                    {firstRole(
-                      object(restriction.authorizer).roles,
-                      word(restriction.actorRole, "Office not recorded"),
-                    )}
-                  </p>
+        <PagedList items={ordered} noun="restrictions">
+          {(ordered) => (
+          <ul className="accs-rows">
+            {ordered.map((restriction, index) => (
+              <li key={word(restriction.id, String(index))}>
+                <div className="accs-row rc-row">
+                  <div>
+                    <p className="accs-row__title">
+                      {features(restriction).join(", ") || "Restricted features"}
+                    </p>
+                    <p className="accs-row__sub">
+                      {word(restriction.basis, "No basis given")}
+                      {Boolean(restriction.decisionReference) && (
+                        <>
+                          {" · "}
+                          <span className="accs-mono">
+                            {word(restriction.decisionReference)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    <p className="accs-row__sub">
+                      {firstRole(
+                        object(restriction.authorizer).roles,
+                        word(restriction.actorRole, "Office not recorded"),
+                      )}
+                    </p>
+                  </div>
+                  <div className="rc-row__aside">
+                    <StatusChip tone={restriction.active === true ? "warn" : "neutral"}>
+                      {restriction.active === true ? "Active" : "Ended"}
+                    </StatusChip>
+                    <span className="accs-mono">
+                      {formatDate(restriction.starts)} to{" "}
+                      {formatDate(restriction.until)}
+                    </span>
+                  </div>
                 </div>
-                <div className="rc-row__aside">
-                  <StatusChip tone={restriction.active === true ? "warn" : "neutral"}>
-                    {restriction.active === true ? "Active" : "Ended"}
-                  </StatusChip>
-                  <span className="accs-mono">
-                    {formatDate(restriction.starts)} to{" "}
-                    {formatDate(restriction.until)}
-                  </span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No restrictions">
           This student has no restrictions on record.
@@ -454,32 +459,36 @@ export function AuditLog({
       action={<span className="accs-mono rc-muted">{entries.length}</span>}
     >
       {entries.length ? (
-        <div className="rc-scroll">
-          <table className="accs-table">
-            <thead>
-              <tr>
-                <th scope="col">When</th>
-                <th scope="col">Actor</th>
-                <th scope="col">Action</th>
-                <th scope="col">Module</th>
-                <th scope="col">Reference</th>
-                <th scope="col">Purpose</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry, index) => (
-                <tr key={word(entry.id, String(index))}>
-                  <td className="accs-mono">{formatDateTime(entry.at)}</td>
-                  <td>{word(object(entry.actor).name, "Unknown user")}</td>
-                  <td>{word(entry.action, "—")}</td>
-                  <td>{word(entry.module, "—")}</td>
-                  <td className="accs-mono">{word(entry.reference, "—")}</td>
-                  <td>{word(entry.purpose, "—")}</td>
+        <PagedList items={entries} noun="entries">
+          {(entries) => (
+          <div className="rc-scroll">
+            <table className="accs-table">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Actor</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Module</th>
+                  <th scope="col">Reference</th>
+                  <th scope="col">Purpose</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {entries.map((entry, index) => (
+                  <tr key={word(entry.id, String(index))}>
+                    <td className="accs-mono">{formatDateTime(entry.at)}</td>
+                    <td>{word(object(entry.actor).name, "Unknown user")}</td>
+                    <td>{word(entry.action, "—")}</td>
+                    <td>{word(entry.module, "—")}</td>
+                    <td className="accs-mono">{word(entry.reference, "—")}</td>
+                    <td>{word(entry.purpose, "—")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No entries yet" />
       )}
@@ -571,11 +580,15 @@ function ClusterList({ page }: { page: PageEnvelope }) {
       </Note>
       {clusters.length ? (
         <Panel flush>
-          <ul className="accs-rows">
-            {clusters.map((cluster) => (
-              <ClusterRow key={word(cluster.id)} cluster={cluster} />
-            ))}
-          </ul>
+          <PagedList items={clusters} noun="groups">
+            {(clusters) => (
+            <ul className="accs-rows">
+              {clusters.map((cluster) => (
+                <ClusterRow key={word(cluster.id)} cluster={cluster} />
+              ))}
+            </ul>
+            )}
+          </PagedList>
         </Panel>
       ) : (
         <Panel>
@@ -930,42 +943,46 @@ function Analytics({ page }: { page: PageEnvelope }) {
         action={<span className="accs-mono rc-muted">{cases.length}</span>}
       >
         {cases.length ? (
-          <div className="rc-scroll">
-            <table className="accs-table">
-              <thead>
-                <tr>
-                  <th scope="col">Reference</th>
-                  <th scope="col">Stage</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cases.map((entry) => (
-                  <tr key={word(entry.id)}>
-                    <td>
-                      <Link
-                        variant="quiet"
-                        className="rc-ref accs-mono"
-                        href={"/cases/" + encodeURIComponent(word(entry.id))}
-                      >
-                        {word(entry.id)}
-                      </Link>
-                    </td>
-                    <td>
-                      {cap(word(entry.stage, "—"))}
-                    </td>
-                    <td>
-                      <StatusChip tone={toneFor(word(entry.status))}>
-                        {word(entry.status, "—")}
-                      </StatusChip>
-                    </td>
-                    <td className="accs-mono">{formatDate(entry.createdAt)}</td>
+          <PagedList items={cases} noun="cases">
+            {(cases) => (
+            <div className="rc-scroll">
+              <table className="accs-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Stage</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Opened</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {cases.map((entry) => (
+                    <tr key={word(entry.id)}>
+                      <td>
+                        <Link
+                          variant="quiet"
+                          className="rc-ref accs-mono"
+                          href={"/cases/" + encodeURIComponent(word(entry.id))}
+                        >
+                          {word(entry.id)}
+                        </Link>
+                      </td>
+                      <td>
+                        {cap(word(entry.stage, "—"))}
+                      </td>
+                      <td>
+                        <StatusChip tone={toneFor(word(entry.status))}>
+                          {word(entry.status, "—")}
+                        </StatusChip>
+                      </td>
+                      <td className="accs-mono">{formatDate(entry.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Empty title="No cases match these filters">
             Change or clear a filter.
@@ -1083,77 +1100,81 @@ function RecordList({ page }: { page: PageEnvelope }) {
         {students.length === 1 ? "student" : "students"}
       </p>
       {matching.length ? (
-        <div className="accs-table-wrap rc-table-wrap">
-          <table className="accs-table rc-table">
-            <caption className="rc-sr">Student records</caption>
-            <thead>
-              <tr>
-                <th scope="col">Student</th>
-                <th scope="col">Student ID</th>
-                <th scope="col">Program</th>
-                <th scope="col">Standing</th>
-                <th scope="col" className="accs-num">
-                  Restrictions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence initial>
-                {matching.map((student, index) => {
-                  const count = Array.isArray(student.restrictions)
-                    ? student.restrictions.length
-                    : undefined;
-                  return (
-                    <motion.tr
-                      key={word(student.id)}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                        transition: {
-                          duration: 0.28,
-                          ease,
-                          delay: Math.min(index, 8) * 0.03,
-                        },
-                      }}
-                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                    >
-                      <td>
-                        <PersonCell
-                          name={word(student.name, "—")}
-                          href={"/records/" + encodeURIComponent(word(student.id))}
-                        />
-                      </td>
-                      <td className="accs-mono">{word(student.studentId, "—")}</td>
-                      <td>
-                        <span className="rc-tags">
-                          <span className="accs-tag">{word(student.program, "—")}</span>
-                          <span className="rc-muted">Section {word(student.section, "—")}</span>
-                        </span>
-                      </td>
-                      <td>
-                        {isPaused(student.standing) ? (
-                          <StandingBadge standing={student.standing} />
-                        ) : (
-                          <span className="rc-muted">Good standing</span>
-                        )}
-                      </td>
-                      <td className="accs-num">
-                        {count ? (
-                          count
-                        ) : hasRestrictions(student) ? (
-                          <StatusChip tone="warn">Active</StatusChip>
-                        ) : (
-                          <span className="rc-muted">None</span>
-                        )}
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </AnimatePresence>
-            </tbody>
-          </table>
-        </div>
+        <PagedList items={matching} noun="students">
+          {(matching) => (
+          <div className="accs-table-wrap rc-table-wrap">
+            <table className="accs-table rc-table">
+              <caption className="rc-sr">Student records</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Student</th>
+                  <th scope="col">Student ID</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Standing</th>
+                  <th scope="col" className="accs-num">
+                    Restrictions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence initial>
+                  {matching.map((student, index) => {
+                    const count = Array.isArray(student.restrictions)
+                      ? student.restrictions.length
+                      : undefined;
+                    return (
+                      <motion.tr
+                        key={word(student.id)}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                          transition: {
+                            duration: 0.28,
+                            ease,
+                            delay: Math.min(index, 8) * 0.03,
+                          },
+                        }}
+                        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                      >
+                        <td>
+                          <PersonCell
+                            name={word(student.name, "—")}
+                            href={"/records/" + encodeURIComponent(word(student.id))}
+                          />
+                        </td>
+                        <td className="accs-mono">{word(student.studentId, "—")}</td>
+                        <td>
+                          <span className="rc-tags">
+                            <span className="accs-tag">{word(student.program, "—")}</span>
+                            <span className="rc-muted">Section {word(student.section, "—")}</span>
+                          </span>
+                        </td>
+                        <td>
+                          {isPaused(student.standing) ? (
+                            <StandingBadge standing={student.standing} />
+                          ) : (
+                            <span className="rc-muted">Good standing</span>
+                          )}
+                        </td>
+                        <td className="accs-num">
+                          {count ? (
+                            count
+                          ) : hasRestrictions(student) ? (
+                            <StatusChip tone="warn">Active</StatusChip>
+                          ) : (
+                            <span className="rc-muted">None</span>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Panel>
           <Empty
@@ -1791,94 +1812,98 @@ function RestrictionRows({
       </Panel>
     );
   return (
-    <div className="accs-table-wrap rc-table-wrap">
-      <table className="accs-table rc-table">
-        <caption className="rc-sr">Restrictions</caption>
-        <thead>
-          <tr>
-            <th scope="col">Student</th>
-            <th scope="col">Paused features</th>
-            <th scope="col">Basis</th>
-            <th scope="col">Period</th>
-            <th scope="col">Status</th>
-            <th scope="col">
-              <span className="rc-sr">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((restriction, index) => {
-            const id = word(restriction.id, String(index));
-            const isActive = Boolean(restriction.active);
-            return (
-              <Fragment key={id}>
-                <tr>
-                  <td>
-                    <PersonCell
-                      name={word(object(restriction.student).name, "—")}
-                      sub={firstRole(object(restriction.authorizer).roles)}
-                    />
-                  </td>
-                  <td>{features(restriction).join(", ") || "—"}</td>
-                  <td className="rc-wrap">
-                    {word(restriction.basis, "—")}
-                    <p className="rc-person__sub accs-mono">
-                      {word(restriction.decisionReference, "—")}
-                    </p>
-                  </td>
-                  <td className="accs-mono">
-                    {formatDate(restriction.starts)} to{" "}
-                    {formatDate(restriction.until)}
-                  </td>
-                  <td>
-                    <StatusChip tone={isActive ? "warn" : "neutral"}>
-                      {isActive ? "Active" : "Ended"}
-                    </StatusChip>
-                  </td>
-                  <td className="rc-actions">
-                    {isActive && roles.includes("administrator") && (
-                      <Button
-                        variant="secondary"
-                        onPress={() => onLift(word(restriction.id))}
-                      >
-                        Lift restriction
-                      </Button>
-                    )}
-                    {isActive && canRefer && (
-                      <Button
-                        variant="secondary"
-                        onPress={() =>
-                          setRequestId(requestId === id ? "" : id)
-                        }
-                      >
-                        Request change
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-                {requestId === id && (
-                  <tr className="rc-form-row">
-                    <td colSpan={6}>
-                      <motion.div
-                        className="rc-expand"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        transition={{ duration: 0.32, ease }}
-                      >
-                        <RestrictionRequestForm
-                          restriction={restriction}
-                          onClose={() => setRequestId("")}
-                        />
-                      </motion.div>
+    <PagedList items={rows} noun="restrictions">
+      {(rows) => (
+      <div className="accs-table-wrap rc-table-wrap">
+        <table className="accs-table rc-table">
+          <caption className="rc-sr">Restrictions</caption>
+          <thead>
+            <tr>
+              <th scope="col">Student</th>
+              <th scope="col">Paused features</th>
+              <th scope="col">Basis</th>
+              <th scope="col">Period</th>
+              <th scope="col">Status</th>
+              <th scope="col">
+                <span className="rc-sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((restriction, index) => {
+              const id = word(restriction.id, String(index));
+              const isActive = Boolean(restriction.active);
+              return (
+                <Fragment key={id}>
+                  <tr>
+                    <td>
+                      <PersonCell
+                        name={word(object(restriction.student).name, "—")}
+                        sub={firstRole(object(restriction.authorizer).roles)}
+                      />
+                    </td>
+                    <td>{features(restriction).join(", ") || "—"}</td>
+                    <td className="rc-wrap">
+                      {word(restriction.basis, "—")}
+                      <p className="rc-person__sub accs-mono">
+                        {word(restriction.decisionReference, "—")}
+                      </p>
+                    </td>
+                    <td className="accs-mono">
+                      {formatDate(restriction.starts)} to{" "}
+                      {formatDate(restriction.until)}
+                    </td>
+                    <td>
+                      <StatusChip tone={isActive ? "warn" : "neutral"}>
+                        {isActive ? "Active" : "Ended"}
+                      </StatusChip>
+                    </td>
+                    <td className="rc-actions">
+                      {isActive && roles.includes("administrator") && (
+                        <Button
+                          variant="secondary"
+                          onPress={() => onLift(word(restriction.id))}
+                        >
+                          Lift restriction
+                        </Button>
+                      )}
+                      {isActive && canRefer && (
+                        <Button
+                          variant="secondary"
+                          onPress={() =>
+                            setRequestId(requestId === id ? "" : id)
+                          }
+                        >
+                          Request change
+                        </Button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  {requestId === id && (
+                    <tr className="rc-form-row">
+                      <td colSpan={6}>
+                        <motion.div
+                          className="rc-expand"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          transition={{ duration: 0.32, ease }}
+                        >
+                          <RestrictionRequestForm
+                            restriction={restriction}
+                            onClose={() => setRequestId("")}
+                          />
+                        </motion.div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      )}
+    </PagedList>
   );
 }
 
