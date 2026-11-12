@@ -68,7 +68,8 @@ export const sites: Site[] = [
     icon: 'list-checks',
     lane: 'navy',
     prefixes: ['/evaluations'],
-    landings: ['/evaluations'],
+    // A Program Chair has results but no evaluations of their own, and the Dean manages cycles: both still open the site.
+    landings: ['/evaluations', '/evaluations/results', '/evaluations/cycles'],
     modules: ['STU-10', 'PRO-07', 'PRO-08', 'CHR-04', 'DEAN-03', 'DEAN-04'],
   },
   {

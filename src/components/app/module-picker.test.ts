@@ -63,13 +63,41 @@ describe('module picker tiles', () => {
     expect(moduleTiles(session(['secretary'], ['/home']))).toEqual([])
   })
 
-  it.each(['chair', 'guidance', 'osas', 'president'])('lists the %s module without a link', (role) => {
-    const unfinished = moduleTiles(session([role], ['/home'])).filter((tile) => tile.id === role)
-    expect(unfinished).toHaveLength(1)
-    expect(unfinished[0].href).toBeUndefined()
+  it('gives the program chair the program tiles', () => {
+    expect(links(session(['chair'], ['/home', '/cases', '/records', '/analytics', '/evaluations/results']))).toEqual([
+      ['chair-cases', '/cases'],
+      ['chair-records', '/records'],
+      ['chair-analytics', '/analytics'],
+      ['chair-results', '/evaluations/results'],
+    ])
   })
 
-  it('combines roles in catalog order, unfinished modules last', () => {
+  it('gives Guidance the case tiles, each a link', () => {
+    expect(links(session(['guidance'], [...own, '/cases', '/records']))).toEqual([
+      ['guidance-cases', '/cases'],
+      ['guidance-records', '/records'],
+      ['guidance-messages', '/messages'],
+      ['guidance-notifications', '/notifications'],
+    ])
+  })
+
+  it('gives OSAS the case and record tiles, each a link', () => {
+    expect(links(session(['osas'], [...own, '/cases', '/records', '/restrictions']))).toEqual([
+      ['osas-cases', '/cases'],
+      ['osas-records', '/records'],
+      ['osas-restrictions', '/restrictions'],
+      ['osas-notifications', '/notifications'],
+    ])
+  })
+
+  it('has no tile that is not available yet, and none for the removed offices', () => {
+    for (const role of ['chair', 'guidance', 'osas', 'president', 'staff']) {
+      for (const tile of moduleTiles(session([role], [...own, '/cases', '/records', '/analytics', '/evaluations/results', '/restrictions']))) expect(tile.href, tile.id).toBeDefined()
+    }
+    expect(moduleTiles(session(['president'], [...own, '/cases', '/records']))).toEqual([])
+  })
+
+  it('combines roles in catalog order', () => {
     const both = session(['professor', 'chair', 'dean'], [...own, '/cases', '/consultations/availability', '/records'], accounts)
     expect(moduleTiles(both).map((tile) => tile.id)).toEqual([
       'dean-accounts',
@@ -80,7 +108,8 @@ describe('module picker tiles', () => {
       'faculty-schedule',
       'availability',
       'faculty-messages',
-      'chair',
+      'chair-cases',
+      'chair-records',
     ])
   })
 

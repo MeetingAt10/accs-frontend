@@ -61,10 +61,20 @@ const entries: Entry[] = [
   { id: 'availability', label: 'My availability', about: 'Set when students can book you.', icon: 'clock', tone: 'consult', roles: ['professor'], to: ['/consultations/availability'] },
   { id: 'faculty-messages', label: 'Messages', about: 'Conversations with students and faculty.', icon: 'envelope', tone: 'community', roles: ['professor'], to: ['/messages'] },
 
-  { id: 'chair', label: 'Program chair', icon: 'chalkboard', roles: ['chair'] },
-  { id: 'guidance', label: 'Guidance', icon: 'hand-heart', roles: ['guidance'] },
-  { id: 'osas', label: 'OSAS', icon: 'student', roles: ['osas'] },
-  { id: 'president', label: "President's office", icon: 'door', roles: ['president'] },
+  { id: 'chair-cases', label: 'Program concerns', about: 'Concerns in your program and where each one stands.', icon: 'file', tone: 'neutral', roles: ['chair'], to: ['/cases'] },
+  { id: 'chair-records', label: 'Student records', about: 'Records of the students in your program.', icon: 'archive', tone: 'neutral', roles: ['chair'], to: ['/records'] },
+  { id: 'chair-analytics', label: 'Analytics', about: 'Concern trends and waiting times in your program.', icon: 'chalkboard', roles: ['chair'], to: ['/analytics'] },
+  { id: 'chair-results', label: 'Evaluation results', about: "Results for your program's faculty.", icon: 'list', roles: ['chair'], to: ['/evaluations/results'] },
+
+  { id: 'guidance-cases', label: 'Case queue', about: 'Concerns sent to Guidance, and the Case Files you open.', icon: 'hand-heart', tone: 'neutral', roles: ['guidance'], to: ['/cases'] },
+  { id: 'guidance-records', label: 'Student records', about: 'Records of the students in your cases.', icon: 'archive', tone: 'neutral', roles: ['guidance'], to: ['/records'] },
+  { id: 'guidance-messages', label: 'Messages', about: 'Conversations with students about their cases.', icon: 'envelope', tone: 'community', roles: ['guidance'], to: ['/messages'] },
+  { id: 'guidance-notifications', label: 'Notifications', about: 'Updates on the cases with Guidance.', icon: 'bell', roles: ['guidance'], to: ['/notifications'] },
+
+  { id: 'osas-cases', label: 'Case queue', about: 'Case Files sent to OSAS, and the strikes the Dean recommended.', icon: 'student', tone: 'neutral', roles: ['osas'], to: ['/cases'] },
+  { id: 'osas-records', label: 'Student records', about: 'Strikes, clearance holds and Good Moral reviews.', icon: 'archive', tone: 'neutral', roles: ['osas'], to: ['/records'] },
+  { id: 'osas-restrictions', label: 'Restrictions', about: 'Ask the System Administrator to pause features for a student.', icon: 'list', roles: ['osas'], to: ['/restrictions'] },
+  { id: 'osas-notifications', label: 'Notifications', about: 'Updates on the cases with OSAS.', icon: 'bell', roles: ['osas'], to: ['/notifications'] },
 ]
 
 /** Tiles for this session, in catalog order. */
