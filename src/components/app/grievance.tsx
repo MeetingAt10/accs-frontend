@@ -34,7 +34,10 @@ const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const isClosed = (report: Item) => ['Resolved', 'Closed'].includes(words(report.status))
 const reportReference = (report: Item) => words(report.caseFileId, words(report.id))
 // Named reporters show their name; an anonymous one shows the alias the office sees.
-const studentName = (report: Item) => words(object(report.reporter).name, words(report.alias, '—'))
+const studentName = (report: Item) => report.source === 'faculty' && words(object(report.reportedStudent).name)
+  ? words(object(report.reportedStudent).name)
+  : words(object(report.reporter).name, words(report.alias, '—'))
+const isFacultyReport = (report: Item) => report.source === 'faculty'
 const severity = (report: Item): SeverityLevel => ['low', 'medium', 'high'].includes(words(report.severity)) ? report.severity as SeverityLevel : 'medium'
 const severityTone: Record<SeverityLevel, Tone> = { high: 'danger', medium: 'warn', low: 'neutral' }
 const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new Date(words(report.updatedAt, words(report.createdAt))).getTime()) / 86400000)) || 0
@@ -547,6 +550,7 @@ function CaseHeader({ report, crumbs, children }: { report: Report; crumbs: Arra
         <SeverityChip report={report} />
         <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>
         {report.confidential === true && <StatusChip tone="warn">Marked confidential by the adviser</StatusChip>}
+        {isFacultyReport(report) && <span className="accs-tag">Faculty report</span>}
         {children}
       </div>}
     />
@@ -689,10 +693,14 @@ function CaseGlance({ report }: { report: Report }) {
         ['Status', <StatusChip key="status" tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>],
         ['Severity', <SeverityChip key="severity" report={report} />],
         ['Assigned to', stageLabel(report) + (report.office ? ' · ' + report.office : '')],
-        ['Consent', access.consentAt ? 'Given ' + formatDateTime(access.consentAt) : 'Not recorded'],
-        ['Also readable by', alsoReadableBy(access)],
-        ['How the student wants to talk', modeLabel(talk.mode) || 'Not chosen yet'],
-        ['Meeting time', meeting],
+        ...(isFacultyReport(report)
+          ? [['Reported student', reportedStudentText(report)], ['Filed by', words(object(report.reporter).name, '—')]] as Array<[string, React.ReactNode]>
+          : [
+            ['Consent', access.consentAt ? 'Given ' + formatDateTime(access.consentAt) : 'Not recorded'],
+            ['Also readable by', alsoReadableBy(access)],
+            ['How the student wants to talk', modeLabel(talk.mode) || 'Not chosen yet'],
+            ['Meeting time', meeting],
+          ] as Array<[string, React.ReactNode]>),
       ]} />
     </Panel>
   )
@@ -751,28 +759,34 @@ function StatusTimeline({ entries }: { entries: Item[] }) {
 }
 
 function StatusOnlyView({ report, crumbs }: { report: Report; crumbs: Array<{ label: string; href?: string }> }) {
+  const filed = isFacultyReport(report)
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
         <PageHeader
           crumbs={crumbs}
-          title={'Status of ' + reportReference(report)}
+          title={filed ? categoryText(report) : 'Status of ' + reportReference(report)}
           description={'Filed ' + formatDate(report.createdAt)}
           actions={<div className="gv-chips">
             <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
             {report.confidential === true && <StatusChip tone="warn">Marked confidential by the adviser</StatusChip>}
+            {filed && <span className="accs-tag">Faculty report</span>}
           </div>}
         />
-        <Alert tone="neutral" title={report.confidential === true ? 'Status only' : 'Following this concern'}>{words(report.statusNotice, 'You can follow the status of this concern here.')}</Alert>
+        <Alert tone="neutral" title={filed ? 'Your report' : report.confidential === true ? 'Status only' : 'Following this concern'}>{words(report.statusNotice, 'You can follow the status of this concern here.')}</Alert>
         <div className="accs-split">
-          <Panel title="Status updates"><StatusTimeline entries={items(report.timeline)} /></Panel>
+          <div className="accs-stack">
+            {filed && <Narrative report={report} title="Your statement" />}
+            <Panel title="Status updates"><StatusTimeline entries={items(report.timeline)} /></Panel>
+          </div>
           <aside className="accs-stack" aria-label="Status">
             <Panel title="Where it is">
               <Facts values={[
                 ['Status', words(report.status, '—')], ['Office', words(report.office, '—')], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
+                ...(filed ? [['Student', reportedStudentText(report)], ['Category', categoryText(report)], ['Severity', <SeverityChip key="severity" report={report} />]] as Array<[string, React.ReactNode]> : []),
               ]} />
-              <Note>The statement, the student, messages and internal notes are not shown here.</Note>
+              <Note>{filed ? 'You follow the status of your report here. Messages and internal notes stay with the office handling it.' : 'The statement, the student, messages and internal notes are not shown here.'}</Note>
             </Panel>
           </aside>
         </div>
@@ -814,9 +828,10 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
             <CaseGlance report={report} />
-            <Narrative report={report} title="Student's statement" />
-            <HandlerTalk report={report} action={talkAction} />
-            <Panel title="Messages"><Conversation report={report} pageId="P22" readOnly={readOnly} /></Panel>
+            <Narrative report={report} title={isFacultyReport(report) ? 'Faculty statement' : "Student's statement"} />
+            {/* A faculty report has no student talk choice or chat: the office follows it up directly. */}
+            {!isFacultyReport(report) && <HandlerTalk report={report} action={talkAction} />}
+            {!isFacultyReport(report) && <Panel title="Messages"><Conversation report={report} pageId="P22" readOnly={readOnly} /></Panel>}
             <Panel title="History"><Timeline report={report} handler /></Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Case details">
@@ -827,12 +842,13 @@ function CaseWorkspace({ page }: { page: PageEnvelope }) {
               <Facts values={[
                 ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report, '—')], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
-                ['Reporter', words(object(report.reporter).name, words(report.alias, '—'))],
+                ...(isFacultyReport(report) ? [['Reported student', reportedStudentText(report)] as [string, string]] : []),
+                [isFacultyReport(report) ? 'Filed by' : 'Reporter', words(object(report.reporter).name, words(report.alias, '—'))],
                 ['Identity', report.identity === 'anonymous' ? 'Alias unless disclosed to this office' : 'Named'],
               ]} />
               <Note>Only authorized handlers can open this record. We record every action.</Note>
             </Panel>
-            <AccessPanel access={readAccess(report)} viewer="handler" />
+            {!isFacultyReport(report) && <AccessPanel access={readAccess(report)} viewer="handler" />}
             {!readOnly && <CaseNotes report={report} />}
           </aside>
         </div>
@@ -847,6 +863,86 @@ const sortColumns: Array<[string, string]> = [['id', 'Reference'], ['category', 
 export const mine = (report: Item) => report.readOnly !== true && report.statusOnly !== true && report.historyOnly !== true
 /** A row the reader can see but not act on. */
 export const following = (report: Item) => report.readOnly === true || report.statusOnly === true
+
+const reportedStudentText = (report: Item) => {
+  const student = object(report.reportedStudent)
+  return [words(student.name), words(student.studentId)].filter(Boolean).join(' · ') || '—'
+}
+
+type StudentReportDraft = { studentId: string; narrative: string; category: string; subcategory: string; categoryDetail: string; severity: SeverityLevel | ''; location: string; occurredOn: string }
+const blankStudentReport: StudentReportDraft = { studentId: '', narrative: '', category: '', subcategory: '', categoryDetail: '', severity: '', location: '', occurredOn: '' }
+
+/** Faculty report a student from their classes (P21 `reportStudent`). It goes to the Program Chair, or to the Dean when the chair files it. */
+function ReportStudent({ page }: { page: PageEnvelope }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<StudentReportDraft>(blankStudentReport)
+  const [tried, setTried] = useState(false)
+  const action = useAction('P21')
+  const options = readCategoryOptions(page.data.categoryOptions)
+  const students = items(page.data.reportableStudents)
+  const option = options.find((entry) => entry.label === draft.category)
+  const missing = choiceProblems(draft, options)
+  const update = <K extends keyof StudentReportDraft>(key: K, value: StudentReportDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
+  const refused = (path: string) => (action.error as { fields?: Array<{ path: string; message: string }> } | null)?.fields?.find((field) => field.path === path)?.message
+  const fieldError = (path: string, local?: string) => refused(path) ?? (tried ? local : undefined)
+  const ready = Boolean(draft.studentId && draft.narrative.trim() && draft.severity) && Object.keys(missing).length === 0
+  const close = () => { setOpen(false); setTried(false); action.reset() }
+  const send = () => {
+    setTried(true)
+    if (!ready) return
+    action.mutate({
+      action: 'reportStudent',
+      payload: {
+        studentId: draft.studentId, narrative: draft.narrative.trim(), ...choicePayload(draft, options), severity: draft.severity,
+        ...(draft.location.trim() ? { location: draft.location.trim() } : {}),
+        ...(draft.occurredOn ? { occurredOn: draft.occurredOn } : {}),
+      },
+    }, { onSuccess: () => { setDraft(blankStudentReport); close() } })
+  }
+  return (
+    <>
+      <Button icon="pencil" onPress={() => { action.reset(); setOpen(true) }}>Report a student</Button>
+      <Drawer title="Report a student" isOpen={open} onOpenChange={(state) => !state && close()}>
+        <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); send() }}>
+          <p className="gv-hint">Report a student from your classes. It goes to the Program Chair, or to the Dean if you are the chair. You can follow its status from your case queue.</p>
+          <Select label="Student" placeholder="Choose a student" isRequired selectedKey={draft.studentId || null} onSelectionChange={(key) => update('studentId', String(key ?? ''))}
+            isInvalid={Boolean(fieldError('studentId', draft.studentId ? undefined : 'Choose a student.'))} errorMessage={fieldError('studentId', draft.studentId ? undefined : 'Choose a student.')}
+            description={students.length ? undefined : 'No students in your classes yet.'}>
+            {students.map((student) => <SelectOption id={words(student.id)} key={words(student.id)}>{[words(student.name), words(student.studentId), [words(student.program), words(student.section)].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}</SelectOption>)}
+          </Select>
+          <Select label="Category" placeholder="Choose a category" isRequired selectedKey={draft.category || null} onSelectionChange={(key) => setDraft((current) => current.category === String(key ?? '') ? current : { ...current, category: String(key ?? ''), subcategory: '', categoryDetail: '' })}
+            description={option?.description} isInvalid={Boolean(fieldError('category', missing.category))} errorMessage={fieldError('category', missing.category)}>
+            {options.map((entry) => <SelectOption id={entry.label} key={entry.label}>{entry.label}</SelectOption>)}
+          </Select>
+          {option?.requiresDetail
+            ? <TextField label="Describe it briefly" isRequired maxLength={categoryDetailMax} value={draft.categoryDetail} onChange={(value) => update('categoryDetail', value)}
+              isInvalid={Boolean(fieldError('categoryDetail', missing.categoryDetail))} errorMessage={fieldError('categoryDetail', missing.categoryDetail)} />
+            : <Select key={draft.category || 'none'} label="Sub-category" placeholder="Choose a sub-category" isRequired isDisabled={!option} selectedKey={draft.subcategory || null} onSelectionChange={(key) => update('subcategory', String(key ?? ''))}
+              description={option ? undefined : 'Choose a category first.'} isInvalid={Boolean(fieldError('subcategory', option ? missing.subcategory : undefined))} errorMessage={fieldError('subcategory', option ? missing.subcategory : undefined)}>
+              {(option?.subcategories ?? []).map((sub) => <SelectOption id={sub} key={sub}>{sub}</SelectOption>)}
+            </Select>}
+          <RadioGroup label="How serious is it?" isRequired value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)}
+            isInvalid={Boolean(fieldError('severity', draft.severity ? undefined : 'Choose how serious it is.'))} errorMessage={fieldError('severity', draft.severity ? undefined : 'Choose how serious it is.')}>
+            <Radio value="low">Low</Radio>
+            <Radio value="medium">Medium</Radio>
+            <Radio value="high">High</Radio>
+          </RadioGroup>
+          <TextArea label="What happened" isRequired showCount maxLength={4000} value={draft.narrative} onChange={(value) => update('narrative', value)}
+            isInvalid={Boolean(fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.'))} errorMessage={fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.')} />
+          <Grid columns={2}>
+            <TextField label="Where" maxLength={200} value={draft.location} onChange={(value) => update('location', value)} description="Optional" />
+            <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description="Optional" />
+          </Grid>
+          {action.error && !(action.error as { fields?: unknown[] }).fields?.length && <Alert tone="danger" title="The report was not sent">{action.error.message}</Alert>}
+          <div className="gv-foot">
+            <Button variant="secondary" onPress={close} isDisabled={action.isPending}>Cancel</Button>
+            <Button type="submit" loading={action.isPending}>Send report</Button>
+          </div>
+        </form>
+      </Drawer>
+    </>
+  )
+}
 
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
@@ -894,7 +990,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
-        <PageHeader title={title} description={page.scope} actions={<Note>{role === 'chair' || role === 'dean' ? 'You can read every concern in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>} />
+        <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : <Note>{role === 'chair' || role === 'dean' ? 'You can read every concern in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>} />
         <div className="gv-page accs-stagger">
           <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabsShown} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">
@@ -944,7 +1040,8 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
                       <tr key={words(report.id)}>
                         <td className="gv-c-ref"><a className="accs-mono gv-ref-link" href={casePath(report)} title={reportReference(report)}>{reportReference(report)}</a></td>
                         <td className="gv-c-title">
-                          <span className="gv-title">{report.statusOnly === true ? 'Status only' : categoryText(report)}</span>
+                          <span className="gv-title">{report.statusOnly === true && !isFacultyReport(report) ? 'Status only' : categoryText(report)}</span>
+                          {isFacultyReport(report) && <span className="accs-tag">Faculty report</span>}
                           {report.confidential === true && <span className="accs-tag gv-lock"><Icon name="lock" size={16} />Confidential</span>}
                           {report.bypassed === true && <span className="accs-tag gv-bypass">Adviser bypassed</span>}
                         </td>
