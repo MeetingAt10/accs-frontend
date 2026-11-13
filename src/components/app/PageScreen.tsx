@@ -182,7 +182,7 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                 key={text(stat.id, label + index)}
                 label={label}
                 value={<Counter value={stat.value} />}
-                note={/synthetic|demo|sample|prototype/i.test(note) ? undefined : note || undefined}
+                note={note || undefined}
                 href={target && allow(target) ? target : undefined}
               />
             )

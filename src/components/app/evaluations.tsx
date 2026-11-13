@@ -117,12 +117,9 @@ function number(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-/** Drops server notes that describe the data as sample or prototype material. */
+/** A server note, or undefined when there is none. */
 function cleanNote(value: unknown): string | undefined {
-  const note = words(value);
-  return note && !/synthetic|sample|prototype|demo/i.test(note)
-    ? note
-    : undefined;
+  return words(value) || undefined;
 }
 
 function questions(value: unknown): EvaluationQuestion[] {

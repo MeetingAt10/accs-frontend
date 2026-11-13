@@ -19,6 +19,8 @@ Start the local role launcher with the frontend API URL set to the Vite proxy:
 ACCS_ROLE_LAUNCHER=1 VITE_API_URL=/api npm run dev -- --port 5188
 ```
 
+Port 5188 is only this example's choice, so the launcher can run beside the normal dev server, which uses 5173.
+
 Open `http://<account id lowercased>.localhost:5188/__role?account=<ACCOUNT ID>` (for example `qcu-stu-it-a.localhost`). The launcher signs in with the backend's local default seed password, which a stack that sets its own `SEED_PASSWORD` rejects, on a separate `<account>.localhost` hostname; `/__roles` only shows these instructions, because the account list endpoint was removed. The tab opens Home, or Administration for an administrator. Reloading a tab keeps its account; signing in on another account's hostname does not replace its cookie. Tabs opened on the same account hostname share that account's session.
 
 `ACCS_DEV_API_TARGET` selects the API proxied by Vite. It defaults to `http://localhost:3000`; set it to the development API origin to use the hosted pilot data. Keep `VITE_API_URL=/api` so requests use the local proxy. The account tabs share the selected API's records, so changes made in one role are visible to other roles according to their permissions.
