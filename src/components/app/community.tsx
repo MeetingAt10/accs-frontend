@@ -133,6 +133,8 @@ export function sectionCode(space: { title: string }) {
 }
 /** True for a section's own group space, as opposed to one of its subjects. */
 export const isSectionGroup = (space: { title: string; subject: string }) => !space.title.includes(',') || /^section group$/i.test(space.subject)
+/** A space's name: "SBIT3A" for a section group, "SBIT3A - CC 104 Data Structures" for one of its subjects. */
+export const spaceName = (space: { title: string; subject: string }) => isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} - ${space.subject}`
 /** Spaces in one order: by section code, the section group first, then its subjects by name. */
 export function sortBySection<T extends { title: string; subject: string }>(spaces: T[]) {
   return [...spaces].sort((a, b) => sectionCode(a).localeCompare(sectionCode(b)) || Number(isSectionGroup(b)) - Number(isSectionGroup(a)) || a.subject.localeCompare(b.subject))
@@ -213,7 +215,7 @@ function audienceName(
   if (kind === 'program') return `${id} program`
   if (kind === 'space') {
     const space = spaces.find((entry) => entry.id === id)
-    return space ? (isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} · ${space.subject}`) : 'Class space'
+    return space ? spaceName(space) : 'Class space'
   }
   if (kind === 'organization')
     return (
@@ -479,8 +481,8 @@ function FeedRail({
                   <RailRow
                     href={`/spaces/${encodeURIComponent(space.id)}`}
                     icon={group ? 'chalkboard' : 'books'}
-                    title={group ? sectionCode(space) : space.subject}
-                    sub={group ? 'Whole section' : `${sectionCode(space)} · Subject`}
+                    title={spaceName(space)}
+                    sub={group ? 'Whole section' : 'Subject'}
                   />
                 </li>
               )
@@ -560,7 +562,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
             roles.includes('student') ||
             space.professorIds?.includes(session.user.id),
         )
-        .map((space) => ({ id: `space:${space.id}`, label: isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} · ${space.subject}` })),
+        .map((space) => ({ id: `space:${space.id}`, label: spaceName(space) })),
     )
   }
   if (roles.some((role) => ['professor', 'chair', 'dean'].includes(role))) {
@@ -1973,7 +1975,7 @@ function SpacesPage({
                           className="fx-table-link"
                           href={`/spaces/${encodeURIComponent(space.id)}`}
                         >
-                          {sectionCode(space)}
+                          {spaceName(space)}
                         </Link>
                       </td>
                       <td>
@@ -2012,11 +2014,11 @@ function SpacesPage({
                           className="fx-table-link"
                           href={`/spaces/${encodeURIComponent(space.id)}`}
                         >
-                          {space.subject}
+                          {spaceName(space)}
                         </Link>
                       </p>
                       <p className="accs-row__sub">
-                        {space.program} · {sectionCode(space)} ·{' '}
+                        {space.program} ·{' '}
                         {adviserNames(space, 'No adviser assigned')} ·{' '}
                         <span className="accs-num">{studentTotal(space)}</span>{' '}
                         students
@@ -2086,7 +2088,7 @@ function SpacePage({
           { label: 'Classes and sections', href: '/spaces' },
           { label: sectionCode(space) },
         ]}
-        title={`${sectionCode(space)} · ${space.subject}`}
+        title={spaceName(space)}
         description={`${adviserNames(space, 'No adviser assigned')} · ${studentTotal(space)} students`}
         actions={
           <>
