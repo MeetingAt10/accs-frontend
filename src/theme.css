@@ -425,3 +425,15 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .fx-page .fx-post-panel { gap: 14px; }
 :root .fx-actions { padding-top: 12px; gap: 8px; }
 :root .fx-reply { margin-top: 8px; }
+
+/* Long text never spills out of its card (#68). Long names, references and subjects break inside the content area,
+   which also lets grid and flex items shrink to their column. Chips, tags and header links may wrap rather than
+   push their card wider. Tables keep their words whole and scroll inside their own box instead. */
+:root .shell-content { overflow-wrap: anywhere; }
+:root .shell-content :is(.accs-status, .accs-tag, .accs-panel__link, .ds-btn) { max-width: 100%; }
+:root .shell-content :is(.accs-status, .accs-tag, .accs-panel__link) { white-space: normal; }
+:root .shell-content table { overflow-wrap: normal; }
+/* A panel's single column never grows past the panel (a long word or a full actions row used to widen every child),
+   and a table's wrapper shrinks to its column and scrolls. Zero specificity, so panels with their own columns keep them. */
+:where(.shell-content) :where(.accs-panel) { grid-template-columns: minmax(0, 1fr); }
+:root .shell-content .accs-table-wrap { min-width: 0; max-width: 100%; }
