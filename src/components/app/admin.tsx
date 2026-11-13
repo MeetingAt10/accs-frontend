@@ -43,6 +43,7 @@ import {
 } from "@/components/app/page-shell";
 import {
   ApiError,
+  issueResetCode,
   performPageAction,
   type PageAction,
   type PageEnvelope,
@@ -1029,6 +1030,63 @@ function UsersPage({ page }: { page: PageEnvelope }) {
 
 /* ---------- P47 User detail ---------- */
 
+/**
+ * Issues a password reset code for an account (POST /api/admin/accounts/:id/reset-code), for when email is not set up or
+ * the account has a sample address. The code is shown once, in the dialog, and dropped when the dialog closes.
+ */
+function ResetCodePanel({ accountId, name }: { accountId: string; name: string }) {
+  const session = useQuery(sessionQuery());
+  const [confirming, setConfirming] = useState(false);
+  const [issued, setIssued] = useState<{ code: string; expiresAt: string }>();
+  const [copied, setCopied] = useState(false);
+  const issue = useMutation({ mutationFn: () => issueResetCode(accountId) });
+  if (!session.data?.permissions.includes("role.manage")) return null;
+  const close = () => { setIssued(undefined); setCopied(false); issue.reset(); };
+  return (
+    <Panel title="Password reset">
+      <p className="adm-hint">
+        Give the account holder a one-time code to set a new password on the sign-in page. It expires in 15 minutes.
+      </p>
+      <Button variant="secondary" size="sm" onPress={() => { issue.reset(); setConfirming(true); }}>
+        Issue reset code
+      </Button>
+      <Modal role="alertdialog" title={`Issue a reset code for ${name}?`} isOpen={confirming} onOpenChange={setConfirming}>
+        <ModalBody>
+          <p>A new code replaces any earlier one. The audit trail records that you issued it.</p>
+          {issue.error && <Alert tone="danger" title="No code was issued">{issue.error.message}</Alert>}
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setConfirming(false)} isDisabled={issue.isPending}>Cancel</Button>
+          <Button
+            loading={issue.isPending}
+            onPress={() => issue.mutate(undefined, { onSuccess: (result) => { setIssued(result.record); setConfirming(false); } })}
+          >
+            Issue code
+          </Button>
+        </ModalActions>
+      </Modal>
+      <Modal title="Reset code" isOpen={Boolean(issued)} onOpenChange={(open) => !open && close()}>
+        <ModalBody>
+          <p className="adm-code accs-mono" aria-label="Reset code">{issued?.code}</p>
+          <p>
+            Give this code to {name}. It works once and expires at {issued ? formatDateTime(issued.expiresAt) : ""}. It is not
+            shown again after you close this.
+          </p>
+        </ModalBody>
+        <ModalActions>
+          <Button
+            variant="secondary"
+            onPress={() => { void navigator.clipboard?.writeText(issued?.code ?? "").then(() => setCopied(true)).catch(() => undefined); }}
+          >
+            {copied ? "Copied" : "Copy code"}
+          </Button>
+          <Button onPress={close}>Done</Button>
+        </ModalActions>
+      </Modal>
+    </Panel>
+  );
+}
+
 function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const record = object(page.data.record);
   const action = useAction("P47");
@@ -1152,6 +1210,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               ]}
             />
           </Panel>
+          {active && <ResetCodePanel accountId={word(record.id)} name={name} />}
           <Panel title="Restrictions">
             <Facts
               rows={[
