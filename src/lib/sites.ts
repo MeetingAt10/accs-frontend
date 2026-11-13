@@ -89,8 +89,8 @@ export const sites: Site[] = [
     purpose: 'Accounts, roles, moderation, restrictions, audit, and monitoring.',
     icon: 'gear',
     lane: 'navy',
-    prefixes: ['/admin', '/accounts'],
-    landings: ['/admin', '/accounts'],
+    prefixes: ['/admin', '/accounts', '/faculty-load'],
+    landings: ['/admin', '/accounts', '/faculty-load'],
     modules: ['ADM-01', 'ADM-02', 'ADM-04', 'ADM-05', 'ADM-06'],
   },
 ]

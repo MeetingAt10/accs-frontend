@@ -519,6 +519,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
         { label: "Home", href: "/home", pageId: "P03", icon: "house" },
         { label: "Accounts", href: "/accounts", icon: "users" },
         {
+          label: "Faculty load",
+          href: "/faculty-load",
+          pageId: "P54",
+          icon: "calendar",
+        },
+        {
           label: "Referred items",
           href: "/admin/moderation",
           pageId: "P49",
