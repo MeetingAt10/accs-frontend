@@ -58,13 +58,13 @@
   --accs-gold: #a16207;
 
   --accs-ok: #15803d;
-  --accs-ok-bg: #f0fdf4;
-  --accs-warn: #a16207;
-  --accs-warn-bg: #fefce8;
+  --accs-ok-bg: #dcfce7;
+  --accs-warn: #92400e;
+  --accs-warn-bg: #fef3c7;
   --accs-danger: #b91c1c;
-  --accs-danger-bg: #fef2f2;
-  --accs-info: #3f3f46;
-  --accs-info-bg: #f4f4f5;
+  --accs-danger-bg: #fee2e2;
+  --accs-info: #1d4ed8;
+  --accs-info-bg: #dbeafe;
 
   --ds-canvas: #ffffff;
   --ds-surface: #ffffff;
@@ -92,13 +92,13 @@
   --ds-secondary-bg: #f4f4f5;
   --ds-secondary-fg: #18181b;
   --ds-secondary-border: #e4e4e7;
-  --ds-info-bg: #f4f4f5;
-  --ds-info-fg: #3f3f46;
-  --ds-success-bg: #f0fdf4;
+  --ds-info-bg: #dbeafe;
+  --ds-info-fg: #1d4ed8;
+  --ds-success-bg: #dcfce7;
   --ds-success-fg: #15803d;
-  --ds-warning-bg: #fefce8;
-  --ds-warning-fg: #a16207;
-  --ds-danger-bg: #fef2f2;
+  --ds-warning-bg: #fef3c7;
+  --ds-warning-fg: #92400e;
+  --ds-danger-bg: #fee2e2;
   --ds-danger-fg: #b91c1c;
   --ds-focus: #a1a1aa;
   --ds-disabled-bg: #f4f4f5;
@@ -133,14 +133,14 @@
   --accs-navy-deep: #e4e4e7;
   --accs-navy-rail: #0c0c0e;
   --accs-gold: #eab308;
-  --accs-ok: #4ade80;
-  --accs-ok-bg: #052e16;
-  --accs-warn: #facc15;
-  --accs-warn-bg: #2a2205;
-  --accs-danger: #f87171;
-  --accs-danger-bg: #2c0b0b;
-  --accs-info: #d4d4d8;
-  --accs-info-bg: #18181b;
+  --accs-ok: #86efac;
+  --accs-ok-bg: #14532d;
+  --accs-warn: #fde047;
+  --accs-warn-bg: #422006;
+  --accs-danger: #fca5a5;
+  --accs-danger-bg: #450a0a;
+  --accs-info: #93c5fd;
+  --accs-info-bg: #172554;
 
   --ds-canvas: #09090b;
   --ds-surface: #09090b;
@@ -168,14 +168,14 @@
   --ds-secondary-bg: #18181b;
   --ds-secondary-fg: #fafafa;
   --ds-secondary-border: #27272a;
-  --ds-info-bg: #18181b;
-  --ds-info-fg: #d4d4d8;
-  --ds-success-bg: #052e16;
-  --ds-success-fg: #4ade80;
-  --ds-warning-bg: #2a2205;
-  --ds-warning-fg: #facc15;
-  --ds-danger-bg: #2c0b0b;
-  --ds-danger-fg: #f87171;
+  --ds-info-bg: #172554;
+  --ds-info-fg: #93c5fd;
+  --ds-success-bg: #14532d;
+  --ds-success-fg: #86efac;
+  --ds-warning-bg: #422006;
+  --ds-warning-fg: #fde047;
+  --ds-danger-bg: #450a0a;
+  --ds-danger-fg: #fca5a5;
   --ds-focus: #71717a;
   --ds-disabled-bg: #18181b;
   --ds-disabled-fg: #52525b;
@@ -197,13 +197,13 @@
     --accs-ink: #fafafa; --accs-ink-2: #e4e4e7; --accs-muted: #a1a1aa; --accs-faint: #71717a;
     --accs-paper: #09090b; --accs-surface: #09090b; --accs-sunken: #18181b; --accs-line: #27272a; --accs-line-strong: #3f3f46;
     --accs-navy: #fafafa; --accs-navy-deep: #e4e4e7; --accs-navy-rail: #0c0c0e; --accs-gold: #eab308;
-    --accs-ok: #4ade80; --accs-ok-bg: #052e16; --accs-warn: #facc15; --accs-warn-bg: #2a2205; --accs-danger: #f87171; --accs-danger-bg: #2c0b0b; --accs-info: #d4d4d8; --accs-info-bg: #18181b;
+    --accs-ok: #86efac; --accs-ok-bg: #14532d; --accs-warn: #fde047; --accs-warn-bg: #422006; --accs-danger: #fca5a5; --accs-danger-bg: #450a0a; --accs-info: #93c5fd; --accs-info-bg: #172554;
     --ds-canvas: #09090b; --ds-surface: #09090b; --ds-raised: #18181b; --ds-text-primary: #fafafa; --ds-text-secondary: #a1a1aa;
     --ds-border-subtle: #27272a; --ds-border-default: #27272a; --ds-border-strong: #3f3f46;
     --ds-action-default: #fafafa; --ds-action-hover: #e4e4e7; --ds-action-pressed: #d4d4d8; --ds-on-action: #18181b;
     --ds-accent-default: #fafafa; --ds-accent-hover: #e4e4e7; --ds-accent-pressed: #d4d4d8; --ds-accent-on-solid: #18181b; --ds-accent-bg: #18181b; --ds-accent-fg: #fafafa; --ds-accent-border: #3f3f46;
     --ds-secondary-default: #27272a; --ds-secondary-hover: #3f3f46; --ds-secondary-pressed: #52525b; --ds-secondary-on-solid: #fafafa; --ds-secondary-bg: #18181b; --ds-secondary-fg: #fafafa; --ds-secondary-border: #27272a;
-    --ds-info-bg: #18181b; --ds-info-fg: #d4d4d8; --ds-success-bg: #052e16; --ds-success-fg: #4ade80; --ds-warning-bg: #2a2205; --ds-warning-fg: #facc15; --ds-danger-bg: #2c0b0b; --ds-danger-fg: #f87171;
+    --ds-info-bg: #172554; --ds-info-fg: #93c5fd; --ds-success-bg: #14532d; --ds-success-fg: #86efac; --ds-warning-bg: #422006; --ds-warning-fg: #fde047; --ds-danger-bg: #450a0a; --ds-danger-fg: #fca5a5;
     --ds-focus: #71717a; --ds-disabled-bg: #18181b; --ds-disabled-fg: #52525b; --ds-inverse-bg: #fafafa; --ds-inverse-fg: #18181b;
     --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b;
   }
@@ -375,3 +375,9 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 /* A secondary list that did not load: the message, then its retry button on its own line. */
 .query-problem { display: grid; gap: 8px; justify-items: start; }
 .sc-faclist + .ds-alert, .sc-faclist + [role="alert"] { margin-top: 12px; }
+
+/* ---------- Status colours ----------
+   Labels for states use the colours people already read: green done, yellow waiting, red urgent or refused, blue in
+   progress. A clear fill and a thin tinted edge, with the dot and the word, so colour is never the only signal. */
+:root .accs-status[data-tone] { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent); }
+:root .accs-status[data-tone]::before { width: 7px; height: 7px; }
