@@ -201,9 +201,10 @@ function addDays(value: string, days: number) {
   return isoDate(date)
 }
 
+/** Weeks run Sunday to Saturday. */
 function weekStart(value: string) {
   const date = parseDate(value)
-  date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
+  date.setDate(date.getDate() - date.getDay())
   return isoDate(date)
 }
 
