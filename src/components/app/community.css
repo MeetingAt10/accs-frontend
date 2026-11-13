@@ -697,3 +697,4 @@
 
 /* A flagged item its author can still see while it waits for review. */
 .fx-review { display: block; margin-top: 6px; color: var(--accs-warn-ink, var(--accs-muted)); font-size: 0.8125rem; }
+.fx-muted { color: var(--accs-muted); }
