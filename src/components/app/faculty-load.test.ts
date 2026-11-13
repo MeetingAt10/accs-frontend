@@ -10,9 +10,9 @@ describe('faculty load file', () => {
   })
 
   it('maps the header to load rows and ignores unknown columns', () => {
-    const { rows, missing } = loadRowsFromCsv('Email,Day,Start,End,Subject,Section,Notes\nprof.it@qcu.edu.ph,Mon,07:30,09:00,IT 301,3A,ignored\n')
+    const { rows, missing } = loadRowsFromCsv('Email,Day,Start,End,Subject,Section,Notes\nprof.it@access-ccs.com,Mon,07:30,09:00,IT 301,3A,ignored\n')
     expect(missing).toEqual([])
-    expect(rows).toEqual([{ facultyEmail: 'prof.it@qcu.edu.ph', day: 'Mon', start: '07:30', end: '09:00', subject: 'IT 301', section: '3A' }])
+    expect(rows).toEqual([{ facultyEmail: 'prof.it@access-ccs.com', day: 'Mon', start: '07:30', end: '09:00', subject: 'IT 301', section: '3A' }])
   })
 
   it('names the required columns that are missing', () => {
