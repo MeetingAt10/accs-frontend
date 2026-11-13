@@ -371,3 +371,7 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .ds-next-person-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 :root .ds-next-person-card__name { font-family: var(--accs-font-body); font-size: 0.9375rem; font-weight: 600; }
 :root .ds-next-person-card__line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* A secondary list that did not load: the message, then its retry button on its own line. */
+.query-problem { display: grid; gap: 8px; justify-items: start; }
+.sc-faclist + .ds-alert, .sc-faclist + [role="alert"] { margin-top: 12px; }
