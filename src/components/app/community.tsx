@@ -73,12 +73,15 @@ interface PostComment {
   author: Person
   body: string
   at: string
+  /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
+  underReview?: boolean
 }
 
 export interface CommunityPost {
   id: string
   title: string
   body: string
+  underReview?: boolean
   audience: string
   kind: 'discussion' | 'announcement'
   label: string
@@ -328,6 +331,7 @@ function ThreadList({
                     </Link>
                   </h3>
                   <p className="fx-thread__excerpt">{post.body}</p>
+                  {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   <p className="fx-thread__meta">
                     <Initials name={name} small />
                     <span className="fx-thread__author">{name}</span>
@@ -1099,6 +1103,7 @@ export function PostView({
           </span>
         </div>
       </div>
+      {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
       <div className="fx-post__body">{post.body}</div>
       {post.eventDate && (
         <dl className="fx-facts">
@@ -1415,6 +1420,7 @@ function PostDetailPage({
                     }
                   >
                     {comment.body}
+                    {comment.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   </Comment>
                 ))}
               </CommentThread>
