@@ -82,6 +82,8 @@ interface Slot {
   start: string
   end: string
   state: 'open' | 'requested' | 'booked' | 'unavailable'
+  /** Why a time is not available. Only the professor and the CCS Secretary get it; students never do. */
+  reason?: string
 }
 
 type ConsultationStatus =
@@ -1870,7 +1872,11 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const [start, setStart] = useState('09:00')
   const [end, setEnd] = useState('09:30')
   const [state, setState] = useState<'open' | 'unavailable'>('open')
+  const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
+  // A time being marked not available from the list waits here for its reason.
+  const [reasonFor, setReasonFor] = useState<Slot>()
+  const [quickReason, setQuickReason] = useState('')
   const times = Array.from(
     { length: 27 },
     (_, index) =>
@@ -1923,13 +1929,18 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       setFieldError(`Overlaps ${slotRange(overlap)}.`)
       return
     }
+    if (state === 'unavailable' && !reason.trim()) {
+      setFieldError('Give a reason for marking this time not available.')
+      return
+    }
     try {
       await action.mutateAsync({
         action: 'saveAvailability',
-        payload: { date, start, end, state },
+        payload: { date, start, end, state, ...(state === 'unavailable' ? { reason: reason.trim() } : {}) },
       })
       setAddOpen(false)
       setDate('')
+      setReason('')
       setFieldError('')
     } catch {
       // The entered date and times remain available after an API error.
@@ -1939,6 +1950,13 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   async function changeSlot(slot: Slot, remove = false) {
     if (['booked', 'requested'].includes(slot.state)) {
       setSelectedSlot(slot)
+      return
+    }
+    // Marking a time not available needs a reason, asked for in a dialog.
+    if (!remove && slot.state === 'open') {
+      action.reset()
+      setQuickReason('')
+      setReasonFor(slot)
       return
     }
     try {
@@ -1960,10 +1978,26 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  async function markUnavailable() {
+    if (!reasonFor || !quickReason.trim()) return
+    try {
+      await action.mutateAsync({
+        action: 'saveAvailability',
+        recordId: reasonFor.id,
+        payload: { date: reasonFor.date, start: reasonFor.start, end: reasonFor.end, state: 'unavailable', reason: quickReason.trim() },
+      })
+      setReasonFor(undefined)
+      setSelectedSlot(undefined)
+    } catch {
+      // The dialog stays open with the API's message.
+    }
+  }
+
   function slotActions(slot: Slot) {
     return (
       <div className="sc-detail">
         <p>{slotTime(slot)}</p>
+        {slot.state === 'unavailable' && slot.reason && <p className="sc-reason">Reason: {slot.reason}</p>}
         <Button
           variant="secondary"
           loading={action.isPending}
@@ -2080,6 +2114,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                           </span>
                           <span className="accs-row__sub">
                             {dayHeading(slot.date)}
+                            {slot.state === 'unavailable' && slot.reason ? ` · ${slot.reason}` : ''}
                           </span>
                         </span>
                         <span className="sc-slotrow__actions">
@@ -2183,6 +2218,16 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 <Radio value="open">Available</Radio>
                 <Radio value="unavailable">Unavailable</Radio>
               </RadioGroup>
+              {state === 'unavailable' && (
+                <TextArea
+                  label="Reason"
+                  isRequired
+                  maxLength={300}
+                  value={reason}
+                  onChange={setReason}
+                  description="Only you and the CCS Secretary see this. Students see the time as not available."
+                />
+              )}
               <RadioGroup
                 label="Repeat"
                 value="once"
@@ -2213,6 +2258,33 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
             </Button>
           </ModalActions>
         </form>
+      </Modal>
+      <Modal
+        role="alertdialog"
+        title="Mark this time not available?"
+        isOpen={Boolean(reasonFor)}
+        onOpenChange={(open) => !open && setReasonFor(undefined)}
+      >
+        <ModalBody>
+          {reasonFor && <p>{slotTime(reasonFor)}</p>}
+          <TextArea
+            label="Reason"
+            isRequired
+            maxLength={300}
+            value={quickReason}
+            onChange={setQuickReason}
+            description="Only you and the CCS Secretary see this. Students see the time as not available."
+          />
+          <ActionError error={action.error} />
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setReasonFor(undefined)}>
+            Cancel
+          </Button>
+          <Button loading={action.isPending} isDisabled={!quickReason.trim()} onPress={() => void markUnavailable()}>
+            Mark not available
+          </Button>
+        </ModalActions>
       </Modal>
       <Modal
         title={
