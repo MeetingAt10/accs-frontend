@@ -352,7 +352,6 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
             />
           </Panel>
           <Panel title="Education">
-            {/* TBD(D-08): education fields are proposed and remain subject to approval. */}
             <TextField
               label="Degree and school"
               value={education}

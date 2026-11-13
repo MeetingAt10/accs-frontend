@@ -295,11 +295,10 @@ export function MessageComposer({
           line
         </small>
         <div className="ds-next-composer__buttons">
-          {/* TBD(D-08): attachments require approved access and retention rules. */}
           {attachments && (
             <IconButton
               icon="paperclip"
-              label="Attachments are not enabled while access rules are being defined"
+              label="Attachments aren't available yet"
               isDisabled
             />
           )}
