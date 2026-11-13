@@ -505,7 +505,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
             <Panel flush>
               <PagedList items={records} noun="reports">
                 {(records) => (
-                <ul className="accs-rows">
+                <ul className="accs-rows gv-rows">
                   {records.map((report) => {
                     const step = stageStep(report)
                     return (

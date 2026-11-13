@@ -124,13 +124,25 @@
 .gv-row:hover .gv-row__go { color: var(--site-accent-ink); transform: translateX(3px); }
 .gv-row:focus-visible { outline-offset: -3px; }
 
-@media (max-width: 767.98px) {
+/* The row follows the width the list actually gets, not the window: with a side bar at 1024 px the six columns left
+   the title 14 px wide. */
+.gv-rows { container: gv-rows / inline-size; }
+@container gv-rows (max-width: 860px) {
+  .gv-row { grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: 6px 16px; }
+  .gv-row__ref { grid-column: 1; grid-row: 1; }
+  .gv-row__main { grid-column: 2; grid-row: 1 / span 2; }
+  .gv-row > .accs-status { grid-column: 3; grid-row: 1; justify-self: end; }
+  .gv-row__progress { grid-column: 1 / span 2; grid-row: 3; }
+  .gv-row__time { grid-column: 3; grid-row: 2 / span 2; align-self: end; }
+  .gv-row__go { display: none; }
+}
+@container gv-rows (max-width: 560px) {
   .gv-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px 16px; }
   .gv-row__ref { grid-column: 1; grid-row: 1; }
   .gv-row > .accs-status { grid-column: 2; grid-row: 1; justify-self: end; }
-  .gv-row__main { grid-column: 1 / -1; }
-  .gv-row__progress { grid-column: 1 / -1; }
-  .gv-row__time { grid-column: 1 / -1; text-align: start; }
+  .gv-row__main { grid-column: 1 / -1; grid-row: auto; }
+  .gv-row__progress { grid-column: 1 / -1; grid-row: auto; }
+  .gv-row__time { grid-column: 1 / -1; grid-row: auto; text-align: start; align-self: auto; }
   .gv-row__go { display: none; }
 }
 
