@@ -1,4 +1,5 @@
 import { AvatarFill } from "@/components/app/photo";
+import { roleLabelOf } from "@/lib/role-labels";
 import {
   IconButton,
   Kbd,
@@ -6,7 +7,7 @@ import {
   TextArea,
 } from "@meetingat10/design-system/react";
 import { motion, useReducedMotion } from "motion/react";
-import { Children, useEffect, useRef, type ReactNode } from "react";
+import { Children, useEffect, useRef, type ReactNode, useState } from "react";
 
 import { formatDateTime, initials, relativeTime } from "@/lib/format";
 import "./chat.css";
@@ -33,7 +34,7 @@ function words(value: unknown, fallback = ""): string {
 
 function roleNames(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((role): role is string => typeof role === "string")
+    ? value.filter((role): role is string => typeof role === "string").map(roleLabelOf)
     : [];
 }
 
@@ -247,6 +248,12 @@ export function MessageBubble({
   );
 }
 
+/** The name being typed after an @ at the end of the message, or undefined when there is none. */
+export function mentionQuery(value: string) {
+  const match = /(?:^|\s)@([^\s@]{0,30})$/.exec(value);
+  return match ? match[1] : undefined;
+}
+
 export function MessageComposer({
   value,
   onChange,
@@ -255,6 +262,7 @@ export function MessageComposer({
   label = "Message",
   attachments = false,
   maxLength = 4000,
+  mentions = [],
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -263,7 +271,18 @@ export function MessageComposer({
   label?: string;
   attachments?: boolean;
   maxLength?: number;
+  /** People who can be named with @ in this conversation. */
+  mentions?: { id: string; name: string }[];
 }) {
+  const typed = mentionQuery(value);
+  const matches = typed === undefined ? [] : mentions.filter((person) => person.name.toLowerCase().split(/\s+/).some((part) => part.startsWith(typed.toLowerCase()))).slice(0, 6);
+  const [active, setActive] = useState(0);
+  const [dismissed, setDismissed] = useState("");
+  const open = matches.length > 0 && dismissed !== value;
+  const pick = (name: string) => {
+    onChange(value.replace(/@([^\s@]*)$/, "@" + name + " "));
+    setActive(0);
+  };
   return (
     <form
       className="ds-next-composer"
@@ -282,6 +301,21 @@ export function MessageComposer({
         isRequired
         isDisabled={isPending}
         onKeyDown={(event) => {
+          if (open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            event.preventDefault();
+            setActive((index) => (index + (event.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+            return;
+          }
+          if (open && (event.key === "Enter" || event.key === "Tab")) {
+            event.preventDefault();
+            pick(matches[Math.min(active, matches.length - 1)].name);
+            return;
+          }
+          if (open && event.key === "Escape") {
+            event.preventDefault();
+            setDismissed(value);
+            return;
+          }
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
@@ -292,6 +326,18 @@ export function MessageComposer({
           }
         }}
       />
+      {open && (
+        <ul className="ds-next-mentions" role="listbox" aria-label="People to mention">
+          {matches.map((person, index) => (
+            <li key={person.id} role="option" aria-selected={index === active}>
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(person.name)}>
+                <Mark name={person.name} />
+                <span>{person.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="ds-next-composer__bar">
         <small className="ds-next-composer__hint">
           <Kbd keys="Enter" /> sends · <Kbd keys={["Shift", "Enter"]} /> adds a

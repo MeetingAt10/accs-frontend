@@ -1,0 +1,22 @@
+/* Reactions on posts and comments. */
+.rx { position: relative; display: inline-flex; align-items: center; gap: 10px; }
+.rx-button { display: inline-flex; align-items: stretch; border: 1px solid var(--accs-line); border-radius: 999px; overflow: hidden; background: var(--accs-paper); }
+.rx-button[data-active] { border-color: color-mix(in srgb, var(--accs-info) 45%, var(--accs-line)); background: var(--accs-info-bg); }
+.rx-main, .rx-more { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--accs-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.rx-main { padding: 6px 12px 6px 10px; font-size: 0.875rem; }
+.rx-more { padding: 6px 10px; border-inline-start: 1px solid var(--accs-line); color: var(--accs-muted); font-size: 0.75rem; }
+.rx-button[data-active] .rx-main { color: var(--accs-info); }
+.rx-main:hover, .rx-more:hover { background: var(--accs-sunken); }
+.rx-main:disabled, .rx-more:disabled { opacity: 0.55; cursor: default; }
+.rx-main:focus-visible, .rx-more:focus-visible, .rx-choice:focus-visible { outline: 2px solid var(--accs-ink); outline-offset: -2px; }
+.rx-emoji { font-size: 1rem; line-height: 1; }
+.rx-picker { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; display: flex; gap: 2px; padding: 6px; border: 1px solid var(--accs-line); border-radius: 999px; background: var(--accs-paper); box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); }
+.rx-choice { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; font-size: 1.35rem; cursor: pointer; transition: transform 120ms ease; }
+.rx-choice:hover { transform: scale(1.18); background: var(--accs-sunken); }
+.rx-choice[aria-pressed='true'] { background: var(--accs-info-bg); }
+.rx-summary { display: inline-flex; align-items: center; gap: 6px; color: var(--accs-muted); font-size: 0.8125rem; font-weight: 600; }
+.rx-summary__emoji { letter-spacing: -2px; font-size: 0.95rem; }
+.rx[data-size='sm'] .rx-main { padding: 3px 10px 3px 8px; font-size: 0.8125rem; }
+.rx[data-size='sm'] .rx-more { padding: 3px 8px; }
+.rx[data-size='sm'] .rx-choice { width: 32px; height: 32px; font-size: 1.15rem; }
+@media (prefers-reduced-motion: reduce) { .rx-choice { transition: none; } .rx-choice:hover { transform: none; } }

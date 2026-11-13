@@ -381,3 +381,47 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
    progress. A clear fill and a thin tinted edge, with the dot and the word, so colour is never the only signal. */
 :root .accs-status[data-tone] { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent); }
 :root .accs-status[data-tone]::before { width: 7px; height: 7px; }
+
+/* ---------- Forum label colours ----------
+   Each post label has its own colour, so a list of posts is easy to scan: Announcement blue, Discussion slate, Rant red,
+   Assistance amber, Support green. The word stays, so colour is never the only signal. Audience tags stay neutral. */
+:root { --lbl-announcement: #1d4ed8; --lbl-announcement-bg: #dbeafe; --lbl-discussion: #334155; --lbl-discussion-bg: #e2e8f0; --lbl-rant: #b91c1c; --lbl-rant-bg: #fee2e2; --lbl-assistance: #92400e; --lbl-assistance-bg: #fef3c7; --lbl-support: #15803d; --lbl-support-bg: #dcfce7; }
+:root[data-theme='dark'] { --lbl-announcement: #93c5fd; --lbl-announcement-bg: #172554; --lbl-discussion: #cbd5e1; --lbl-discussion-bg: #1e293b; --lbl-rant: #fca5a5; --lbl-rant-bg: #450a0a; --lbl-assistance: #fde047; --lbl-assistance-bg: #422006; --lbl-support: #86efac; --lbl-support-bg: #14532d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --lbl-announcement: #93c5fd; --lbl-announcement-bg: #172554; --lbl-discussion: #cbd5e1; --lbl-discussion-bg: #1e293b; --lbl-rant: #fca5a5; --lbl-rant-bg: #450a0a; --lbl-assistance: #fde047; --lbl-assistance-bg: #422006; --lbl-support: #86efac; --lbl-support-bg: #14532d; } }
+:root .fx-page .accs-tag.fx-tag--label { display: inline-flex; align-items: center; gap: 6px; border: 0; font-weight: 600; }
+:root .fx-page .accs-tag.fx-tag--label::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+:root .accs-tag.fx-tag--label[data-label='announcement'] { background: var(--lbl-announcement-bg); color: var(--lbl-announcement); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lbl-announcement) 28%, transparent); }
+:root .accs-tag.fx-tag--label[data-label='discussion'] { background: var(--lbl-discussion-bg); color: var(--lbl-discussion); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lbl-discussion) 28%, transparent); }
+:root .accs-tag.fx-tag--label[data-label='rant'] { background: var(--lbl-rant-bg); color: var(--lbl-rant); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lbl-rant) 28%, transparent); }
+:root .accs-tag.fx-tag--label[data-label='assistance'] { background: var(--lbl-assistance-bg); color: var(--lbl-assistance); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lbl-assistance) 28%, transparent); }
+:root .accs-tag.fx-tag--label[data-label='support'] { background: var(--lbl-support-bg); color: var(--lbl-support); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lbl-support) 28%, transparent); }
+/* Filter pills: a coloured dot, and the label's colours once chosen. */
+:root .accs-pill.fx-cat[data-label]::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-inline-end: 6px; border-radius: 50%; background: var(--lbl-dot, currentColor); vertical-align: middle; }
+:root .accs-pill.fx-cat[data-label='announcement'] { --lbl-dot: var(--lbl-announcement); }
+:root .accs-pill.fx-cat[data-label='discussion'] { --lbl-dot: var(--lbl-discussion); }
+:root .accs-pill.fx-cat[data-label='rant'] { --lbl-dot: var(--lbl-rant); }
+:root .accs-pill.fx-cat[data-label='assistance'] { --lbl-dot: var(--lbl-assistance); }
+:root .accs-pill.fx-cat[data-label='support'] { --lbl-dot: var(--lbl-support); }
+:root .accs-pill.fx-cat[data-label='announcement'][aria-pressed='true'] { background: var(--lbl-announcement-bg); color: var(--lbl-announcement); border-color: var(--lbl-announcement); }
+:root .accs-pill.fx-cat[data-label='discussion'][aria-pressed='true'] { background: var(--lbl-discussion-bg); color: var(--lbl-discussion); border-color: var(--lbl-discussion); }
+:root .accs-pill.fx-cat[data-label='rant'][aria-pressed='true'] { background: var(--lbl-rant-bg); color: var(--lbl-rant); border-color: var(--lbl-rant); }
+:root .accs-pill.fx-cat[data-label='assistance'][aria-pressed='true'] { background: var(--lbl-assistance-bg); color: var(--lbl-assistance); border-color: var(--lbl-assistance); }
+:root .accs-pill.fx-cat[data-label='support'][aria-pressed='true'] { background: var(--lbl-support-bg); color: var(--lbl-support); border-color: var(--lbl-support); }
+:root .fx-vote__emoji { font-size: 1rem; line-height: 1; }
+
+/* ---------- Post page and New post: less empty space ----------
+   New post is one column with each group's title above its fields, at a comfortable reading width, instead of a wide
+   two-column form. The post page keeps the post, its reactions and its comments close together. */
+:root .fx-compose-page { max-width: 46rem; }
+:root .fx-page .fx-form-panel { border: 0; background: transparent; }
+:root .fx-group { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 20px 0; }
+:root .fx-group:first-child { padding-top: 4px; }
+:root .fx-group__head { gap: 2px; }
+:root .fx-group__body { gap: 16px; }
+:root .fx-form > :not(section):not(.fx-note):not(.fx-form__actions) { margin: 12px 0 0; }
+:root .fx-form > .fx-note { padding: 12px 0 0; }
+:root .fx-form__actions { padding: 16px 0 4px; }
+:root .fx-thread-page { max-width: 56rem; gap: 12px; }
+:root .fx-page .fx-post-panel { gap: 14px; }
+:root .fx-actions { padding-top: 12px; gap: 8px; }
+:root .fx-reply { margin-top: 8px; }

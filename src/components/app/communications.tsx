@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import { Pager, usePaged } from '@/components/app/paging'
 import {
   Alert,
@@ -126,6 +127,14 @@ function Heading({
       crumbs={crumbs}
     />
   );
+}
+
+/** A person matches when every word typed starts a word of their name. A leading @ is ignored, so "@rob" finds Robin. */
+export function matchesPerson(name: string, input: string) {
+  const typed = input.trim().replace(/^@/, '').toLowerCase().split(/\s+/).filter(Boolean)
+  if (!typed.length) return true
+  const parts = name.toLowerCase().split(/[\s.,-]+/).filter(Boolean)
+  return typed.every((word) => parts.some((part) => part.startsWith(word)))
 }
 
 function MessagesPage({ page }: { page: PageEnvelope }) {
@@ -276,32 +285,19 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               <TabList aria-label="Conversation types">
                 <Tab
                   id="all"
-                  count={allThreads.reduce(
-                    (sum, thread) => sum + Number(thread.unread ?? 0),
-                    0,
-                  )}
+                  count={allThreads.length}
                 >
                   All
                 </Tab>
                 <Tab
                   id="direct"
-                  count={allThreads
-                    .filter((thread) => thread.kind === "direct")
-                    .reduce(
-                      (sum, thread) => sum + Number(thread.unread ?? 0),
-                      0,
-                    )}
+                  count={allThreads.filter((thread) => thread.kind === "direct").length}
                 >
                   Direct
                 </Tab>
                 <Tab
                   id="group"
-                  count={allThreads
-                    .filter((thread) => thread.kind === "group")
-                    .reduce(
-                      (sum, thread) => sum + Number(thread.unread ?? 0),
-                      0,
-                    )}
+                  count={allThreads.filter((thread) => thread.kind === "group").length}
                 >
                   Groups
                 </Tab>
@@ -401,7 +397,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                           <MessageBubble
                             photo={words(sender.photo)}
                             sender={words(sender.name, "ACCS member")}
-                            role={roles(sender.roles).join(" · ")}
+                            role={roles(sender.roles).map(roleLabelOf).join(" · ")}
                             body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
                             at={words(message.at)}
                             own={sender.id === session.data?.user.id}
@@ -446,6 +442,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                 onSend={() => void sendMessage()}
                 isPending={action.isPending}
                 attachments
+                mentions={members
+                  .filter((member) => member.id !== session.data?.user.id)
+                  .map((member) => ({ id: words(member.id), name: words(member.name) }))}
               />
             </Stack>
           )}
@@ -456,6 +455,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           <Stack gap={16}>
             <ComboBox
               label="To"
+              placeholder="Search people"
+              description="Type a name, or @ and a name."
+              defaultFilter={matchesPerson}
               selectedKey={recipientId || null}
               onSelectionChange={(key) => setRecipientId(String(key ?? ""))}
               emptyMessage="No matching recipients"
@@ -467,7 +469,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   key={words(recipient.id)}
                   textValue={words(recipient.name)}
                 >
-                  {words(recipient.name)} · {roles(recipient.roles).join(", ")}
+                  {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
                 </SelectOption>
               ))}
             </ComboBox>
