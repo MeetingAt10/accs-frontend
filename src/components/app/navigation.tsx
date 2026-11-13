@@ -524,6 +524,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P54",
           icon: "calendar",
         },
+        {
+          label: "Referred items",
+          href: "/admin/moderation",
+          pageId: "P49",
+          icon: "flag",
+        },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
         {
           label: "Organizations",

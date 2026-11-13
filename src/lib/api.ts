@@ -247,3 +247,24 @@ export const setAdvisors = (yearLevel: number, facultyIds: string[]) =>
 
 export const setChair = (program: Program, facultyId: string) =>
   put<Recorded<{ program: Program; chairId: string; previousChairIds: string[] }>>('/accounts/chairs/' + program, { facultyId })
+
+/** A class material file the API is waiting for, and the signed address to send it to. */
+export type MaterialUpload = {
+  material: { id: string; title: string; fileName?: string; status?: string }
+  upload: { url: string; method: 'PUT'; headers: Record<string, string>; expiresInSeconds: number }
+}
+
+/** Starts a class material file upload (MeetingAt10/accs-backend#77). */
+export const startMaterialUpload = (input: { spaceId: string; title: string; note?: string; fileName: string; contentType: string; size: number }) =>
+  post<Recorded<MaterialUpload>>('/materials/uploads', input)
+
+/** Confirms a material file once it has been sent to the signed address. */
+export const completeMaterialUpload = (id: string) =>
+  post<Recorded<Record<string, unknown>>>('/materials/' + encodeURIComponent(id) + '/complete', {})
+
+/** Sends the file itself to the signed storage address. The address carries its own credentials, so no cookies go with it. */
+export async function sendMaterialFile(upload: MaterialUpload['upload'], file: File) {
+  const headers = Object.fromEntries(Object.entries(upload.headers).filter(([name]) => name.toLowerCase() !== 'content-length'))
+  const response = await fetch(upload.url, { method: upload.method, headers, body: file })
+  if (!response.ok) throw new ApiError("The file couldn't be uploaded. Try again.", response.status)
+}

@@ -47,6 +47,7 @@ import {
   toneFor,
 } from '@/components/app/page-shell'
 import { Comment, CommentThread, ReactionButton } from '@/components/ds-next'
+import { SubjectList, SubjectMaterials } from '@/components/app/materials'
 import {
   performPageAction,
   type PageAction,
@@ -73,12 +74,15 @@ interface PostComment {
   author: Person
   body: string
   at: string
+  /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
+  underReview?: boolean
 }
 
 export interface CommunityPost {
   id: string
   title: string
   body: string
+  underReview?: boolean
   audience: string
   kind: 'discussion' | 'announcement'
   label: string
@@ -112,6 +116,10 @@ interface Space {
   studentIds?: string[]
   students?: Person[]
   threadId?: string
+  /** A section space lists its subjects; a subject space carries its own materials. */
+  subjects?: Array<Record<string, unknown>>
+  materials?: Array<Record<string, unknown>>
+  canManageMaterials?: boolean
 }
 
 interface Organization {
@@ -328,6 +336,7 @@ function ThreadList({
                     </Link>
                   </h3>
                   <p className="fx-thread__excerpt">{post.body}</p>
+                  {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   <p className="fx-thread__meta">
                     <Initials name={name} small />
                     <span className="fx-thread__author">{name}</span>
@@ -1099,6 +1108,7 @@ export function PostView({
           </span>
         </div>
       </div>
+      {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
       <div className="fx-post__body">{post.body}</div>
       {post.eventDate && (
         <dl className="fx-facts">
@@ -1415,6 +1425,7 @@ function PostDetailPage({
                     }
                   >
                     {comment.body}
+                    {comment.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   </Comment>
                 ))}
               </CommentThread>
@@ -2007,13 +2018,25 @@ function SpacePage({
           </>
         }
       />
-      <Tabs defaultSelectedKey="discussion">
+      <Tabs defaultSelectedKey={space.subjects ? 'subjects' : space.materials ? 'materials' : 'discussion'}>
         <TabList aria-label="Class space views">
+          {space.subjects && <Tab id="subjects">Subjects</Tab>}
+          {space.materials && <Tab id="materials">Materials</Tab>}
           <Tab id="discussion">Discussion</Tab>
           {!oversightOnly && <Tab id="announcements">Announcements</Tab>}
           <Tab id="members">{academic ? 'Roster' : 'Members'}</Tab>
           <Tab id="about">About</Tab>
         </TabList>
+        {space.subjects && (
+          <TabPanel id="subjects">
+            <div className="fx-tab"><SubjectList subjects={space.subjects} /></div>
+          </TabPanel>
+        )}
+        {space.materials && (
+          <TabPanel id="materials">
+            <div className="fx-tab"><SubjectMaterials spaceId={space.id} materials={space.materials} canManage={space.canManageMaterials === true} /></div>
+          </TabPanel>
+        )}
         <TabPanel id="discussion">
           <div className="fx-tab">
             <div className="fx-toolbar fx-toolbar--slim">
