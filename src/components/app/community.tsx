@@ -30,11 +30,12 @@ import {
   ViewState,
   toast,
   EmptyState,
+  type IconName,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker, useRouter, useRouterState } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
 import { RestrictedView } from '@/components/app/guards'
@@ -379,6 +380,30 @@ function ThreadList({
   )
 }
 
+/** A rail section's heading: its icon, its name and how many items it lists. */
+function RailTitle({ icon, children, count }: { icon: IconName; children: string; count?: number }) {
+  return (
+    <span className="fx-rail-title">
+      <span className="fx-rail-mark" aria-hidden><Icon name={icon} size={16} /></span>
+      {children}
+      {count ? <span className="fx-rail-count" aria-label={`${count} shown`}>{count}</span> : null}
+    </span>
+  )
+}
+
+/** One rail row: a tinted icon, then the title and a line under it. */
+function RailRow({ href, icon, title, sub }: { href: string; icon: IconName; title: ReactNode; sub: ReactNode }) {
+  return (
+    <Link variant="quiet" className="fx-mini__row" href={href}>
+      <span className="fx-mini__mark" aria-hidden><Icon name={icon} size={16} /></span>
+      <span className="fx-mini__text">
+        <span className="fx-mini__title">{title}</span>
+        <span className="fx-mini__sub">{sub}</span>
+      </span>
+    </Link>
+  )
+}
+
 function RailLink({ href, children }: { href: string; children: string }) {
   return (
     <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
@@ -412,20 +437,16 @@ function FeedRail({
   return (
     <aside className="fx-rail accs-stagger" aria-label="Forum sidebar">
       {announcements.length > 0 && (
-        <Panel title="Announcements" flush>
+        <Panel title={<RailTitle icon="megaphone" count={announcements.length}>Announcements</RailTitle>} flush className="fx-rail-sec" data-tone="warn">
           <ul className="fx-mini">
             {announcements.map((post) => (
               <li key={post.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
+                <RailRow
                   href={`/feed/${encodeURIComponent(post.id)}`}
-                >
-                  <span className="fx-mini__title">{post.title}</span>
-                  <span className="fx-mini__sub">
-                    {priorityLabel(post.priority)} · {relativeTime(post.at)}
-                  </span>
-                </Link>
+                  icon="megaphone"
+                  title={post.title}
+                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
+                />
               </li>
             ))}
           </ul>
@@ -443,48 +464,55 @@ function FeedRail({
       )}
       {spaces.length > 0 && (
         <Panel
-          title="Your spaces"
+          title={<RailTitle icon="graduation-cap" count={Math.min(spaces.length, 5)}>Your spaces</RailTitle>}
           flush
+          className="fx-rail-sec"
+          data-tone="info"
           action={<RailLink href="/spaces">View all</RailLink>}
         >
           <ul className="fx-mini">
-            {spaces.slice(0, 5).map((space) => (
-              <li key={space.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
-                  href={`/spaces/${encodeURIComponent(space.id)}`}
-                >
-                  <span className="fx-mini__title">{sectionCode(space)}</span>
-                  <span className="fx-mini__sub">{space.subject}</span>
-                </Link>
-              </li>
-            ))}
+            {spaces.slice(0, 5).map((space) => {
+              // The section group is the whole class; a subject space is one subject of it, named by the subject.
+              const group = isSectionGroup(space)
+              return (
+                <li key={space.id}>
+                  <RailRow
+                    href={`/spaces/${encodeURIComponent(space.id)}`}
+                    icon={group ? 'chalkboard' : 'books'}
+                    title={group ? sectionCode(space) : space.subject}
+                    sub={group ? 'Whole section' : `${sectionCode(space)} · Subject`}
+                  />
+                </li>
+              )
+            })}
           </ul>
         </Panel>
       )}
       {orgs.length > 0 && (
         <Panel
-          title="Organizations"
+          title={<RailTitle icon="users" count={orgs.length}>Organizations</RailTitle>}
           flush
+          className="fx-rail-sec"
+          data-tone="ok"
           action={<RailLink href="/organizations">Browse</RailLink>}
         >
           <ul className="fx-mini">
-            {orgs.map((organization) => (
-              <li key={organization.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
-                  href={`/organizations/${encodeURIComponent(organization.id)}`}
-                >
-                  <span className="fx-mini__title">{organization.name}</span>
-                  <span className="fx-mini__sub">
-                    {organization.memberCount ?? 0} members
-                    {organization.member ? ' · You’re a member' : ''}
-                  </span>
-                </Link>
-              </li>
-            ))}
+            {orgs.map((organization) => {
+              const count = organization.memberCount ?? 0
+              return (
+                <li key={organization.id}>
+                  <RailRow
+                    href={`/organizations/${encodeURIComponent(organization.id)}`}
+                    icon="users"
+                    title={organization.name}
+                    sub={<>
+                      {count} {count === 1 ? 'member' : 'members'}
+                      {organization.member && <span className="fx-mini__badge">Member</span>}
+                    </>}
+                  />
+                </li>
+              )
+            })}
           </ul>
         </Panel>
       )}
