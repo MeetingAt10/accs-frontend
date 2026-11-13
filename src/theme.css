@@ -329,8 +329,8 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
   :root .accs-split { grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 420px); }
   :root .accs-split--wide-rail { grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 480px); }
 }
-/* A post page and the concern form get room to breathe instead of a narrow column. */
-:root .fx-thread-page { max-width: 72rem; }
+/* A post page and the concern form use the whole page instead of a narrow column. */
+:root .fx-thread-page { max-width: none; }
 :root .gv-wizard { max-width: none; }
 
 /* ---------- Charts ---------- */
@@ -412,7 +412,7 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 /* ---------- Post page and New post: less empty space ----------
    New post is one column with each group's title above its fields, at a comfortable reading width, instead of a wide
    two-column form. The post page keeps the post, its reactions and its comments close together. */
-:root .fx-compose-page { max-width: 46rem; }
+:root .fx-compose-page { max-width: none; }
 :root .fx-page .fx-form-panel { border: 0; background: transparent; }
 :root .fx-group { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 20px 0; }
 :root .fx-group:first-child { padding-top: 4px; }
@@ -421,7 +421,7 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .fx-form > :not(section):not(.fx-note):not(.fx-form__actions) { margin: 12px 0 0; }
 :root .fx-form > .fx-note { padding: 12px 0 0; }
 :root .fx-form__actions { padding: 16px 0 4px; }
-:root .fx-thread-page { max-width: 56rem; gap: 12px; }
+:root .fx-thread-page { max-width: none; gap: 12px; }
 :root .fx-page .fx-post-panel { gap: 14px; }
 :root .fx-actions { padding-top: 12px; gap: 8px; }
 :root .fx-reply { margin-top: 8px; }
@@ -437,3 +437,11 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
    and a table's wrapper shrinks to its column and scrolls. Zero specificity, so panels with their own columns keep them. */
 :where(.shell-content) :where(.accs-panel) { grid-template-columns: minmax(0, 1fr); }
 :root .shell-content .accs-table-wrap { min-width: 0; max-width: 100%; }
+
+/* Content uses the whole page instead of a narrow column with empty space beside it: post and comment text, the
+   message thread, the evaluation form and the records forms. Short lines such as page intros and notes keep their
+   reading width; the sign-in column, the password form and chat bubbles keep theirs on purpose. */
+:root :is(.fx-post__body, .ds-next-comment__body, .fx-about) { max-width: none; }
+:root .cm-chat__col { max-width: none; }
+:root .ev-form { max-width: none; }
+:root :is(.rc-form, .rc-choices) { max-width: none; }
