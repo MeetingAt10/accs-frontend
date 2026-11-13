@@ -1,3 +1,4 @@
+import { AvatarFill, photoSrc } from '@/components/app/photo'
 import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
@@ -265,10 +266,10 @@ function ActionError({ error }: { error: unknown }) {
 const ease = [0.16, 1, 0.3, 1] as const
 const priorityRank = ['urgent', 'important', 'general']
 
-function Initials({ name, small }: { name: string; small?: boolean }) {
+function Initials({ name, small, photo }: { name: string; small?: boolean; photo?: unknown }) {
   return (
     <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} aria-hidden>
-      {initials(name) || '?'}
+      <AvatarFill photo={photo} fallback={initials(name) || '?'} />
     </span>
   )
 }
@@ -356,7 +357,7 @@ function ThreadList({
                   <p className="fx-thread__excerpt">{post.body}</p>
                   {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   <p className="fx-thread__meta">
-                    <Initials name={name} small />
+                    <Initials name={name} small photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
                     <span className="fx-thread__author">{name}</span>
                     <span aria-hidden>·</span>
                     <time dateTime={post.at} title={formatDateTime(post.at)}>
@@ -1145,7 +1146,7 @@ export function PostView({
         {post.private && <span className="accs-tag">Members only</span>}
       </div>
       <div className="fx-post__author">
-        <Initials name={name} />
+        <Initials name={name} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
         <div className="fx-post__who">
           <strong>{name}</strong>
           <span>
@@ -1448,6 +1449,7 @@ function PostDetailPage({
                 {post.comments.slice(0, shownComments).map((comment) => (
                   <Comment
                     key={comment.id}
+                    photo={photoSrc((comment.author as { photo?: unknown } | undefined)?.photo)}
                     author={comment.author?.name ?? 'College member'}
                     role={personRole(comment.author ?? { name: '' })}
                     date={relativeTime(comment.at)}

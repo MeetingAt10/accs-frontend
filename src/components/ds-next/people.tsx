@@ -1,3 +1,4 @@
+import { AvatarFill } from '@/components/app/photo'
 import { Icon, Link } from '@meetingat10/design-system/react'
 import type { ReactNode } from 'react'
 
@@ -6,6 +7,8 @@ import { initials } from '@/lib/format'
 import './people.css'
 
 export interface PersonCardProps {
+  /** Profile photo (a data URL); initials when there is none. */
+  photo?: string
   name: string
   role?: ReactNode
   office?: string
@@ -24,11 +27,12 @@ export function PersonCard({
   meta,
   href,
   actions,
+  photo,
 }: PersonCardProps) {
   return (
     <article className="ds-next-person-card" data-link={href ? '' : undefined}>
       <span className="accs-avatar ds-next-person-card__avatar" aria-hidden>
-        {initials(name)}
+        <AvatarFill photo={photo} fallback={initials(name)} />
       </span>
       {/* Two lines: the name with its roles, then office and title together. */}
       <div className="ds-next-person-card__body">
@@ -66,6 +70,8 @@ export interface ProfileHeaderProps {
   email?: string
   compact?: boolean
   actions?: ReactNode
+  /** Profile photo (a data URL); initials when there is none. */
+  photo?: string
 }
 
 export function ProfileHeader({
@@ -76,6 +82,7 @@ export function ProfileHeader({
   email,
   compact = false,
   actions,
+  photo,
 }: ProfileHeaderProps) {
   return (
     <header
@@ -87,7 +94,7 @@ export function ProfileHeader({
         .join(' ')}
     >
       <span className="ds-next-profile-header__avatar" aria-hidden>
-        {initials(name)}
+        <AvatarFill photo={photo} fallback={initials(name)} />
       </span>
       <div className="ds-next-profile-header__body">
         <h1 className="accs-page-title">{name}</h1>

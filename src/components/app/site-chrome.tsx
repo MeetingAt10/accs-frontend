@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
+import { pageQuery } from '@/lib/queries'
+import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
@@ -103,6 +106,9 @@ export function AccountMenu({ session, links, onSignOut }: { session: Session; l
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
+  // The session leaves photos out (it is checked on every request); My profile has yours.
+  const own = useQuery({ ...pageQuery('P39'), enabled: session.allowedPages.includes('P39'), staleTime: 300_000 })
+  const ownPhoto = (own.data?.data.record as { photo?: unknown } | undefined)?.photo
   useEffect(() => {
     if (!open) return
     const away = (event: PointerEvent) => root.current?.contains(event.target as Node) || setOpen(false)
@@ -125,7 +131,7 @@ export function AccountMenu({ session, links, onSignOut }: { session: Session; l
         title={session.user.name}
         onClick={() => setOpen((value) => !value)}
       >
-        {initials(session.user.name)}
+        <AvatarFill photo={ownPhoto} fallback={initials(session.user.name)} />
       </button>
       <AnimatePresence>
         {open && (
