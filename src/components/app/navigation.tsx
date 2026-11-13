@@ -8,10 +8,11 @@ import {
   Popover,
   Search,
   Stack,
+  toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AssistantPanel,
@@ -35,7 +36,7 @@ import {
   type Role,
   type Session,
 } from "@/lib/api";
-import { notificationsFromQuery, pageQuery } from "@/lib/queries";
+import { newNotifications, notificationsFromQuery, pageQuery } from "@/lib/queries";
 import {
   allowsPath,
   canOpenSite,
@@ -640,7 +641,8 @@ function Topbar({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const notifications = useQuery(pageQuery("P40"));
+  // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
+  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000 });
   const notificationAction = useMutation({
     mutationFn: (action: {
       action: "markNotification";
@@ -677,6 +679,27 @@ function Topbar({
 
   const { recent: recentNotifications, unreadCount } =
     notificationsFromQuery(notifications);
+
+  // A pop-up for each notification that arrives while the portal is open; the ones already there on load stay quiet.
+  const seenNotifications = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const fresh = newNotifications(seenNotifications, notifications.isSuccess ? notifications.data?.data.notifications : undefined);
+    if (!fresh.length) return;
+    // An open conversation or message list shows the new message right away.
+    if (fresh.some((notice) => notice.kind === "message")) {
+      void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
+    }
+    for (const notice of fresh.slice(0, 3)) {
+      const body = String(notice.body ?? "");
+      toast(String(notice.title ?? "New update"), {
+        ...(body && !body.startsWith("Open this update") ? { description: body } : {}),
+        action: { label: "Open", onAction: () => void openNotification(notice) },
+      });
+    }
+    if (fresh.length > 3) toast(`${fresh.length - 3} more new notifications`, { action: { label: "View all", onAction: () => router.history.push("/notifications") } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifications.data]);
   const siteLabel = siteById[site].label;
 
   return (

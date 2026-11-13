@@ -33,6 +33,23 @@ export const pageQuery = (pageId: string, recordId?: string, filters = '') =>
  * only from a successful fetch - a failed or still-loading query must not read as "zero
  * notifications" (it isn't; the request just hasn't told us yet).
  */
+/**
+ * The unread notifications not seen before, given the ones seen so far. The first list only marks everything as seen,
+ * so opening the portal does not pop up old notifications.
+ */
+export function newNotifications(seen: { current: Set<string> | null }, items: unknown) {
+  if (!Array.isArray(items)) return []
+  const list = items as Record<string, unknown>[]
+  if (seen.current === null) {
+    seen.current = new Set(list.map((notice) => String(notice.id)))
+    return []
+  }
+  const known = seen.current
+  const fresh = list.filter((notice) => notice.read !== true && !known.has(String(notice.id)))
+  for (const notice of list) known.add(String(notice.id))
+  return fresh
+}
+
 export function notificationsFromQuery(page: { isSuccess: boolean; data?: PageEnvelope }) {
   const items = page.isSuccess ? page.data?.data.notifications : undefined
   const all = Array.isArray(items) ? (items as Record<string, unknown>[]) : []
