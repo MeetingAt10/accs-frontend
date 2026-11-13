@@ -48,6 +48,7 @@ import {
 } from '@/components/app/page-shell'
 import { Comment, CommentThread, ReactionButton } from '@/components/ds-next'
 import { SubjectList, SubjectMaterials } from '@/components/app/materials'
+import { QueryProblem } from '@/components/app/query-problem'
 import {
   performPageAction,
   type PageAction,
@@ -368,14 +369,20 @@ function RailLink({ href, children }: { href: string; children: string }) {
   )
 }
 
+type Retry = { failed: boolean; retry: () => void; retrying: boolean }
+
 function FeedRail({
   posts,
   spaces,
   organizations,
+  spacesLoad,
+  organizationsLoad,
 }: {
   posts: CommunityPost[]
   spaces: Space[]
   organizations: Organization[]
+  spacesLoad?: Retry
+  organizationsLoad?: Retry
 }) {
   const announcements = posts
     .filter((post) => post.kind === 'announcement')
@@ -404,6 +411,16 @@ function FeedRail({
               </li>
             ))}
           </ul>
+        </Panel>
+      )}
+      {spacesLoad?.failed && (
+        <Panel title="Your spaces">
+          <QueryProblem what="your class spaces" onRetry={spacesLoad.retry} retrying={spacesLoad.retrying} />
+        </Panel>
+      )}
+      {organizationsLoad?.failed && (
+        <Panel title="Organizations">
+          <QueryProblem what="organizations" onRetry={organizationsLoad.retry} retrying={organizationsLoad.retrying} />
         </Panel>
       )}
       {spaces.length > 0 && (
@@ -695,7 +712,13 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
             </Panel>
           )}
         </div>
-        <FeedRail posts={allPosts} spaces={spaces} organizations={organizations} />
+        <FeedRail
+          posts={allPosts}
+          spaces={spaces}
+          organizations={organizations}
+          spacesLoad={{ failed: spacesQuery.isError, retry: () => void spacesQuery.refetch(), retrying: spacesQuery.isFetching }}
+          organizationsLoad={{ failed: organizationsQuery.isError, retry: () => void organizationsQuery.refetch(), retrying: organizationsQuery.isFetching }}
+        />
       </div>
     </div>
   )
@@ -722,6 +745,8 @@ export function PostComposer({
     organizationsQuery.data?.data.organizations,
   )
   const audiences = list<string>(page.data.audiences)
+  const audienceListsFailed = spacesQuery.isError || organizationsQuery.isError
+  const retryAudienceLists = () => { if (spacesQuery.isError) void spacesQuery.refetch(); if (organizationsQuery.isError) void organizationsQuery.refetch() }
   const announcementAudiences = list<string>(page.data.announcementAudiences)
   const requested = params.get('space') ?? ''
   const requestedAudience =
@@ -844,6 +869,9 @@ export function PostComposer({
               </p>
             </div>
             <div className="fx-group__body">
+              {audienceListsFailed && (
+                <QueryProblem what="the names of your spaces and organizations" onRetry={retryAudienceLists} retrying={spacesQuery.isFetching || organizationsQuery.isFetching} />
+              )}
               {announcementAudiences.length > 0 && (
                 <SegmentedControl
                   aria-label="Post type"

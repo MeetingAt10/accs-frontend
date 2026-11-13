@@ -34,6 +34,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 import { RestrictedView } from '@/components/app/guards'
 import { PagedList } from '@/components/app/paging'
+import { QueryProblem } from '@/components/app/query-problem'
 import { readCategoryOptions } from '@/lib/concern-categories'
 import {
   Empty,
@@ -1331,6 +1332,9 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                         <FacultyCard key={person.id} person={person} />
                       ))}
                     </div>
+                    {directory.isError && (
+                      <QueryProblem what="the other professors" onRetry={() => void directory.refetch()} retrying={directory.isFetching} />
+                    )}
                   </section>
                 )}
                 {step.n === 2 && (
@@ -2034,6 +2038,9 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         }
       />
       <div className="accs-stack accs-stagger">
+        {consultationsQuery.isError && (
+          <QueryProblem what="the appointment requests on your times" onRetry={() => void consultationsQuery.refetch()} retrying={consultationsQuery.isFetching} />
+        )}
         <p className="accs-meta" aria-live="polite">
           This week: {count('open')} open, {count('requested', 'booked')}{' '}
           requested or booked, {count('unavailable')} unavailable.
