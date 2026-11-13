@@ -307,7 +307,7 @@ const DECISIONS: Record<string, string> = {
   keep: "Kept, no action",
   remove: "Content removed",
   warn: "Removed, author warned",
-  refer: "Referred for authorized review",
+  refer: "Referred to the CCS Secretary",
 };
 
 /* ---------- P48 Permission matrix ---------- */
@@ -1339,6 +1339,9 @@ function ModerationReview({
   page: PageEnvelope;
   itemId: string;
 }) {
+  const secretaryRole = useQuery(sessionQuery()).data?.user.roles ?? [];
+  // The CCS Secretary decides referred items; only moderators refer.
+  const secretary = secretaryRole.includes("secretary") && !secretaryRole.includes("administrator");
   const record = object(page.data.record);
   const action = useAction("P50");
   const [decision, setDecision] = useState("keep");
@@ -1421,11 +1424,13 @@ function ModerationReview({
                   <Radio value="warn" card>
                     Remove and warn the author
                   </Radio>
-                  <Radio value="refer" card isDisabled={!userReport}>
-                    {userReport
-                      ? "Refer as a possible grievance"
-                      : "Refer as a possible grievance (user reports only)"}
-                  </Radio>
+                  {!secretary && (
+                    <Radio value="refer" card isDisabled={!userReport} description="The CCS Secretary reviews it and decides.">
+                      {userReport
+                        ? "Refer to the CCS Secretary"
+                        : "Refer to the CCS Secretary (user reports only)"}
+                    </Radio>
+                  )}
                 </RadioGroup>
                 <TextArea
                   label="Reason"
