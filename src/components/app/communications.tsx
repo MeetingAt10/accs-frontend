@@ -1,3 +1,4 @@
+import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
 import { roleLabelOf } from '@/lib/role-labels'
 import { Pager, usePaged } from '@/components/app/paging'
 import {
@@ -44,6 +45,9 @@ import {
 } from "@/components/app/guards";
 import {
   ApiError,
+  apiErrorText,
+  uploadMessageFile,
+  type MessageFile,
   performPageAction,
   type PageAction,
   type PageEnvelope,
@@ -213,17 +217,49 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  // Files chosen with the paperclip upload right away; the message names the ones that finished.
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const readyFiles = pendingFiles.filter((file) => file.state === "ready");
+  const filesBusy = pendingFiles.some((file) => file.state === "uploading");
+  function removePendingFile(key: string) {
+    setPendingFiles((current) => {
+      const gone = current.find((file) => file.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return current.filter((file) => file.key !== key);
+    });
+  }
+  function addFiles(chosen: File[]) {
+    const room = messageFilesPerMessage - pendingFiles.length;
+    if (room <= 0) {
+      toast(`Send at most ${messageFilesPerMessage} files at a time.`);
+      return;
+    }
+    if (chosen.length > room) toast(`Only ${room} more ${room === 1 ? "file fits" : "files fit"} in this message.`);
+    for (const file of chosen.slice(0, room)) {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const problem = messageFileProblem(file);
+      const preview = !problem && file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+      setPendingFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? "failed" : "uploading", problem }]);
+      if (problem) continue;
+      uploadMessageFile(file)
+        .then((uploaded) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "ready", file: uploaded } : item))))
+        .catch((error) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "failed", problem: apiErrorText(error) } : item))));
+    }
+  }
+
   async function sendMessage() {
-    if (!body.trim() || action.isPending) return;
+    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending) return;
     try {
       await action.mutateAsync({
         action: "sendMessage",
         recordId: words(conversation.id),
-        payload: { body: body.trim() },
+        payload: { body: body.trim(), attachments: readyFiles.map((file) => file.file!) },
       });
       setBody("");
+      for (const file of pendingFiles) if (file.preview) URL.revokeObjectURL(file.preview);
+      setPendingFiles([]);
     } catch {
-      // The composer keeps the entered text after an error.
+      // The composer keeps the entered text and files after an error.
     }
   }
 
@@ -401,6 +437,13 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                             body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
                             at={words(message.at)}
                             own={sender.id === session.data?.user.id}
+                            children={
+                              <MessageFiles
+                                threadId={words(conversation.id)}
+                                messageId={words(message.id)}
+                                files={(Array.isArray(message.attachments) ? message.attachments : []) as MessageFile[]}
+                              />
+                            }
                             actions={
                               <MenuButton
                                 label="Message actions"
@@ -442,6 +485,11 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                 onSend={() => void sendMessage()}
                 isPending={action.isPending}
                 attachments
+                onAddFiles={addFiles}
+                fileAccept={messageFileAccept}
+                files={<PendingFiles files={pendingFiles} onRemove={removePendingFile} />}
+                hasFiles={readyFiles.length > 0}
+                filesBusy={filesBusy}
                 mentions={members
                   .filter((member) => member.id !== session.data?.user.id)
                   .map((member) => ({ id: words(member.id), name: words(member.name) }))}
