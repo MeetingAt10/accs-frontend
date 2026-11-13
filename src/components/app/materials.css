@@ -1,0 +1,17 @@
+/* Subjects and class materials in a class space. */
+.mt-row { display: flex; align-items: flex-start; gap: 12px; }
+.mt-row__icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--accs-sunken); color: var(--accs-muted); }
+.mt-row__body { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.mt-row__title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-weight: 600; color: var(--accs-ink); overflow-wrap: anywhere; }
+.mt-row__title a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.mt-row__meta { color: var(--accs-muted); font-size: 0.8125rem; }
+.mt-row__note { color: var(--accs-ink-2); font-size: 0.875rem; overflow-wrap: anywhere; }
+.mt-row__aside { flex: none; display: inline-flex; align-items: center; gap: 6px; color: var(--accs-muted); font-size: 0.8125rem; align-self: center; }
+.mt-row__actions { flex: none; display: flex; gap: 6px; align-self: center; }
+.mt-form { display: grid; gap: 14px; }
+.mt-file { display: grid; gap: 6px; }
+.mt-file__label { font-weight: 600; font-size: 0.875rem; color: var(--accs-ink); }
+.mt-file input { font: inherit; color: var(--accs-ink); }
+.mt-file input::file-selector-button { margin-inline-end: 12px; padding: 8px 14px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control, 8px); background: var(--accs-paper); color: var(--accs-ink); font: inherit; font-weight: 500; cursor: pointer; }
+.mt-hint { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.5; }
+@media (max-width: 640px) { .mt-row { flex-wrap: wrap; } .mt-row__actions { width: 100%; } }
