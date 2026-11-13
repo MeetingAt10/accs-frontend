@@ -268,3 +268,7 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
   const response = await fetch(upload.url, { method: upload.method, headers, body: file })
   if (!response.ok) throw new ApiError("The file couldn't be uploaded. Try again.", response.status)
 }
+
+/** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
+export const issueResetCode = (accountId: string) =>
+  post<Recorded<{ code: string; expiresAt: string }>>('/admin/accounts/' + encodeURIComponent(accountId) + '/reset-code', {})
