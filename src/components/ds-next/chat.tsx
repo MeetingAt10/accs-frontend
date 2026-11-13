@@ -229,7 +229,7 @@ export function MessageBubble({
         )}
         <div className="ds-next-message-bubble__line">
           <div className="ds-next-message-bubble__text">
-            <p>{body}</p>
+            {body && <p>{body}</p>}
             {children}
           </div>
           {actions && (
@@ -263,6 +263,11 @@ export function MessageComposer({
   attachments = false,
   maxLength = 4000,
   mentions = [],
+  onAddFiles,
+  fileAccept,
+  files,
+  hasFiles = false,
+  filesBusy = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -271,6 +276,16 @@ export function MessageComposer({
   label?: string;
   attachments?: boolean;
   maxLength?: number;
+  /** Called with the files chosen with the paperclip; without it the paperclip is off. */
+  onAddFiles?: (files: File[]) => void;
+  /** The file types the paperclip offers. */
+  fileAccept?: string;
+  /** The files waiting to go with the message, shown above the bar. */
+  files?: ReactNode;
+  /** Files are ready, so the message may be sent without words. */
+  hasFiles?: boolean;
+  /** A file is still uploading, so the message waits. */
+  filesBusy?: boolean;
   /** People who can be named with @ in this conversation. */
   mentions?: { id: string; name: string }[];
 }) {
@@ -279,6 +294,8 @@ export function MessageComposer({
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState("");
   const open = matches.length > 0 && dismissed !== value;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const canSend = (Boolean(value.trim()) || hasFiles) && !isPending && !filesBusy;
   const pick = (name: string) => {
     onChange(value.replace(/@([^\s@]*)$/, "@" + name + " "));
     setActive(0);
@@ -288,7 +305,7 @@ export function MessageComposer({
       className="ds-next-composer"
       onSubmit={(event) => {
         event.preventDefault();
-        onSend();
+        if (canSend) onSend();
       }}
     >
       <TextArea
@@ -298,7 +315,7 @@ export function MessageComposer({
         onChange={onChange}
         maxLength={maxLength}
         showCount
-        isRequired
+        isRequired={!hasFiles}
         isDisabled={isPending}
         onKeyDown={(event) => {
           if (open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
@@ -322,10 +339,11 @@ export function MessageComposer({
             !event.nativeEvent.isComposing
           ) {
             event.preventDefault();
-            onSend();
+            if (canSend) onSend();
           }
         }}
       />
+      {files}
       {open && (
         <ul className="ds-next-mentions" role="listbox" aria-label="People to mention">
           {matches.map((person, index) => (
@@ -344,7 +362,31 @@ export function MessageComposer({
           line
         </small>
         <div className="ds-next-composer__buttons">
-          {attachments && (
+          {attachments && onAddFiles && (
+            <>
+              <input
+                ref={fileInput}
+                className="mf-input"
+                type="file"
+                multiple
+                accept={fileAccept}
+                tabIndex={-1}
+                aria-hidden
+                onChange={(event) => {
+                  const chosen = Array.from(event.target.files ?? []);
+                  event.target.value = "";
+                  if (chosen.length) onAddFiles(chosen);
+                }}
+              />
+              <IconButton
+                icon="paperclip"
+                label="Attach pictures or files"
+                isDisabled={isPending}
+                onPress={() => fileInput.current?.click()}
+              />
+            </>
+          )}
+          {attachments && !onAddFiles && (
             <IconButton
               icon="paperclip"
               label="Attachments aren't available yet"
@@ -355,8 +397,8 @@ export function MessageComposer({
             type="submit"
             variant="solid"
             icon="arrow-right"
-            label={isPending ? "Sending message" : "Send"}
-            isDisabled={!value.trim() || isPending}
+            label={isPending ? "Sending message" : filesBusy ? "Waiting for files to upload" : "Send"}
+            isDisabled={!canSend}
           />
         </div>
       </div>

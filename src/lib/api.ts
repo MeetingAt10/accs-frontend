@@ -267,6 +267,24 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
   if (!response.ok) throw new ApiError("The file couldn't be uploaded. Try again.", response.status)
 }
 
+/** A file sent with a message (MeetingAt10/accs-backend#90). */
+export type MessageFile = { id: string; fileName: string; contentType: string; size: number }
+
+/** Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`. */
+export async function uploadMessageFile(file: File): Promise<MessageFile> {
+  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType: file.type, size: file.size })
+  await sendMaterialFile(started.record.upload, file)
+  return started.record.attachment
+}
+
+/** Downloads a file from a conversation (the API checks membership, then redirects to a short-lived link). */
+export const messageFilePath = (threadId: string, messageId: string, fileId: string) =>
+  `${baseUrl}/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileId)}`
+
+/** A short-lived link that shows a picture in the browser. */
+export const messageFileLink = async (threadId: string, messageId: string, fileId: string) =>
+  (await request<Recorded<{ url: string }>>(messageFilePath(threadId, messageId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
+
 /** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
 export const issueResetCode = (accountId: string) =>
   post<Recorded<{ code: string; expiresAt: string }>>('/admin/accounts/' + encodeURIComponent(accountId) + '/reset-code', {})
