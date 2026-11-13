@@ -268,3 +268,6 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
   const response = await fetch(upload.url, { method: upload.method, headers, body: file })
   if (!response.ok) throw new ApiError("The file couldn't be uploaded. Try again.", response.status)
 }
+
+/** Ends every other session of the signed-in account; this one stays signed in. */
+export const signOutOtherDevices = () => post<Done>('/auth/sign-out-others', {})

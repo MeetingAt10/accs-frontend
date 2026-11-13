@@ -28,6 +28,7 @@ import {
   changePassword,
   performPageAction,
   signOut,
+  signOutOtherDevices,
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
@@ -660,6 +661,11 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
       router.history.push("/sign-in");
     },
   });
+  // Ends the account's other sessions; this one stays signed in.
+  const othersAction = useMutation({
+    mutationFn: signOutOtherDevices,
+    onSuccess: (result) => toast(result.message, { tone: "success" }),
+  });
   const saveAppearance = (nextTheme: string, nextDensity: string) => {
     setTheme(nextTheme);
     setDensity(nextDensity);
@@ -753,15 +759,20 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
               </Button>
               <Button
                 variant="secondary"
-                isDisabled
+                loading={othersAction.isPending}
+                onPress={() => othersAction.mutate()}
                 aria-describedby="other-device-note"
               >
                 Sign out of other devices
               </Button>
-              {/* TBD(ALL-01-G): session policy is not configured yet. */}
               <p id="other-device-note" className="pa-muted">
-                Signing out of other devices isn't available yet.
+                Signs you out everywhere else, for example on a shared computer. You stay signed in here.
               </p>
+              {othersAction.isError && (
+                <Alert tone="danger" title="Your other devices were not signed out">
+                  {apiErrorText(othersAction.error)}
+                </Alert>
+              )}
               {signOutAction.isError && (
                 <Alert
                   tone="danger"
