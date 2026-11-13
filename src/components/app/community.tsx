@@ -46,9 +46,10 @@ import {
   StatusChip,
   toneFor,
 } from '@/components/app/page-shell'
-import { Comment, CommentThread, ReactionButton } from '@/components/ds-next'
+import { Comment, CommentThread } from '@/components/ds-next'
 import { SubjectList, SubjectMaterials } from '@/components/app/materials'
 import { QueryProblem } from '@/components/app/query-problem'
+import { ReactionBar, readReactions, topReactions } from '@/components/app/reactions'
 import {
   performPageAction,
   type PageAction,
@@ -163,6 +164,8 @@ interface ScopeOption {
 }
 
 const postLabels = ['Discussion', 'Rant', 'Assistance', 'Support']
+/** The label as a key for its colour (Announcement, Discussion, Rant, Assistance, Support). */
+export const labelKey = (label: string) => label.toLowerCase().replace(/s$/, '').replace(/[^a-z]/g, '') || 'discussion'
 const participatingRoles = [
   'student',
   'organization',
@@ -320,14 +323,14 @@ function ThreadList({
                   delay: reduce ? 0 : Math.min(index, 8) * 0.04,
                 }}
               >
-                <div className="fx-vote">
-                  <Icon name="caret-up" size={16} weight="bold" />
-                  <span className="accs-num">{post.reactionCount}</span>
-                  <span className="fx-sr">agreements</span>
+                <div className="fx-vote" title={`${readReactions(post as unknown as Record<string, unknown>).total} reactions`}>
+                  <span aria-hidden className="fx-vote__emoji">{topReactions(readReactions(post as unknown as Record<string, unknown>).counts, 1)[0]?.emoji ?? '👍'}</span>
+                  <span className="accs-num">{readReactions(post as unknown as Record<string, unknown>).total}</span>
+                  <span className="fx-sr">reactions</span>
                 </div>
                 <div className="fx-thread__body">
                   <div className="fx-thread__tags">
-                    <span className="accs-tag fx-tag--label">
+                    <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
                       {announcement ? 'Announcement' : post.label}
                     </span>
                     <span className="accs-tag">
@@ -676,6 +679,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                     type="button"
                     key={label}
                     className="accs-pill fx-cat"
+                    data-label={labelKey(label)}
                     aria-pressed={labels.includes(label)}
                     onClick={() => toggleLabel(label)}
                   >
@@ -1127,7 +1131,7 @@ export function PostView({
   return (
     <article className="fx-post">
       <div className="fx-thread__tags">
-        <span className="accs-tag fx-tag--label">
+        <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
           {announcement ? 'Announcement' : post.label}
         </span>
         <span className="accs-tag">
@@ -1339,6 +1343,7 @@ function PostDetailPage({
         payload: {},
       })
       setDeleteOpen(false)
+      router.history.push('/feed')
     } catch {
       // Keep the confirmation open so the API error can be reviewed.
     }
@@ -1361,13 +1366,12 @@ function PostDetailPage({
         <Panel as="div" className="fx-post-panel">
           <PostView post={post} />
           <div className="fx-actions">
-            <ReactionButton
-              count={post.reactionCount}
-              isSelected={post.reacted}
-              isDisabled={page.data.canReact !== true}
-              loading={action.isPending}
-              onChange={() =>
-                action.mutate({ action: 'react', recordId: post.id, payload: {} })
+            <ReactionBar
+              item={post as unknown as Record<string, unknown>}
+              disabled={page.data.canReact !== true}
+              pending={action.isPending && action.variables?.action === 'react'}
+              onReact={(reaction) =>
+                action.mutate({ action: 'react', recordId: post.id, payload: { reaction } })
               }
             />
             {page.data.canComment === true && (
@@ -1381,6 +1385,11 @@ function PostDetailPage({
               </Link>
             )}
             <span className="fx-actions__spacer" />
+            {post.owned && (
+              <Button variant="tertiary" icon="trash" onPress={() => { action.reset(); setDeleteOpen(true) }}>
+                Delete
+              </Button>
+            )}
             <MenuButton
               iconOnly
               icon="dots-three"
@@ -1446,6 +1455,14 @@ function PostDetailPage({
                     dateTime={comment.at}
                     actions={
                       <>
+                        <ReactionBar
+                          size="sm"
+                          item={comment as unknown as Record<string, unknown>}
+                          disabled={page.data.canReact !== true}
+                          onReact={(reaction) =>
+                            action.mutate({ action: 'reactComment', recordId: post.id, payload: { commentId: comment.id, reaction } })
+                          }
+                        />
                         {page.data.canComment === true && (
                           <Button
                             variant="tertiary"
