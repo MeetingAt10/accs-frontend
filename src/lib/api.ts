@@ -31,14 +31,12 @@ export interface Session {
   allowedPages: string[]
   /** The name of each role, for example "System Administrator". */
   roleLabels?: Record<string, string>
-  sampleData: true
 }
 
 export interface PageEnvelope {
   pageId: string
   title: string
   scope: string
-  sampleData: true
   data: Record<string, unknown>
 }
 

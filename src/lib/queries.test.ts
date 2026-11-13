@@ -31,7 +31,6 @@ const notificationsPage = (notifications: unknown): PageEnvelope => ({
   pageId: 'P40',
   title: 'Notifications',
   scope: '',
-  sampleData: true,
   data: { notifications },
 })
 
