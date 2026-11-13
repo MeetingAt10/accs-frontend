@@ -273,3 +273,6 @@ export const issueResetCode = (accountId: string) =>
 
 /** Ends every other session of the signed-in account; this one stays signed in. */
 export const signOutOtherDevices = () => post<Done>('/auth/sign-out-others', {})
+
+/** Sets the signed-in person's profile photo (a data URL the browser already resized), or removes it with null. */
+export const setProfilePhoto = (photo: string | null) => performPageAction('P39', { action: 'setProfilePhoto', payload: { photo } })

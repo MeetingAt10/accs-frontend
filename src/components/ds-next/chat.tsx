@@ -1,3 +1,4 @@
+import { AvatarFill } from "@/components/app/photo";
 import {
   IconButton,
   Kbd,
@@ -48,10 +49,10 @@ function clock(value: string): string {
       });
 }
 
-function Mark({ name }: { name: string }) {
+function Mark({ name, photo }: { name: string; photo?: string }) {
   return (
     <span className="accs-avatar ds-next-chat-avatar" aria-hidden>
-      {initials(name) || "?"}
+      <AvatarFill photo={photo} fallback={initials(name) || "?"} />
     </span>
   );
 }
@@ -193,7 +194,9 @@ export function MessageBubble({
   own = false,
   actions,
   children,
+  photo,
 }: {
+  photo?: string;
   sender: string;
   role?: string;
   body: string;
@@ -215,7 +218,7 @@ export function MessageBubble({
       animate={{ opacity: 1, y: 0, x: 0 }}
       transition={{ duration: 0.36, ease }}
     >
-      {!own && <Mark name={sender} />}
+      {!own && <Mark name={sender} photo={photo} />}
       <div className="ds-next-message-bubble__col">
         {!own && (
           <header className="ds-next-message-bubble__who">

@@ -399,6 +399,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                             />
                           )}
                           <MessageBubble
+                            photo={words(sender.photo)}
                             sender={words(sender.name, "ACCS member")}
                             role={roles(sender.roles).join(" · ")}
                             body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
