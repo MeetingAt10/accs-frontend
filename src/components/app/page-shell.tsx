@@ -94,13 +94,15 @@ export function StatusChip({ tone = 'neutral', children }: { tone?: Tone; childr
   )
 }
 
-/** Map common workflow words to a tone. */
+/** Map common workflow words to a tone: green done, red refused or urgent, yellow waiting, blue in progress. */
 export function toneFor(status: string): Tone {
   const s = status.toLowerCase()
-  if (/(resolved|completed|approved|booked|published|active|submitted|done|closed|ok|healthy|confirmed)/.test(s)) return 'ok'
-  if (/(declined|rejected|removed|cancel|overdue|high|urgent|failed|restricted|suspended)/.test(s)) return 'danger'
+  // "Not finished" and "Not started" are waiting, even though they contain a done word.
+  if (/(^|[^a-z])not (started|finished|yet|chosen|set)/.test(s)) return 'warn'
+  if (/(resolved|completed|approved|booked|published|active|submitted|done|closed|ok|healthy|confirmed|clear|finished|kept|good standing|low)/.test(s)) return 'ok'
+  if (/(declined|rejected|removed|cancel|overdue|high|urgent|failed|restricted|suspended|missing|on hold|paused)/.test(s)) return 'danger'
   if (/(pending|requested|review|draft|waiting|medium|due|open|not started|important)/.test(s)) return 'warn'
-  if (/(new|in progress|escalat|with |transfer)/.test(s)) return 'info'
+  if (/(new|in progress|escalat|with |transfer|case file|at guidance|at osas|ongoing|scheduled)/.test(s)) return 'info'
   return 'neutral'
 }
 

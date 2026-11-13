@@ -39,7 +39,7 @@ const studentName = (report: Item) => report.source === 'faculty' && words(objec
   : words(object(report.reporter).name, words(report.alias, '—'))
 const isFacultyReport = (report: Item) => report.source === 'faculty'
 const severity = (report: Item): SeverityLevel => ['low', 'medium', 'high'].includes(words(report.severity)) ? report.severity as SeverityLevel : 'medium'
-const severityTone: Record<SeverityLevel, Tone> = { high: 'danger', medium: 'warn', low: 'neutral' }
+const severityTone: Record<SeverityLevel, Tone> = { high: 'danger', medium: 'warn', low: 'ok' }
 const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new Date(words(report.updatedAt, words(report.createdAt))).getTime()) / 86400000)) || 0
 const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
 const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
