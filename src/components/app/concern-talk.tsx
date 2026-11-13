@@ -8,7 +8,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 
 import type { ActionResult, PageAction } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
-import { Empty, Panel, StatusChip } from '@/components/app/page-shell'
+import { Empty, Panel } from '@/components/app/page-shell'
 
 // Consent, who can see a report, and how the student and the person handling it talk.
 
@@ -245,7 +245,12 @@ export function TalkChoice({ report, wording, action }: { report: Item; wording:
             <button type="button" className="gv-mode" aria-haspopup="dialog" data-current={talk.mode === mode.id || undefined} disabled={closed} onClick={() => { action.reset(); setPicked(mode.id) }}>
               <Icon {...mode.icon} size={24} />
               <span className="gv-mode__text"><strong>{mode.label}</strong><span>{mode.blurb}</span></span>
-              {talk.mode === mode.id && <StatusChip tone="accent">Current choice</StatusChip>}
+              {talk.mode === mode.id && (
+                <span className="gv-mode__chosen">
+                  <Icon name="check" size={16} />
+                  <span className="gv-visually-hidden">Current choice</span>
+                </span>
+              )}
             </button>
           </li>
         ))}
