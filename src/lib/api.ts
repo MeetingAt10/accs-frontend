@@ -270,3 +270,6 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
 /** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
 export const issueResetCode = (accountId: string) =>
   post<Recorded<{ code: string; expiresAt: string }>>('/admin/accounts/' + encodeURIComponent(accountId) + '/reset-code', {})
+
+/** Ends every other session of the signed-in account; this one stays signed in. */
+export const signOutOtherDevices = () => post<Done>('/auth/sign-out-others', {})
