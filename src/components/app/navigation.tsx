@@ -639,6 +639,8 @@ function ThemeToggle() {
     <IconButton
       icon={current === "dark" ? "sun" : "moon"}
       label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
+      // Off until the saved settings are known, so saving the theme never replaces the saved density with a default.
+      isDisabled={!appearance.isSuccess || save.isPending}
       onPress={() => {
         document.documentElement.setAttribute("data-theme", next);
         setCurrent(next);
