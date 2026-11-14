@@ -1,3 +1,5 @@
+import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
+import type { MessageFile } from '@/lib/api'
 import { AvatarFill, photoSrc } from '@/components/app/photo'
 import { roleLabelOf } from '@/lib/role-labels'
 import {
@@ -99,6 +101,8 @@ export interface CommunityPost {
   reactionCount: number
   reacted: boolean
   commentCount: number
+  /** Pictures and files posted with it. */
+  attachments?: MessageFile[]
   comments: PostComment[]
   removed: boolean
   eventDate?: string
@@ -366,6 +370,13 @@ function ThreadList({
                     <time dateTime={post.at} title={formatDateTime(post.at)}>
                       {relativeTime(post.at)}
                     </time>
+                    {post.attachments?.length ? (
+                      <span className="fx-thread__replies" title={`${post.attachments.length} ${post.attachments.length === 1 ? 'file' : 'files'}`}>
+                        <Icon name="paperclip" size={16} />
+                        <span className="accs-num">{post.attachments.length}</span>
+                        <span className="fx-sr">{post.attachments.length === 1 ? 'file' : 'files'}</span>
+                      </span>
+                    ) : null}
                     <span className="fx-thread__replies">
                       <Icon name="chat" size={16} />
                       <span className="accs-num">{post.commentCount}</span>
@@ -819,6 +830,7 @@ export function PostComposer({
   const [label, setLabel] = useState('')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const uploads = useFileUploads(10)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
   const [eventDate, setEventDate] = useState('')
@@ -856,7 +868,8 @@ export function PostComposer({
     const nextErrors: Record<string, string> = {}
     if (!audience) nextErrors.audience = 'Choose an audience.'
     if (!title.trim()) nextErrors.title = 'Enter a title.'
-    if (!body.trim()) nextErrors.body = 'Enter your post.'
+    if (!body.trim() && !uploads.ready.length) nextErrors.body = 'Write your post or attach a file.'
+    if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
     if (eventRequired) {
       if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
@@ -880,6 +893,7 @@ export function PostComposer({
           anonymous: kind === 'discussion' && identity === 'anonymous',
           priority,
           private: audience.startsWith('organization:'),
+          ...(uploads.ready.length ? { attachments: uploads.ready } : {}),
           ...(eventRequired
             ? { eventDate, eventTime, eventPlace, eventContact, notifyMembers }
             : {}),
@@ -1009,7 +1023,6 @@ export function PostComposer({
                 onChange={setBody}
                 maxLength={5000}
                 showCount
-                isRequired
                 isInvalid={Boolean(errors.body)}
                 errorMessage={errors.body}
               />
@@ -1086,11 +1099,7 @@ export function PostComposer({
               </motion.section>
             )}
           </AnimatePresence>
-          {/* TBD(D-08): attachment handling and retention are not approved. */}
-          <p className="fx-note">
-            <Icon name="paperclip" size={16} />
-            You can't attach files yet. Write your post as text.
-          </p>
+          <FilePicker uploads={uploads} />
           {session.user.roles.some((role) =>
             ['guidance', 'osas'].includes(role),
           ) && (
@@ -1186,7 +1195,8 @@ export function PostView({
         </div>
       </div>
       {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
-      <div className="fx-post__body">{post.body}</div>
+      {post.body && <div className="fx-post__body">{post.body}</div>}
+      {post.attachments?.length ? <PostFiles postId={post.id} files={post.attachments} /> : null}
       {post.eventDate && (
         <dl className="fx-facts">
           <div>
@@ -1236,6 +1246,7 @@ function PostDetailPage({
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editBody, setEditBody] = useState('')
+  const editUploads = useFileUploads(10)
   const [editLabel, setEditLabel] = useState('')
   const [editPriority, setEditPriority] = useState('general')
   const [editError, setEditError] = useState('')
@@ -1294,6 +1305,7 @@ function PostDetailPage({
       setEditBody(post!.body)
       setEditLabel(post!.label)
       setEditPriority(post!.priority)
+      editUploads.reset(post!.attachments ?? [])
       setEditError('')
       setEditOpen(true)
     }
@@ -1343,10 +1355,14 @@ function PostDetailPage({
     event.preventDefault()
     if (
       !editTitle.trim() ||
-      !editBody.trim() ||
+      (!editBody.trim() && !editUploads.ready.length) ||
       (post!.kind === 'discussion' && !editLabel)
     ) {
-      setEditError('Add a title and text, and choose a label, then save again.')
+      setEditError('Add a title and some text or a file, and choose a label, then save again.')
+      return
+    }
+    if (editUploads.busy) {
+      setEditError('Wait for your files to finish uploading, then save again.')
       return
     }
     try {
@@ -1358,6 +1374,7 @@ function PostDetailPage({
           body: editBody.trim(),
           label: editLabel,
           priority: editPriority,
+          attachments: editUploads.ready,
         },
       })
       setEditOpen(false)
@@ -1683,10 +1700,10 @@ function PostDetailPage({
                 label="Post"
                 value={editBody}
                 onChange={setEditBody}
-                isRequired
                 maxLength={5000}
                 showCount
               />
+              <FilePicker uploads={editUploads} />
               {post.kind === 'discussion' ? (
                 <RadioGroup
                   label="Label"

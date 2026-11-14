@@ -1,7 +1,8 @@
-import { Icon } from '@meetingat10/design-system/react'
+import { Button, Icon, toast } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
 
-import { messageFileLink, messageFilePath, type MessageFile } from '@/lib/api'
+import { apiErrorText, messageFileLink, messageFilePath, postFileLink, postFilePath, uploadMessageFile, type MessageFile } from '@/lib/api'
 import './message-files.css'
 
 // Files in Messages (MeetingAt10/accs-backend#90). Pictures show as thumbnails that open full size; other files are a
@@ -44,16 +45,19 @@ export function fileSize(bytes: number) {
 
 const isPicture = (file: { contentType: string }) => file.contentType.startsWith('image/')
 
-function Picture({ threadId, messageId, file }: { threadId: string; messageId: string; file: MessageFile }) {
+/** Where a set of files comes from: a message or a post. */
+type FileSource = { key: string[]; path: (fileId: string) => string; link: (fileId: string) => Promise<string> }
+
+function Picture({ source, file }: { source: FileSource; file: MessageFile }) {
   // Signed links last five minutes; ask again a little before that.
   const link = useQuery({
-    queryKey: ['message-file', threadId, messageId, file.id],
-    queryFn: () => messageFileLink(threadId, messageId, file.id),
+    queryKey: [...source.key, file.id],
+    queryFn: () => source.link(file.id),
     staleTime: 240_000,
     refetchInterval: 240_000,
   })
   return (
-    <a className="mf-picture" href={link.data ?? messageFilePath(threadId, messageId, file.id)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.fileName} (opens in a new tab)`}>
+    <a className="mf-picture" href={link.data ?? source.path(file.id)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.fileName} (opens in a new tab)`}>
       {link.data ? <img src={link.data} alt={file.fileName} loading="lazy" /> : <span className="mf-picture__wait" aria-hidden><Icon name="file" size={20} /></span>}
     </a>
   )
@@ -61,6 +65,15 @@ function Picture({ threadId, messageId, file }: { threadId: string; messageId: s
 
 /** The files sent with one message. */
 export function MessageFiles({ threadId, messageId, files }: { threadId: string; messageId: string; files: MessageFile[] }) {
+  return <FileGallery files={files} source={{ key: ['message-file', threadId, messageId], path: (id) => messageFilePath(threadId, messageId, id), link: (id) => messageFileLink(threadId, messageId, id) }} />
+}
+
+/** The pictures and files posted with a post. */
+export function PostFiles({ postId, files }: { postId: string; files: MessageFile[] }) {
+  return <FileGallery files={files} source={{ key: ['post-file', postId], path: (id) => postFilePath(postId, id), link: (id) => postFileLink(postId, id) }} />
+}
+
+function FileGallery({ files, source }: { files: MessageFile[]; source: FileSource }) {
   if (!files.length) return null
   const pictures = files.filter(isPicture)
   const others = files.filter((file) => !isPicture(file))
@@ -68,11 +81,11 @@ export function MessageFiles({ threadId, messageId, files }: { threadId: string;
     <div className="mf-files">
       {pictures.length > 0 && (
         <div className="mf-pictures" data-count={Math.min(pictures.length, 3)}>
-          {pictures.map((file) => <Picture key={file.id} threadId={threadId} messageId={messageId} file={file} />)}
+          {pictures.map((file) => <Picture key={file.id} source={source} file={file} />)}
         </div>
       )}
       {others.map((file) => (
-        <a key={file.id} className="mf-chip" href={messageFilePath(threadId, messageId, file.id)} download={file.fileName}>
+        <a key={file.id} className="mf-chip" href={source.path(file.id)} download={file.fileName}>
           <Icon name="file" size={20} />
           <span className="mf-chip__text"><strong>{file.fileName}</strong><small>{fileSize(file.size)}</small></span>
           <Icon name="download" size={16} />
@@ -103,5 +116,71 @@ export function PendingFiles({ files, onRemove }: { files: PendingFile[]; onRemo
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * Files chosen for a post or a message: each uploads as soon as it is chosen. `ready` are the ones to send; `busy` while
+ * any is still uploading. Start from files already saved (editing a post) with `initial` or `reset`.
+ */
+export function useFileUploads(max: number, initial: MessageFile[] = []) {
+  const saved = (list: MessageFile[]): PendingFile[] => list.map((file) => ({ key: file.id, name: file.fileName, size: file.size, state: 'ready', file }))
+  const [files, setFiles] = useState<PendingFile[]>(() => saved(initial))
+  const ready = files.filter((file) => file.state === 'ready' && file.file).map((file) => file.file!)
+  const busy = files.some((file) => file.state === 'uploading')
+  function add(chosen: File[]) {
+    const room = max - files.length
+    if (room <= 0) { toast(`Attach at most ${max} files.`); return }
+    if (chosen.length > room) toast(`Only ${room} more ${room === 1 ? 'file fits' : 'files fit'}.`)
+    for (const file of chosen.slice(0, room)) {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const problem = messageFileProblem(file)
+      const preview = !problem && file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+      setFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? 'failed' : 'uploading', problem }])
+      if (problem) continue
+      uploadMessageFile(file)
+        .then((uploaded) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'ready', file: uploaded } : item))))
+        .catch((error) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'failed', problem: apiErrorText(error) } : item))))
+    }
+  }
+  function remove(key: string) {
+    setFiles((current) => {
+      const gone = current.find((file) => file.key === key)
+      if (gone?.preview) URL.revokeObjectURL(gone.preview)
+      return current.filter((file) => file.key !== key)
+    })
+  }
+  function reset(next: MessageFile[] = []) {
+    for (const file of files) if (file.preview) URL.revokeObjectURL(file.preview)
+    setFiles(saved(next))
+  }
+  return { files, ready, busy, add, remove, reset }
+}
+
+/** "Add pictures or files" with the chosen files under it. */
+export function FilePicker({ uploads, label = 'Add pictures or files' }: { uploads: ReturnType<typeof useFileUploads>; label?: string }) {
+  const input = useRef<HTMLInputElement>(null)
+  return (
+    <div className="mf-picker">
+      <input
+        ref={input}
+        className="mf-input"
+        type="file"
+        multiple
+        accept={messageFileAccept}
+        tabIndex={-1}
+        aria-hidden
+        onChange={(event) => {
+          const chosen = Array.from(event.target.files ?? [])
+          event.target.value = ''
+          if (chosen.length) uploads.add(chosen)
+        }}
+      />
+      <div className="mf-picker__bar">
+        <Button variant="secondary" icon="paperclip" onPress={() => input.current?.click()}>{label}</Button>
+        <small>Pictures, PDF, Word, PowerPoint, Excel or text. Up to 10 MB each.</small>
+      </div>
+      <PendingFiles files={uploads.files} onRemove={uploads.remove} />
+    </div>
   )
 }

@@ -286,6 +286,14 @@ export const messageFilePath = (threadId: string, messageId: string, fileId: str
 export const messageFileLink = async (threadId: string, messageId: string, fileId: string) =>
   (await request<Recorded<{ url: string }>>(messageFilePath(threadId, messageId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
 
+/** Downloads a file from a post (the API checks the post can be read, then redirects to a short-lived link). */
+export const postFilePath = (postId: string, fileId: string) =>
+  `${baseUrl}/posts/${encodeURIComponent(postId)}/files/${encodeURIComponent(fileId)}`
+
+/** A short-lived link that shows a post's picture in the browser. */
+export const postFileLink = async (postId: string, fileId: string) =>
+  (await request<Recorded<{ url: string }>>(postFilePath(postId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
+
 /** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
 export const issueResetCode = (accountId: string) =>
   post<Recorded<{ code: string; expiresAt: string }>>('/admin/accounts/' + encodeURIComponent(accountId) + '/reset-code', {})

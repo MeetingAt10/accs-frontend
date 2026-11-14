@@ -52,3 +52,10 @@
 .mf-pending__remove:hover { background: var(--accs-sunken); color: var(--accs-ink); }
 .mf-pending__remove:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; }
 .mf-input { display: none; }
+
+.mf-picker { display: grid; gap: 10px; }
+.mf-picker__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mf-picker__bar small { color: var(--accs-muted); font-size: 0.8125rem; }
+.fx-post .mf-files { margin-top: 0; }
+.fx-post .mf-pictures { width: min(100%, 36rem); }
+.fx-post .mf-pictures[data-count='1'] .mf-picture, .fx-post .mf-pictures[data-count='1'] .mf-picture img { max-height: 28rem; }
