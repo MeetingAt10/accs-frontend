@@ -61,7 +61,13 @@ jobs:
           VITE_DEV_TOOLBOX: ${{ github.ref_name == 'dev' && 'true' || '' }} # only the dev branch's build carries the dev toolbox
 
       - name: Upload
-        run: aws s3 sync dist "s3://${{ steps.stack.outputs.bucket }}" --delete
+        run: |
+          aws s3 sync dist "s3://${{ steps.stack.outputs.bucket }}" --delete
+          # Entry points the browser must revalidate on every load; hashed assets under /assets stay cacheable.
+          for f in index.html sw.js registerSW.js manifest.webmanifest; do
+            [ -f "dist/$f" ] && aws s3 cp "dist/$f" "s3://${{ steps.stack.outputs.bucket }}/$f" --cache-control no-cache --metadata-directive REPLACE \
+              --content-type "$(case $f in *.html) echo text/html;; *.js) echo text/javascript;; *) echo application/manifest+json;; esac)"
+          done
 
       - name: Invalidate
         run: aws cloudfront create-invalidation --distribution-id "${{ steps.stack.outputs.distribution }}" --paths '/*'

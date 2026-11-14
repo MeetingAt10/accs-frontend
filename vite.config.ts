@@ -1,6 +1,7 @@
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 import { localRoleLauncher } from './vite.local-role-launcher'
 
 export default defineConfig(({ command }) => {
@@ -21,6 +22,36 @@ export default defineConfig(({ command }) => {
     plugins: [
       TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
       react(),
+      // App shell only: no runtime caching, so confidential API data is never stored by the SW. Non-navigation
+      // requests that are not precached (including a cross-origin API) are never intercepted.
+      VitePWA({
+        registerType: 'autoUpdate',
+        devOptions: { enabled: false },
+        includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
+        manifest: {
+          name: 'ACCS · College of Computer Studies',
+          short_name: 'ACCS',
+          start_url: '/',
+          scope: '/',
+          display: 'standalone',
+          background_color: '#F5F7FB',
+          theme_color: '#F5F7FB',
+          icons: [
+            { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+            { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,woff2,svg,png,ico}'],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api(\/|$)/],
+          runtimeCaching: [],
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
+        },
+      }),
       ...(roleLauncherEnabled ? [localRoleLauncher()] : []),
     ],
     resolve: { alias: { '@': '/src' } },
