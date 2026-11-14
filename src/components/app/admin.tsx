@@ -1951,8 +1951,10 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     ),
   );
   const session = useQuery(sessionQuery());
+  // Moderation pages are also the Secretary's, for referred items; the rest of administration is the administrator's.
   const roleAllowed =
-    session.data?.user.roles.includes("administrator") === true;
+    session.data?.user.roles.includes("administrator") === true ||
+    (["P49", "P50"].includes(pageId) && session.data?.permissions.includes("moderation.referral") === true);
   if (session.isPending || page.isPending)
     return (
       <div
