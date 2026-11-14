@@ -17,7 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Empty, PageHeader, Panel, StatusChip } from "@/components/app/page-shell";
 import { Collapse, SlidePills, ease } from "@/components/app/portal-motion";
@@ -709,6 +709,10 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
   const action = useAction("P43");
   const [theme, setTheme] = useState(word(settings.theme, "system"));
   const [density, setDensity] = useState(word(settings.density, "comfortable"));
+  // The top-bar theme switch saves too: follow the saved values, so a later change here does not restore an old theme.
+  const savedTheme = word(settings.theme, "system");
+  const savedDensity = word(settings.density, "comfortable");
+  useEffect(() => { setTheme(savedTheme); setDensity(savedDensity); }, [savedTheme, savedDensity]);
   // Only a successful sign-out clears the cache and leaves the page - a failed request must
   // keep the person right where they are, with the server session (and the cache) intact.
   const signOutAction = useMutation({
