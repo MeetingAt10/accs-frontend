@@ -616,6 +616,14 @@ function ThemeToggle() {
   useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
   const save = useMutation({
     mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
+    // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
+    onError: (error) => {
+      const restored = resolvedTheme(saved);
+      if (saved === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", restored);
+      setCurrent(restored);
+      toast(apiErrorText(error));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
   });
   const next = current === "dark" ? "light" : "dark";

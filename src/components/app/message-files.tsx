@@ -1,6 +1,6 @@
 import { Button, Icon, toast } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { apiErrorText, messageFileLink, messageFilePath, postFileLink, postFilePath, uploadMessageFile, type MessageFile } from '@/lib/api'
 import './message-files.css'
@@ -137,6 +137,10 @@ export function useFileUploads(max: number, initial: MessageFile[] = []) {
   const [files, setFiles] = useState<PendingFile[]>(() => saved(initial))
   const ready = files.filter((file) => file.state === 'ready' && file.file).map((file) => file.file!)
   const busy = files.some((file) => file.state === 'uploading')
+  // Previews still open when the composer goes away are released, or each keeps its picture in memory.
+  const latest = useRef(files)
+  latest.current = files
+  useEffect(() => () => { for (const file of latest.current) if (file.preview) URL.revokeObjectURL(file.preview) }, [])
   function add(chosen: File[]) {
     const room = max - files.length
     if (room <= 0) { toast(`Attach at most ${max} files.`); return }

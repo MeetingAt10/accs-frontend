@@ -221,6 +221,10 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const readyFiles = pendingFiles.filter((file) => file.state === "ready");
   const filesBusy = pendingFiles.some((file) => file.state === "uploading");
+  // Previews still open when Messages is left are released.
+  const latestFiles = useRef(pendingFiles);
+  latestFiles.current = pendingFiles;
+  useEffect(() => () => { for (const file of latestFiles.current) if (file.preview) URL.revokeObjectURL(file.preview); }, []);
   // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
   useEffect(() => {
     setBody("");
