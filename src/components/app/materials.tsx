@@ -2,7 +2,7 @@ import { Alert, Button, Icon, Modal, ModalActions, ModalBody, Radio, RadioGroup,
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
 
-import { ApiError, completeMaterialUpload, performPageAction, sendMaterialFile, startMaterialUpload, type PageAction } from '@/lib/api'
+import { ApiError, completeMaterialUpload, materialFilePath, performPageAction, sendMaterialFile, startMaterialUpload, type PageAction } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { Empty, Panel, StatusChip } from '@/components/app/page-shell'
 import './materials.css'
@@ -105,7 +105,7 @@ export function SubjectMaterials({ spaceId, materials, canManage }: { spaceId: s
             {materials.map((material) => {
               const file = material.kind === 'file'
               const pending = file && material.status !== 'ready'
-              const href = file ? text(material.downloadUrl) : text(material.url)
+              const href = file ? materialFilePath(text(material.id)) : text(material.url)
               return (
                 <li key={text(material.id)} className="accs-row mt-row">
                   <span className="mt-row__icon" aria-hidden><Icon name={file ? 'file' : 'link'} size={16} /></span>

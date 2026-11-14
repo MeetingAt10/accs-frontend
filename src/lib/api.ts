@@ -278,6 +278,9 @@ export async function uploadMessageFile(file: File): Promise<MessageFile> {
   return started.record.attachment
 }
 
+/** Downloads a class material file (the API checks access, then redirects to a short-lived link). On the API's own origin. */
+export const materialFilePath = (materialId: string) => `${baseUrl}/materials/${encodeURIComponent(materialId)}/file`
+
 /** Downloads a file from a conversation (the API checks membership, then redirects to a short-lived link). */
 export const messageFilePath = (threadId: string, messageId: string, fileId: string) =>
   `${baseUrl}/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileId)}`
