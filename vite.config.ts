@@ -41,6 +41,7 @@ export default defineConfig(({ command }) => {
             if (/node_modules[\/](motion|framer-motion|motion-dom|motion-utils)[\/]/.test(id)) return 'motion'
             if (id.includes('@meetingat10/design-system')) return 'design-system'
             if (id.includes('@phosphor-icons')) return 'icons'
+            if (/@grafana[\/]faro|@opentelemetry/.test(id)) return 'observability'
             return 'vendor'
           },
         },
