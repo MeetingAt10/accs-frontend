@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isSectionGroup, sectionCode, sortBySection } from './community'
+import { isSectionGroup, sectionCode, sortBySection, spaceName } from './community'
 
 describe('section names', () => {
   const group = { title: 'SBIT3A', subject: 'Section group' }
@@ -12,6 +12,11 @@ describe('section names', () => {
     expect(sectionCode(subject)).toBe('SBIT3A')
     expect(isSectionGroup(group)).toBe(true)
     expect(isSectionGroup(subject)).toBe(false)
+  })
+
+  it('names a subject space "SECTION - SUBJECT"', () => {
+    expect(spaceName(group)).toBe('SBIT3A')
+    expect(spaceName(subject)).toBe('SBIT3A - CC 104 Data Structures')
   })
 
   it('lists a section group first, then its subjects, section by section', () => {
