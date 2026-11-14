@@ -2,6 +2,7 @@ export type Role =
   | 'student'
   | 'organization'
   | 'professor'
+  | 'staff'
   | 'chair'
   | 'dean'
   | 'administrator'

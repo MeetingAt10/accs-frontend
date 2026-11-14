@@ -5,6 +5,7 @@ export const defaultRoleLabels: Record<string, string> = {
   student: 'Student',
   organization: 'CCS Student Organization',
   professor: 'Professor',
+  staff: 'CCS Staff',
   chair: 'Program Chair',
   dean: 'Dean',
   administrator: 'System Administrator',
