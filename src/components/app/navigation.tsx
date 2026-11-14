@@ -614,6 +614,14 @@ function ThemeToggle() {
   const density = typeof settings?.density === "string" ? settings.density : "comfortable";
   const [current, setCurrent] = useState(() => resolvedTheme(saved));
   useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
+  // Following the device: track its light/dark changes so the switch offers the other theme.
+  useEffect(() => {
+    if (saved !== "system" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const follow = () => setCurrent(media.matches ? "dark" : "light");
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, [saved]);
   const save = useMutation({
     mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
     // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
