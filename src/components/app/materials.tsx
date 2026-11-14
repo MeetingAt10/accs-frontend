@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
 
 import { ApiError, completeMaterialUpload, performPageAction, sendMaterialFile, startMaterialUpload, type PageAction } from '@/lib/api'
-import { formatDate } from '@/lib/format'
+import { formatDate, relativeTime } from '@/lib/format'
 import { Empty, Panel, StatusChip } from '@/components/app/page-shell'
 import './materials.css'
 
@@ -109,7 +109,7 @@ export function SubjectMaterials({ spaceId, materials, canManage }: { spaceId: s
               return (
                 <li key={text(material.id)} className="accs-row mt-row">
                   <span className="mt-row__icon" aria-hidden><Icon name={file ? 'file' : 'link'} size={16} /></span>
-                  <span className="mt-row__body">
+                  <div className="mt-row__body">
                     <span className="mt-row__title">
                       {href && !pending ? <a href={href} target="_blank" rel="noopener noreferrer">{text(material.title)}</a> : text(material.title)}
                       {pending && <StatusChip tone="warn">Upload not finished</StatusChip>}
@@ -118,7 +118,8 @@ export function SubjectMaterials({ spaceId, materials, canManage }: { spaceId: s
                       {[file ? [text(material.fileName), material.size ? fileSize(Number(material.size)) : ''].filter(Boolean).join(' · ') : 'Link', text(object(material.author).name), formatDate(material.updatedAt ?? material.at)].filter(Boolean).join(' · ')}
                     </span>
                     {text(material.note) && <span className="mt-row__note">{text(material.note)}</span>}
-                  </span>
+                    {!pending && <MaterialComments material={material} />}
+                  </div>
                   {canManage && (
                     <span className="mt-row__actions">
                       <Button size="sm" variant="secondary" onPress={() => setEditing(material)}>Edit</Button>
@@ -145,6 +146,49 @@ export function SubjectMaterials({ spaceId, materials, canManage }: { spaceId: s
           <Button variant="destructive" loading={remove.isPending} onPress={() => remove.mutate({ action: 'removeMaterial', recordId: text(removing?.id), payload: {} }, { onSuccess: () => setRemoving(undefined) })}>Remove</Button>
         </ModalActions>
       </Modal>
+    </div>
+  )
+}
+
+/** Questions and answers under one material (MeetingAt10/accs-backend#93): open them, add one, remove where allowed. */
+function MaterialComments({ material }: { material: Item }) {
+  const comments = items(material.comments)
+  const [open, setOpen] = useState(false)
+  const [body, setBody] = useState('')
+  const act = useMaterialAction()
+  const id = text(material.id)
+  const send = () => {
+    if (!body.trim() || act.isPending) return
+    act.mutate({ action: 'commentMaterial', recordId: id, payload: { body: body.trim() } }, { onSuccess: () => setBody('') })
+  }
+  return (
+    <div className="mt-comments">
+      <button type="button" className="mt-comments__toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <Icon name="chat" size={16} />
+        {comments.length ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}` : 'Comment'}
+      </button>
+      {open && (
+        <div className="mt-comments__panel">
+          {comments.length > 0 && (
+            <ul className="mt-comments__list">
+              {comments.map((comment) => (
+                <li key={text(comment.id)}>
+                  <span className="mt-comments__who"><strong>{text(object(comment.author).name, 'Class member')}</strong> <small>{relativeTime(text(comment.at))}</small></span>
+                  <span className="mt-comments__body">{text(comment.body)}</span>
+                  {comment.canDelete === true && (
+                    <button type="button" className="mt-comments__remove" onClick={() => act.mutate({ action: 'deleteMaterialComment', recordId: id, payload: { commentId: text(comment.id) } })}>Remove</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="mt-comments__form" onSubmit={(event) => { event.preventDefault(); send() }}>
+            <TextArea label="Add a comment" value={body} onChange={setBody} maxLength={4000} />
+            <Button type="submit" size="sm" loading={act.isPending} isDisabled={!body.trim()}>Comment</Button>
+          </form>
+          {act.error && <Alert tone="danger" title="The comment was not saved">{act.error.message}</Alert>}
+        </div>
+      )}
     </div>
   )
 }
