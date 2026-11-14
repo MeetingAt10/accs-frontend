@@ -1,6 +1,3 @@
-import { faro, getWebInstrumentations, initializeFaro } from '@grafana/faro-web-sdk'
-import { TracingInstrumentation } from '@grafana/faro-web-tracing'
-
 /**
  * Matches only the API's own origin. Trace headers must never reach other origins: S3 upload URLs (src/lib/api.ts)
  * allow only content-type and content-length in the bucket's CORS rules, so a catch-all would break uploads.
@@ -16,10 +13,17 @@ export function apiOriginPattern(apiUrl: string | undefined): RegExp[] {
 }
 
 /** Starts Grafana Faro (Frontend Observability). Does nothing unless VITE_FARO_URL is set. Sets no user identity. */
-export function initObservability() {
+let faroApi: { pushError(error: Error): void } | undefined
+
+export async function initObservability() {
   const url = import.meta.env.VITE_FARO_URL
   if (!url) return
-  initializeFaro({
+  // Loaded only when configured, so a build without VITE_FARO_URL never downloads the SDK.
+  const [{ getWebInstrumentations, initializeFaro }, { TracingInstrumentation }] = await Promise.all([
+    import('@grafana/faro-web-sdk'),
+    import('@grafana/faro-web-tracing'),
+  ])
+  faroApi = initializeFaro({
     url,
     app: {
       name: 'accs-frontend',
@@ -32,10 +36,10 @@ export function initObservability() {
         instrumentationOptions: { propagateTraceHeaderCorsUrls: apiOriginPattern(import.meta.env.VITE_API_URL) },
       }),
     ],
-  })
+  }).api
 }
 
 /** Sends an error to Faro; does nothing when Faro is not initialised. */
 export function reportError(error: unknown) {
-  faro.api?.pushError(error instanceof Error ? error : new Error(String(error)))
+  faroApi?.pushError(error instanceof Error ? error : new Error(String(error)))
 }

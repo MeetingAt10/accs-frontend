@@ -652,7 +652,7 @@ function Topbar({
   const [search, setSearch] = useState("");
   const [assistantOpen, setAssistantOpen] = useState(false);
   // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
-  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000 });
+  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
     mutationFn: (action: {
       action: "markNotification";

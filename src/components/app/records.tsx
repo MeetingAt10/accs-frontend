@@ -723,7 +723,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
             Read each report in context.
           </p>
           {status === "To review" ? (
-            <div className="rc-hold-reasons">
+            <div className="rc-reasons">
               <TextArea
                 label="Review note"
                 value={reason}

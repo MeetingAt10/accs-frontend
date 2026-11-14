@@ -621,6 +621,7 @@ const routingTitles: Record<string, string> = {
   'possible-conflict': 'Routed to you to check whether a faculty member is involved',
   'wide-scope': 'Routed to you because the concern affects the whole program or college',
   'chair-conflict': 'Routed to you because the Program Chair may be involved',
+  'chair-and-dean-conflict': 'Routed to you because the Program Chair and the Dean may be involved',
   critical: 'Routed to you because the report has words that need urgent care',
 }
 const personRoles: Record<string, string> = { adviser: 'adviser', subject: 'subject professor', chair: 'Program Chair', dean: 'Dean' }
@@ -634,7 +635,7 @@ export function ConflictNotice({ routing }: { routing?: Routing }) {
   return (
     <Alert tone="warning" title={title ?? 'Routing notes'}>
       <ul className="gv-routing">
-        {lines.map((m) => <li key={m.personId}>The report mentions the student's {personRoles[m.role] ?? m.role} ({m.name}) as "{m.alias}"{m.term ? `, ${m.distance} ${m.distance === 1 ? 'word' : 'words'} from "${m.term}"` : ''}. Score {m.conflict.toFixed(2)}.</li>)}
+        {lines.map((m) => <li key={m.personId}>The report mentions the student's {personRoles[m.role] ?? m.role} ({m.name}) as "{m.alias}"{m.term && m.distance != null ? `, ${m.distance} ${m.distance === 1 ? 'word' : 'words'} from "${m.term}"` : ''}. Score {Number(m.conflict ?? 0).toFixed(2)}.</li>)}
         {routing.criticalTerm && <li>Words that may need urgent care: "{routing.criticalTerm}".</li>}
         {routing.heldBack.map((note) => <li key={note}>{note}</li>)}
       </ul>

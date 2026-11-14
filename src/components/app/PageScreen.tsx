@@ -109,7 +109,7 @@ function Sub({ children }: { children: ReactNode }) {
 function kpiTarget(label: string) {
   if (/queue/i.test(label)) return '/cases'
   if (/report|case/i.test(label)) return '/reports'
-  if (/consult/i.test(label)) return '/consultations'
+  if (/appoint|consult/i.test(label)) return '/consultations'
   if (/evaluation/i.test(label)) return '/evaluations'
   if (/unread|update|notification/i.test(label)) return '/notifications'
   if (/event|calendar/i.test(label)) return '/calendar'
@@ -307,7 +307,7 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
               </Panel>
             )}
             {consultations.length > 0 && (
-              <Panel flush title={counted('Appointments', /consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
+              <Panel flush title={counted('Appointments', /appoint|consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
                 <Rows>
                   {consultations.map((item, index) => {
                     const student = asItem(item.student)

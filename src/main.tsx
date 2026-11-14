@@ -37,7 +37,7 @@ declare module '@tanstack/react-router' {
   }
 }
 
-initObservability()
+void initObservability()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

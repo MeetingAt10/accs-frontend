@@ -99,7 +99,8 @@ export function toneFor(status: string): Tone {
   const s = status.toLowerCase()
   // "Not finished" and "Not started" are waiting, even though they contain a done word.
   if (/(^|[^a-z])not (started|finished|yet|chosen|set)/.test(s)) return 'warn'
-  if (/(resolved|completed|approved|booked|published|active|submitted|done|closed|ok|healthy|confirmed|clear|finished|kept|good standing|low)/.test(s)) return 'ok'
+  if (/(^|[^a-z])(unfinished|unclear|not cleared)/.test(s)) return 'warn'
+  if (/(resolved|completed|approved|booked|published|active|submitted|done|closed|ok|healthy|confirmed|\bclear(ed)?\b|\bfinished\b|\bkept\b|good standing|\blow\b)/.test(s)) return 'ok'
   if (/(declined|rejected|removed|cancel|overdue|high|urgent|failed|restricted|suspended|missing|on hold|paused)/.test(s)) return 'danger'
   if (/(pending|requested|review|draft|waiting|medium|due|open|not started|important)/.test(s)) return 'warn'
   if (/(new|in progress|escalat|with |transfer|case file|at guidance|at osas|ongoing|scheduled)/.test(s)) return 'info'
