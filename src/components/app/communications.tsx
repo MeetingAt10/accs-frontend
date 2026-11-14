@@ -189,6 +189,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     roles(member.roles).some((role) => ["guidance", "osas"].includes(role)),
   );
 
+  // New messages show without notifications too: muting a conversation must not stop it from updating while open.
+  useEffect(() => {
+    const timer = window.setInterval(() => void queryClient.invalidateQueries({ queryKey: ["page", page.pageId] }), 15_000);
+    return () => window.clearInterval(timer);
+  }, [queryClient, page.pageId]);
+
   useEffect(() => {
     if (!isThread || !conversationId) return;
     void performPageAction("P12", {
