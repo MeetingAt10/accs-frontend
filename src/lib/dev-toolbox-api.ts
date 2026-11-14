@@ -32,3 +32,14 @@ export const listDevUsers = () => request<{ users: DevUser[] }>('/dev/users').th
 /** Ends the current session and starts one for `userId`. Answers with the new session. */
 export const switchDevUser = (userId: string) =>
   request<Session>('/dev/switch-user', { method: 'POST', body: JSON.stringify({ userId }) })
+
+export interface EscalationMention { personId: string; name: string; role: string; alias: string; aliasKind: string; matchScore: number; term?: string; distance?: number; proximity: number; conflict: number }
+export interface EscalationTrace { engineVersion: string; lexiconVersion: string; rule: string; scope: string; severityHint?: 'critical'; criticalTerm?: string; mentions: EscalationMention[]; heldBack: string[]; thresholds: { bypass: number; triage: number } }
+export interface EscalationTry {
+  decision: { stage: string; bypassed: boolean; aboutAdvisor: boolean; possibleConflict: boolean; involvedUserIds: string[]; reason: string; trace: EscalationTrace }
+  roster: { id: string; name: string; role: string; aliases: string[] }[]
+}
+
+/** Where a report would go for this student, with the engine's full trace. Nothing is stored. */
+export const tryEscalation = (reporterId: string, narrative: string, aboutAdvisor: boolean) =>
+  request<EscalationTry>('/dev/escalation/try', { method: 'POST', body: JSON.stringify({ reporterId, narrative, aboutAdvisor }) })
