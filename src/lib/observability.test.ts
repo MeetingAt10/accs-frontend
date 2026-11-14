@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { apiOriginPattern } from './observability'
+import { apiOriginPattern, gaPageLocation, gaReferrer } from './observability'
 
 describe('apiOriginPattern', () => {
   const [pattern] = apiOriginPattern('https://api.example.com/api')
@@ -12,5 +12,15 @@ describe('apiOriginPattern', () => {
   it('is empty for a relative or missing URL', () => {
     expect(apiOriginPattern('/api')).toEqual([])
     expect(apiOriginPattern(undefined)).toEqual([])
+  })
+})
+
+describe('GA sanitizers', () => {
+  it('builds page_location from the template only', () => {
+    expect(gaPageLocation('https://portal.access-ccs.com', '/cases/$caseId')).toBe('https://portal.access-ccs.com/cases/$caseId')
+  })
+  it('reduces the referrer to its origin', () => {
+    expect(gaReferrer('https://x.test/people/USER-1?q=a#h')).toBe('https://x.test')
+    expect(gaReferrer('')).toBe('')
   })
 })
