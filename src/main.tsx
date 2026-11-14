@@ -4,6 +4,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { RouteError, RouteNotFound } from '@/components/app/route-fallbacks'
+import { initObservability } from '@/lib/observability'
 
 import '@meetingat10/design-system/tokens.css'
 import '@meetingat10/design-system/components.css'
@@ -35,6 +36,8 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+initObservability()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
