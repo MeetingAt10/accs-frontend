@@ -1,4 +1,3 @@
-import { Panel } from '@/components/app/page-shell'
 import { NavLink } from '@/components/app/site-chrome'
 import { canOpenPath } from '@/lib/sites'
 
@@ -34,7 +33,8 @@ const walkers = ['dean', 'secretary', 'student', 'professor']
 export function GettingStarted({ session }: { session: Parameters<typeof canOpenPath>[0] }) {
   if (!session.user.roles.some((role) => walkers.includes(role))) return null
   return (
-    <Panel title="Getting started" aria-label="Getting started">
+    <details className="getting-started-box" aria-label="Getting started">
+      <summary>Getting started <span className="getting-started-box__count">{gettingStartedSteps(session).length} steps</span></summary>
       <ol className="getting-started" role="list">
         {gettingStartedSteps(session).map(({ id, label, href }) => (
           <li key={id} className="getting-started__step">
@@ -42,6 +42,6 @@ export function GettingStarted({ session }: { session: Parameters<typeof canOpen
           </li>
         ))}
       </ol>
-    </Panel>
+    </details>
   )
 }

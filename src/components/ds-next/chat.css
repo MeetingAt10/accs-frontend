@@ -252,7 +252,7 @@ a.ds-next-conversation[aria-current='page'] {
 .ds-next-message-bubble--own .ds-next-message-bubble__text {
   border-radius: 18px 18px 6px 18px;
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
 }
 
 .ds-next-message-bubble p {
@@ -346,3 +346,34 @@ a.ds-next-conversation[aria-current='page'] {
     display: none;
   }
 }
+
+/* ---------- Messages, flat (#67) ----------
+   No grey box around the list: one thin line splits the list from the conversation, like the rest of the app. */
+@media (min-width: 1024px) {
+  .ds-cols.communications-messages { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+  .communications-messages__inbox { background: transparent; padding-inline-end: 4px; }
+  .communications-messages__thread { padding: 0 0 0 24px; }
+}
+@media (max-width: 1023.98px) {
+  .communications-messages__inbox,
+  .communications-messages__thread { padding: 0; border: 0; background: transparent; }
+}
+a.ds-next-conversation { border-radius: 10px; }
+a.ds-next-conversation[aria-current='page'] { background: var(--accs-sunken); box-shadow: none; }
+.ds-next-conversation-list__item { border-bottom: 0; }
+.ds-next-conversation__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.ds-next-conversation__roles { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A message: the avatar beside the sender's name, a visible bubble for others' messages. */
+.ds-next-message-bubble { align-items: flex-start; }
+.ds-next-message-bubble__text { background: var(--accs-sunken); }
+
+/* The message box starts at two lines and grows as you type. */
+.ds-next-composer textarea { min-height: 2.75rem; max-height: 12rem; field-sizing: content; resize: none; }
+
+/* People to mention with @. */
+.ds-next-composer { position: relative; }
+.ds-next-mentions { position: absolute; bottom: calc(100% + 6px); left: 12px; z-index: 20; min-width: 220px; max-width: calc(100% - 24px); margin: 0; padding: 6px; list-style: none; border: 1px solid var(--accs-line); border-radius: 12px; background: var(--accs-paper); box-shadow: 0 10px 28px rgb(0 0 0 / 0.14); }
+.ds-next-mentions button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--accs-ink); font: inherit; text-align: start; cursor: pointer; }
+.ds-next-mentions [aria-selected='true'] button, .ds-next-mentions button:hover { background: var(--accs-sunken); }
+.ds-next-mentions span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

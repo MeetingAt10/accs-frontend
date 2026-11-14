@@ -41,7 +41,7 @@
   color: var(--accs-ink-2);
 }
 .sc-seg--chip .sc-seg__btn:hover { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
-.sc-seg--chip .sc-seg__btn[aria-pressed='true'] { border-color: var(--accs-ink); background: transparent; color: #fff; }
+.sc-seg--chip .sc-seg__btn[aria-pressed='true'] { border-color: var(--accs-ink); background: transparent; color: var(--accs-on-accent); }
 .sc-seg--chip .sc-seg__thumb { background: var(--accs-ink); box-shadow: 0 6px 14px -6px rgb(11 18 32 / 55%); }
 .sc-seg--chip .sc-seg__count { font-size: 0.75rem; font-variant-numeric: tabular-nums; opacity: 0.6; }
 
@@ -196,7 +196,7 @@
   height: 24px;
   border-radius: 50%;
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
   animation: accs-scale-in 320ms var(--accs-ease-spring) both;
 }
 
@@ -253,7 +253,7 @@
   font: 800 0.8125rem var(--accs-font-display);
   transition: background 240ms var(--accs-ease), box-shadow 240ms var(--accs-ease), color 240ms var(--accs-ease);
 }
-.bk-steps [data-state='done'] .bk-step__dot { background: var(--site-accent); box-shadow: none; color: #fff; }
+.bk-steps [data-state='done'] .bk-step__dot { background: var(--site-accent); box-shadow: none; color: var(--accs-on-accent); }
 .bk-steps [data-state='current'] .bk-step__dot { box-shadow: inset 0 0 0 2px var(--site-accent); color: var(--site-accent-ink); }
 .bk-step__ring {
   position: absolute;
@@ -294,7 +294,7 @@
 .bk-slot > span { position: relative; z-index: 1; }
 .bk-slot:hover:not(:disabled) { background: var(--site-accent-wash); }
 .bk-slot:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 3px; }
-.bk-slot[aria-pressed='true'] { color: #fff; }
+.bk-slot[aria-pressed='true'] { color: var(--accs-on-accent); }
 .bk-slot__thumb {
   position: absolute;
   inset: -1.5px;
@@ -347,3 +347,9 @@
   .sc-slotrow__actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 .sc-timepair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+/* Booking: category and sub-category side by side on wide screens. */
+.bk-purpose { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; margin-bottom: 12px; }
+
+/* Why a time is not available, for the professor's own view. */
+.sc-reason { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }

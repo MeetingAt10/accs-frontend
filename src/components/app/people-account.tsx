@@ -1,3 +1,5 @@
+import { PersonAvatar, photoFileProblem, squarePhoto } from '@/components/app/photo'
+import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
@@ -15,7 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Empty, PageHeader, Panel, StatusChip } from "@/components/app/page-shell";
 import { Collapse, SlidePills, ease } from "@/components/app/portal-motion";
@@ -26,7 +28,9 @@ import {
   apiErrorText,
   changePassword,
   performPageAction,
+  setProfilePhoto,
   signOut,
+  signOutOtherDevices,
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
@@ -65,7 +69,7 @@ function useAction(pageId: string) {
 const roleTags = (roles: string[]) =>
   roles.map((role) => (
     <span className="accs-tag pa-role" key={role}>
-      {role}
+      {roleLabelOf(role)}
     </span>
   ));
 
@@ -149,7 +153,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             { id: "All", label: "Everyone" },
             ...roleOptions.map((value) => ({
               id: value,
-              label: <span className="pa-role">{value}</span>,
+              label: <span className="pa-role">{roleLabelOf(value)}</span>,
             })),
           ]}
         />
@@ -171,6 +175,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
                 }}
               >
                 <PersonCard
+                  photo={word(person.photo)}
                   name={word(person.name)}
                   role={roleTags(strings(person.roles))}
                   office={word(person.office, word(person.program))}
@@ -228,6 +233,7 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
         </Button>
       </div>
       <ProfileHeader
+        photo={word(person.photo)}
         name={word(person.name)}
         role={roleTags(strings(person.roles))}
         title={word(person.title)}
@@ -307,6 +313,58 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
   );
 }
 
+/** My profile: choose, preview and save a photo, or remove it. The image is squared and shrunk in the browser first. */
+function ProfilePhotoPanel({ name, photo }: { name: string; photo: string }) {
+  const client = useQueryClient();
+  const input = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState("");
+  const [problem, setProblem] = useState("");
+  const save = useMutation({
+    mutationFn: (value: string | null) => setProfilePhoto(value),
+    onSuccess: async (result) => {
+      setPreview("");
+      await client.invalidateQueries({ queryKey: ["page"] });
+      toast(result.message, { tone: "success" });
+    },
+  });
+  const choose = async (file?: File) => {
+    save.reset();
+    setProblem("");
+    if (!file) return;
+    const wrong = photoFileProblem(file);
+    if (wrong) { setProblem(wrong); return; }
+    try { setPreview(await squarePhoto(file)); } catch (error) { setProblem(error instanceof Error ? error.message : "This image could not be read."); }
+  };
+  const shown = preview || photo;
+  return (
+    <Panel title="Profile photo">
+      <div className="pp-panel">
+        <PersonAvatar name={name} photo={shown} size={72} />
+        <div className="accs-stack accs-stack--tight">
+          <p className="pp-panel__hint">
+            {preview ? "This is how your photo will look. Save it to show it to others." : "A square photo of you. JPEG, PNG or WebP; it is cropped to a square and made small."}
+          </p>
+          <div className="pp-panel__actions">
+            <input ref={input} className="pp-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { void choose(event.target.files?.[0]); event.target.value = ""; }} />
+            {preview ? (
+              <>
+                <Button loading={save.isPending} onPress={() => save.mutate(preview)}>Save photo</Button>
+                <Button variant="secondary" onPress={() => setPreview("")} isDisabled={save.isPending}>Cancel</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" icon="upload" onPress={() => input.current?.click()}>{photo ? "Change photo" : "Add a photo"}</Button>
+                {photo && <Button variant="tertiary" loading={save.isPending} onPress={() => save.mutate(null)}>Remove</Button>}
+              </>
+            )}
+          </div>
+          {(problem || save.error) && <Alert tone="danger" title="The photo was not saved">{problem || apiErrorText(save.error)}</Alert>}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const record = object(page.data.record);
   const action = useAction("P39");
@@ -319,12 +377,14 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <PageHeader title="My profile" description="This is the profile other people see." />
       <ProfileHeader
+        photo={word(record.photo)}
         name={word(record.name)}
         role={roleTags(roles)}
         title={title}
         office={word(record.office, word(record.program))}
         email={word(record.email)}
       />
+      <ProfilePhotoPanel name={word(record.name)} photo={word(record.photo)} />
       <div className="accs-split accs-stagger">
         <div className="accs-stack">
           <Panel title="About">
@@ -351,7 +411,6 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
             />
           </Panel>
           <Panel title="Education">
-            {/* TBD(D-08): education fields are proposed and remain subject to approval. */}
             <TextField
               label="Degree and school"
               value={education}
@@ -366,7 +425,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               rows={[
                 ["Name", word(record.name)],
                 ["Email", word(record.email)],
-                ["Roles", roles.join(", ")],
+                ["Roles", roles.map(roleLabelOf).join(", ")],
                 ["Program or office", word(record.program, word(record.office))],
               ]}
             />
@@ -405,7 +464,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
 
 const topicFor = (faq: Item) => {
   const href = word(faq.href);
-  if (href.includes("consultation")) return "Consultations";
+  if (href.includes("consultation")) return "Appointments";
   if (href.includes("report") || href.includes("case"))
     return "Reports and privacy";
   if (href.includes("evaluations")) return "Evaluations";
@@ -459,7 +518,7 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
     <div className="accs-stack">
       <PageHeader
         title="Help"
-        description="Answers on reports, consultations, evaluations, and your account."
+        description="Answers on reports, appointments, evaluations, and your account."
         actions={
           <Button href="/assistant" variant="secondary" icon="chats">
             Ask the assistant
@@ -659,6 +718,11 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
       router.history.push("/sign-in");
     },
   });
+  // Ends the account's other sessions; this one stays signed in.
+  const othersAction = useMutation({
+    mutationFn: signOutOtherDevices,
+    onSuccess: (result) => toast(result.message, { tone: "success" }),
+  });
   const saveAppearance = (nextTheme: string, nextDensity: string) => {
     setTheme(nextTheme);
     setDensity(nextDensity);
@@ -752,15 +816,20 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
               </Button>
               <Button
                 variant="secondary"
-                isDisabled
+                loading={othersAction.isPending}
+                onPress={() => othersAction.mutate()}
                 aria-describedby="other-device-note"
               >
                 Sign out of other devices
               </Button>
-              {/* TBD(ALL-01-G): session policy is not configured yet. */}
               <p id="other-device-note" className="pa-muted">
-                Signing out of other devices isn't available yet.
+                Signs you out everywhere else, for example on a shared computer. You stay signed in here.
               </p>
+              {othersAction.isError && (
+                <Alert tone="danger" title="Your other devices were not signed out">
+                  {apiErrorText(othersAction.error)}
+                </Alert>
+              )}
               {signOutAction.isError && (
                 <Alert
                   tone="danger"

@@ -19,6 +19,8 @@ Start the local role launcher with the frontend API URL set to the Vite proxy:
 ACCS_ROLE_LAUNCHER=1 VITE_API_URL=/api npm run dev -- --port 5188
 ```
 
+Port 5188 is only this example's choice, so the launcher can run beside the normal dev server, which uses 5173.
+
 Open `http://<account id lowercased>.localhost:5188/__role?account=<ACCOUNT ID>` (for example `qcu-stu-it-a.localhost`). The launcher signs in with the backend's local default seed password, which a stack that sets its own `SEED_PASSWORD` rejects, on a separate `<account>.localhost` hostname; `/__roles` only shows these instructions, because the account list endpoint was removed. The tab opens Home, or Administration for an administrator. Reloading a tab keeps its account; signing in on another account's hostname does not replace its cookie. Tabs opened on the same account hostname share that account's session.
 
 `ACCS_DEV_API_TARGET` selects the API proxied by Vite. It defaults to `http://localhost:3000`; set it to the development API origin to use the hosted pilot data. Keep `VITE_API_URL=/api` so requests use the local proxy. The account tabs share the selected API's records, so changes made in one role are visible to other roles according to their permissions.
@@ -42,3 +44,7 @@ The signed-in app has seven module sites (Home, Forums, Schedule, Cases, Evaluat
 ## Errors
 
 `src/main.tsx` sets router-wide not-found and error screens (`src/components/app/route-fallbacks.tsx`); a route with its own `errorComponent` still handles its own errors. The session check redirects to sign-in only on a 401. A network error or a 5xx shows a "Couldn't load this page" screen with Try again, so a server fault does not look like a sign-out. A failed sign-out shows an alert with Try again and keeps the person signed in; the cache is cleared only after the server confirms.
+
+## Observability
+
+With `VITE_FARO_URL` set, `src/lib/observability.ts` starts Grafana Faro, which sends page loads, web vitals, JavaScript errors, and traces to the Frontend Observability app `accs-frontend` in Grafana Cloud. Router errors shown by `RouteError` are reported too. The deploy workflow sets it from the repository variable `FARO_URL`, plus `VITE_FARO_ENV` (`prod` on `main`, else `dev`) and `VITE_APP_VERSION` (the commit SHA). The collector URL is public by design: it only accepts telemetry. Unset, nothing loads or sends. No user identity is set. Trace headers go only to the API origin when `VITE_API_URL` is an absolute URL, never to S3 upload URLs, whose bucket CORS rules would reject them.

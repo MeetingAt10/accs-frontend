@@ -1,4 +1,4 @@
-import { Alert, Button, Icon, ViewState } from '@meetingat10/design-system/react'
+import { Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { useState, type ReactNode } from 'react'
@@ -9,7 +9,7 @@ import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
-import { AboutPanel, CommunityHeader, Composer, dashboardStats, isCommunityRole } from '@/components/app/community-home'
+import { CommunityHeader, dashboardStats, isCommunityRole } from '@/components/app/community-home'
 import { GettingStarted } from '@/components/app/getting-started'
 import { ModulePicker } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
@@ -123,20 +123,25 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
   const me = session.data?.user.id
   const community = isCommunityRole(role)
   const stats = dashboardStats(asItems(data.stats), role)
-  const announcements = asItems(data.announcements)
-  const posts = asItems(data.posts)
-  const reports = asItems(data.reports)
-  const cases = asItems(data.cases)
-  const sections = asItems(data.sections)
-  const consultations = asItems(data.consultations)
-  const todos = asItems(data.todos)
+  // Each list on the home shows its five newest items; "View all" opens the rest.
+  const top = (items: Item[]) => items.slice(0, 5)
+  const announcements = top(asItems(data.announcements))
+  // A post already listed as an announcement is not repeated under "From your spaces".
+  const announced = new Set(asItems(data.announcements).map((item) => text(item.id)))
+  const posts = top(asItems(data.posts).filter((item) => !announced.has(text(item.id))))
+  const reports = top(asItems(data.reports))
+  const cases = top(asItems(data.cases))
+  const sections: Item[] = []
+  const consultations = top(asItems(data.consultations))
+  // To-dos live on the calendar and updates under the bell, so the home leaves them out.
+  const todos: Item[] = []
   const assignments = asItems(data.assignments)
-  const notes = asItems(data.notifications)
+  const notes: Item[] = []
   const today = manilaToday()
   const events = asItems(data.events)
     .filter((event) => dayKey(event.date) >= today)
     .sort((a, b) => dayKey(a.date).localeCompare(dayKey(b.date)) || text(a.start).localeCompare(text(b.start)))
-    .slice(0, 5)
+    .slice(0, 3)
   const submitted = assignments.filter((item) => /submitted/i.test(text(item.status))).length
   const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
   const empty =
@@ -177,7 +182,7 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                 key={text(stat.id, label + index)}
                 label={label}
                 value={<Counter value={stat.value} />}
-                note={/synthetic|demo|sample|prototype/i.test(note) ? undefined : note || undefined}
+                note={note || undefined}
                 href={target && allow(target) ? target : undefined}
               />
             )
@@ -302,7 +307,7 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
               </Panel>
             )}
             {consultations.length > 0 && (
-              <Panel flush title={counted('Consultations', /consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
+              <Panel flush title={counted('Appointments', /consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
                 <Rows>
                   {consultations.map((item, index) => {
                     const student = asItem(item.student)
@@ -310,8 +315,8 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                     const slot = asItem(item.slot)
                     const status = text(item.status, 'Requested')
                     return (
-                      <Entry key={text(item.id, 'consultation-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
-                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Consultation'))}</p>
+                      <Entry key={text(item.id, 'appointment-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
+                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Appointment'))}</p>
                         <Sub>
                           <StatusChip tone={toneFor(status)}>{status}</StatusChip>
                           {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
@@ -378,12 +383,6 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                 </ol>
               </Panel>
             )}
-            {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
-            {role === 'staff' && (
-              <Alert tone="neutral" title="Staff view">
-                Staff see CCS-wide material.
-              </Alert>
-            )}
           </aside>
         </div>
       )}
@@ -405,10 +404,10 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
 
   const shortcuts: { label: string; href: string; icon: 'plus' | 'calendar' | 'megaphone' | 'list-checks' | 'clock'; when?: string[] }[] = [
     { label: 'New report', href: '/reports/new', icon: 'plus', when: ['student'] },
-    { label: 'Book consultation', href: '/consultations', icon: 'calendar', when: ['student'] },
+    { label: 'Book appointment', href: '/consultations', icon: 'calendar', when: ['student'] },
     { label: 'Post announcement', href: '/feed/new', icon: 'megaphone' },
     { label: 'Manage availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
-    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas', 'president'] },
+    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
   ]
   const actions = shortcuts
     .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href))
@@ -417,8 +416,9 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
 
   const community = isCommunityRole(role) && Boolean(session.data)
-  const communityLead = community && session.data ? <Composer session={session.data} /> : undefined
-  const communityIntro = community && session.data ? <AboutPanel session={session.data} /> : undefined
+  // The home stays short: posting lives in Forums, and the sidebar already leads to classes and help.
+  const communityLead = undefined
+  const communityIntro = undefined
 
   return (
     <div className="accs-stack">

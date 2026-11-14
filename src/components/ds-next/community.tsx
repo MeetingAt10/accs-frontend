@@ -1,3 +1,4 @@
+import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { ReactNode } from 'react'
@@ -25,6 +26,8 @@ export function CommentThread({
 }
 
 export interface CommentProps {
+  /** The author's photo (a data URL); initials when there is none. */
+  photo?: string
   author: string
   role?: string
   date: string
@@ -43,6 +46,7 @@ export function Comment({
   dateTime,
   children,
   actions,
+  photo,
 }: CommentProps) {
   const reduce = useReducedMotion()
   return (
@@ -55,7 +59,7 @@ export function Comment({
       transition={{ duration: 0.4, ease }}
     >
       <span className="accs-avatar ds-next-comment__avatar" aria-hidden>
-        {initials(author) || '?'}
+        <AvatarFill photo={photo} fallback={initials(author) || '?'} />
       </span>
       <div className="ds-next-comment__content">
         <div className="ds-next-comment__meta">

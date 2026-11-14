@@ -140,7 +140,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",
@@ -218,7 +218,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",
@@ -239,21 +239,6 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/evaluations",
           pageId: "P26",
           icon: "list-checks",
-        },
-      ],
-    },
-  ],
-  staff: [
-    {
-      label: "Workspace",
-      entries: [
-        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
-        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-        {
-          label: "Organizations",
-          href: "/organizations",
-          pageId: "P09",
-          icon: "flag",
         },
       ],
     },
@@ -307,6 +292,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P33",
           icon: "archive",
         },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
       ],
     },
   ],
@@ -352,6 +343,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/records",
           pageId: "P33",
           icon: "archive",
+        },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },
@@ -501,30 +498,16 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "archive",
         },
         {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
+        {
           label: "Restrictions",
           href: "/restrictions",
           pageId: "P35",
           icon: "prohibit",
-        },
-      ],
-    },
-  ],
-  president: [
-    {
-      label: "Workspace",
-      entries: [
-        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
-        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-      ],
-    },
-    {
-      label: "Cases",
-      entries: [
-        {
-          label: "Executive cases",
-          href: "/cases",
-          pageId: "P21",
-          icon: "tray",
         },
       ],
     },
@@ -535,12 +518,35 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       entries: [
         { label: "Home", href: "/home", pageId: "P03", icon: "house" },
         { label: "Accounts", href: "/accounts", icon: "users" },
+        {
+          label: "Faculty load",
+          href: "/faculty-load",
+          pageId: "P54",
+          icon: "calendar",
+        },
+        {
+          label: "Referred items",
+          href: "/admin/moderation",
+          pageId: "P49",
+          icon: "flag",
+        },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
         {
           label: "Organizations",
           href: "/organizations",
           pageId: "P09",
           icon: "flag",
+        },
+      ],
+    },
+    {
+      label: "Records",
+      entries: [
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },
@@ -577,6 +583,42 @@ function useSignOut() {
       router.history.push("/sign-in");
     },
   });
+}
+
+/** The theme a saved setting resolves to right now ("system" follows the device). */
+function resolvedTheme(theme: string) {
+  if (theme === "light" || theme === "dark") return theme;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Light / dark switch in the top bar. It applies at once and saves the choice with the same settings action as the
+ * Settings page (Settings keeps "Match my device" for following the device again).
+ */
+function ThemeToggle() {
+  const queryClient = useQueryClient();
+  const appearance = useQuery(pageQuery("P43"));
+  const settings = appearance.data?.data.settings as { theme?: unknown; density?: unknown } | undefined;
+  const saved = typeof settings?.theme === "string" ? settings.theme : "system";
+  const density = typeof settings?.density === "string" ? settings.density : "comfortable";
+  const [current, setCurrent] = useState(() => resolvedTheme(saved));
+  useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
+  const save = useMutation({
+    mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
+  });
+  const next = current === "dark" ? "light" : "dark";
+  return (
+    <IconButton
+      icon={current === "dark" ? "sun" : "moon"}
+      label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
+      onPress={() => {
+        document.documentElement.setAttribute("data-theme", next);
+        setCurrent(next);
+        save.mutate(next);
+      }}
+    />
+  );
 }
 
 function Topbar({
@@ -674,6 +716,7 @@ function Topbar({
               onChange={setSearch}
             />
           </form>
+          <ThemeToggle />
           <IconButton
             icon="chat"
             label="Assistant"
@@ -818,7 +861,6 @@ export function AppChrome({
       "dean",
       "guidance",
       "osas",
-      "president",
     ].includes(role),
   )
     ? "compact"

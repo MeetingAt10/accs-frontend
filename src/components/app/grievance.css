@@ -124,13 +124,25 @@
 .gv-row:hover .gv-row__go { color: var(--site-accent-ink); transform: translateX(3px); }
 .gv-row:focus-visible { outline-offset: -3px; }
 
-@media (max-width: 767.98px) {
+/* The row follows the width the list actually gets, not the window: with a side bar at 1024 px the six columns left
+   the title 14 px wide. */
+.gv-rows { container: gv-rows / inline-size; }
+@container gv-rows (max-width: 860px) {
+  .gv-row { grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: 6px 16px; }
+  .gv-row__ref { grid-column: 1; grid-row: 1; }
+  .gv-row__main { grid-column: 2; grid-row: 1 / span 2; }
+  .gv-row > .accs-status { grid-column: 3; grid-row: 1; justify-self: end; }
+  .gv-row__progress { grid-column: 1 / span 2; grid-row: 3; }
+  .gv-row__time { grid-column: 3; grid-row: 2 / span 2; align-self: end; }
+  .gv-row__go { display: none; }
+}
+@container gv-rows (max-width: 560px) {
   .gv-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px 16px; }
   .gv-row__ref { grid-column: 1; grid-row: 1; }
   .gv-row > .accs-status { grid-column: 2; grid-row: 1; justify-self: end; }
-  .gv-row__main { grid-column: 1 / -1; }
-  .gv-row__progress { grid-column: 1 / -1; }
-  .gv-row__time { grid-column: 1 / -1; text-align: start; }
+  .gv-row__main { grid-column: 1 / -1; grid-row: auto; }
+  .gv-row__progress { grid-column: 1 / -1; grid-row: auto; }
+  .gv-row__time { grid-column: 1 / -1; grid-row: auto; text-align: start; align-self: auto; }
   .gv-row__go { display: none; }
 }
 
@@ -193,7 +205,7 @@
   transition: background 240ms var(--accs-ease-out), border-color 240ms var(--accs-ease-out), color 240ms var(--accs-ease-out), box-shadow 240ms var(--accs-ease-out);
 }
 .gv-steps__item[data-state='current'] .gv-steps__dot { border-color: var(--site-accent); color: var(--site-accent-ink); box-shadow: 0 0 0 4px var(--site-accent-wash); }
-.gv-steps__item[data-state='done'] .gv-steps__dot { border-color: var(--accs-ink); background: var(--accs-ink); color: #fff; }
+.gv-steps__item[data-state='done'] .gv-steps__dot { border-color: var(--accs-ink); background: var(--accs-ink); color: var(--accs-on-accent); }
 .gv-steps__name { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
 .gv-steps__item[data-state='current'] .gv-steps__name, .gv-steps__item[data-state='done'] .gv-steps__name { color: var(--accs-ink); }
 .gv-steps__line { position: relative; flex: 1 1 16px; height: 2px; margin-inline: 4px; border-radius: 2px; background: var(--accs-line); overflow: hidden; }
@@ -231,15 +243,19 @@
 .gv-details summary { min-height: 32px; font-weight: 600; cursor: pointer; }
 .gv-details[open] summary { margin-bottom: 8px; }
 
-.gv-modes { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+/* Every way to talk is the same size, chosen or not: the rows share one height and the check sits in the corner. */
+.gv-modes { display: grid; grid-auto-rows: 1fr; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.gv-modes > li { display: grid; }
 .gv-mode {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   width: 100%;
+  height: 100%;
   min-height: 64px;
-  padding: 12px 14px;
+  padding: 12px 40px 12px 14px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-control);
   background: var(--accs-surface);
@@ -250,7 +266,21 @@
   transition: border-color 160ms var(--accs-ease-out), background 160ms var(--accs-ease-out);
 }
 .gv-mode:hover:not(:disabled) { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
-.gv-mode[data-current] { border-color: var(--site-accent); background: var(--site-accent-wash); }
+.gv-mode[data-current] { border-color: var(--accs-ok); background: var(--accs-ok-bg); box-shadow: inset 0 0 0 1px var(--accs-ok); }
+.gv-mode[data-current]:hover:not(:disabled) { border-color: var(--accs-ok); background: var(--accs-ok-bg); }
+.gv-mode[data-current] > svg { color: var(--accs-ok); }
+.gv-mode__chosen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accs-ok);
+  color: var(--accs-surface);
+}
 .gv-mode:disabled { opacity: 0.6; cursor: not-allowed; }
 .gv-mode__text { display: grid; gap: 2px; min-width: 0; }
 .gv-mode__text strong { color: var(--accs-ink); font-size: 0.9375rem; }
@@ -262,12 +292,11 @@
 @media (min-width: 640px) {
   .gv-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 479.98px) {
-  .gv-mode { grid-template-columns: auto minmax(0, 1fr); }
-  .gv-mode .accs-status { grid-column: 2; justify-self: start; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .gv-timeline > li[data-current]::before { animation: none; }
 }
 .gv-routing { margin: 4px 0 8px; padding-inline-start: 18px; }
+/* New reports have long IDs: the reference stays on one line and is cut with an ellipsis (the full ID is in the tooltip). */
+.gv-row__ref, .gv-ref-link { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gv-c-ref { max-width: 14ch; }

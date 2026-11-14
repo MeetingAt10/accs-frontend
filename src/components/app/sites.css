@@ -18,7 +18,7 @@
   padding: 10px 16px;
   border-radius: var(--accs-radius-control);
   background: var(--accs-ink);
-  color: #fff;
+  color: var(--accs-on-accent);
   font-weight: 600;
   text-decoration: none;
   transform: translateY(-160%);
@@ -248,7 +248,7 @@
   font-weight: 600;
   text-decoration: none;
 }
-.shell-drawer__site[aria-current='page'] { background: var(--site-accent); color: #fff; }
+.shell-drawer__site[aria-current='page'] { background: var(--site-accent); color: var(--accs-on-accent); }
 
 /* ---------- Access screens ---------- */
 .shell-denied {

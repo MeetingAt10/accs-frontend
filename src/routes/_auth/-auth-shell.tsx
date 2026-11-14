@@ -132,7 +132,7 @@ export function SubmitButton({ loading, children }: { loading: boolean; children
   )
 }
 
-const facts = ['Join your class spaces', 'Book a faculty consultation', 'Send a confidential report']
+const facts = ['Join your class spaces', 'Book a faculty appointment', 'Send a confidential report']
 
 const headline = 'The CCS office, online.'
 

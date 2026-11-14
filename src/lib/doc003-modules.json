@@ -93,7 +93,7 @@
   {
    "id": "STU-05",
    "role": "student",
-   "name": "Consultation requests",
+   "name": "Appointment requests",
    "pages": [
     "P03",
     "P14",
@@ -230,7 +230,7 @@
   {
    "id": "PRO-05",
    "role": "professor",
-   "name": "Consultation decisions",
+   "name": "Appointment decisions",
    "pages": [
     "P03",
     "P14",
@@ -264,15 +264,6 @@
    "pages": [
     "P28",
     "P29"
-   ]
-  },
-  {
-   "id": "STF-01",
-   "role": "staff",
-   "name": "Staff workspace",
-   "pages": [
-    "P03",
-    "P04"
    ]
   },
   {
@@ -552,24 +543,6 @@
     "P11",
     "P12",
     "P13"
-   ]
-  },
-  {
-   "id": "PRES-01",
-   "role": "president",
-   "name": "Executive case intake",
-   "pages": [
-    "P03",
-    "P21",
-    "P22"
-   ]
-  },
-  {
-   "id": "PRES-02",
-   "role": "president",
-   "name": "Executive case action",
-   "pages": [
-    "P22"
    ]
   }
  ]

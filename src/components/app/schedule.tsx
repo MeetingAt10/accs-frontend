@@ -33,6 +33,9 @@ import {
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 import { RestrictedView } from '@/components/app/guards'
+import { PagedList } from '@/components/app/paging'
+import { QueryProblem } from '@/components/app/query-problem'
+import { readCategoryOptions } from '@/lib/concern-categories'
 import {
   Empty,
   PageHeader,
@@ -80,6 +83,8 @@ interface Slot {
   start: string
   end: string
   state: 'open' | 'requested' | 'booked' | 'unavailable'
+  /** Why a time is not available. Only the professor and the CCS Secretary get it; students never do. */
+  reason?: string
 }
 
 type ConsultationStatus =
@@ -100,6 +105,9 @@ interface Consultation {
   facultyId: string
   slotId: string
   purpose: string
+  category?: string
+  subcategory?: string
+  details?: string
   status: ConsultationStatus
   createdAt: string
   updatedAt: string
@@ -193,9 +201,10 @@ function addDays(value: string, days: number) {
   return isoDate(date)
 }
 
+/** Weeks run Sunday to Saturday. */
 function weekStart(value: string) {
   const date = parseDate(value)
-  date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
+  date.setDate(date.getDate() - date.getDay())
   return isoDate(date)
 }
 
@@ -370,7 +379,7 @@ function CalendarPage({
         { id: 'ccs', label: 'CCS events' },
         { id: 'faculty', label: 'Faculty availability' },
         ...(professor
-          ? [{ id: 'consultations', label: 'My consultations' }]
+          ? [{ id: 'consultations', label: 'My appointments' }]
           : []),
         ...(canTodo ? [{ id: 'todos', label: 'My to-dos' }] : []),
       ]
@@ -457,8 +466,8 @@ function CalendarPage({
       id: `consultation:${consultation.id}`,
       title:
         session.user.id === consultation.facultyId
-          ? `Consultation with ${consultation.student.name}`
-          : `Consultation with ${consultation.faculty.name}`,
+          ? `Appointment with ${consultation.student.name}`
+          : `Appointment with ${consultation.faculty.name}`,
       date: consultation.slot.date,
       start: consultation.slot.start,
       end: consultation.slot.end,
@@ -713,30 +722,34 @@ function CalendarPage({
             </Panel>
             <Panel flush title="Upcoming">
               {upcoming.length ? (
-                <ul className="accs-rows">
-                  {upcoming.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        className="accs-row accs-row--link sc-up"
-                        onClick={() => setSelectedEntry(entry)}
-                      >
-                        <DateTile value={entry.date} />
-                        <span>
-                          <span className="accs-row__title">{entry.title}</span>
-                          <span className="accs-row__sub">
-                            {entry.allDay ? 'All day' : entry.time}
+                <PagedList items={upcoming} noun="events">
+                  {(upcoming) => (
+                  <ul className="accs-rows">
+                    {upcoming.map((entry) => (
+                      <li key={entry.id}>
+                        <button
+                          type="button"
+                          className="accs-row accs-row--link sc-up"
+                          onClick={() => setSelectedEntry(entry)}
+                        >
+                          <DateTile value={entry.date} />
+                          <span>
+                            <span className="accs-row__title">{entry.title}</span>
+                            <span className="accs-row__sub">
+                              {entry.allDay ? 'All day' : entry.time}
+                            </span>
                           </span>
-                        </span>
-                        <i
-                          className="ec-dot"
-                          data-etone={entry.tone}
-                          aria-hidden
-                        />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                          <i
+                            className="ec-dot"
+                            data-etone={entry.tone}
+                            aria-hidden
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  )}
+                </PagedList>
               ) : (
                 <Empty title="Nothing coming up">
                   No events in the layers you selected.
@@ -936,7 +949,7 @@ function ConsultationList({
                   <Avatar name={person.name} />
                   <span className="sc-crow__who">
                     <span className="accs-row__title">{person.name}</span>
-                    <span className="accs-row__sub">{item.purpose}</span>
+                    <span className="accs-row__sub">{appointmentText(item)}</span>
                   </span>
                   <span className="sc-crow__when">
                     <time dateTime={item.slot.date}>
@@ -1001,7 +1014,7 @@ function ConsultationsPage({
   return (
     <>
       <PageHeader
-        title={professor ? 'Consultation requests' : 'Consultations'}
+        title={professor ? 'Appointment requests' : 'Appointments'}
         description={
           professor
             ? 'Approve or decline requests, and set the times you offer. To meet a student about a concern, add the time, link or place on the case.'
@@ -1024,7 +1037,7 @@ function ConsultationsPage({
           {dual && (
             <Segmented
               id="consult-role"
-              label="Consultation role view"
+              label="Appointment role view"
               value={roleView}
               onChange={(id) => {
                 setRoleView(id)
@@ -1039,7 +1052,7 @@ function ConsultationsPage({
           {!professor && (
             <Segmented
               id="consult-mode"
-              label="Consultation sections"
+              label="Appointment sections"
               value={mode}
               onChange={setMode}
               items={[
@@ -1123,6 +1136,17 @@ function ConsultationsPage({
 }
 
 const bookingSteps = ['Faculty', 'Time', 'Purpose', 'Confirm']
+const appointmentDetailsMax = 300
+
+/** What an appointment is for: "Category · Sub-category", the description for Other, or an older free-text purpose. */
+export function appointmentText(item: { purpose?: string; category?: string; subcategory?: string; details?: string }) {
+  if (!item.category) return item.purpose ?? ''
+  const second = item.subcategory || item.details
+  return second ? item.category + ' · ' + second : item.category
+}
+
+/** The student's note, when it is not already the description of an "Other" appointment. */
+export const appointmentNote = (item: { category?: string; subcategory?: string; details?: string }) => item.subcategory ? item.details ?? '' : ''
 
 function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const faculty = record<Person>(page.data.record)
@@ -1138,8 +1162,21 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const [step, setStep] = useState({ n: 1, dir: 1 })
   const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
-  const [purpose, setPurpose] = useState('')
+  const [category, setCategory] = useState('')
+  const [subcategory, setSubcategory] = useState('')
+  const [details, setDetails] = useState('')
   const [purposeError, setPurposeError] = useState('')
+  const options = readCategoryOptions(page.data.appointmentCategories)
+  const option = options.find((entry) => entry.label === category)
+  // What is still missing on the purpose step, by field.
+  const missing: Partial<Record<'category' | 'subcategory' | 'details', string>> = !option
+    ? { category: 'Choose what the appointment is for.' }
+    : option.requiresDetail
+      ? details.trim() ? {} : { details: 'Describe what the appointment is for in a few words.' }
+      : option.subcategories.includes(subcategory) ? {} : { subcategory: 'Choose a sub-category.' }
+  const refused = (path: string) => (action.error as { fields?: Array<{ path: string; message: string }> } | null)?.fields?.find((field) => field.path === path)?.message
+  const fieldError = (path: 'category' | 'subcategory' | 'details') => refused(path) ?? (purposeError ? missing[path] : undefined)
+  const chosenPurpose = appointmentText({ category, subcategory: option?.requiresDetail ? '' : subcategory, details: details.trim() })
   const end = addDays(week, 7)
   const weekSlots = slots.filter((slot) => slot.date >= week && slot.date < end)
   const openCount = weekSlots.filter((slot) => slot.state === 'open').length
@@ -1171,8 +1208,8 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   }
 
   function next() {
-    if (step.n === 3 && !purpose.trim()) {
-      setPurposeError('Add a short topic for your professor.')
+    if (step.n === 3 && Object.keys(missing).length > 0) {
+      setPurposeError('Say what the appointment is for.')
       return
     }
     setPurposeError('')
@@ -1182,14 +1219,19 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   async function requestTime(event: FormEvent) {
     event.preventDefault()
     if (step.n !== 4) return
-    if (!selectedSlot || !purpose.trim()) {
-      setPurposeError('Choose an open time and add a short topic.')
+    if (!selectedSlot || Object.keys(missing).length > 0) {
+      setPurposeError('Choose an open time and say what the appointment is for.')
       return
     }
     try {
       const result = await action.mutateAsync({
         action: 'createConsultation',
-        payload: { slotId: selectedSlot, purpose: purpose.trim() },
+        payload: {
+          slotId: selectedSlot,
+          category,
+          ...(option?.requiresDetail ? {} : { subcategory }),
+          ...(details.trim() ? { details: details.trim() } : {}),
+        },
       })
       const request = record<Consultation>(result.record)
       if (request)
@@ -1216,7 +1258,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
     <>
       <PageHeader
         crumbs={[
-          { label: 'Consultations', href: '/consultations' },
+          { label: 'Appointments', href: '/consultations' },
           { label: faculty.name },
         ]}
         title={`Book ${faculty.name}`}
@@ -1291,6 +1333,9 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                         <FacultyCard key={person.id} person={person} />
                       ))}
                     </div>
+                    {directory.isError && (
+                      <QueryProblem what="the other professors" onRetry={() => void directory.refetch()} retrying={directory.isFetching} />
+                    )}
                   </section>
                 )}
                 {step.n === 2 && (
@@ -1402,18 +1447,63 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                         {slotTime(chosen)}
                       </p>
                     )}
+                    <div className="bk-purpose">
+                      <Select
+                        label="Category"
+                        placeholder="Choose a category"
+                        isRequired
+                        selectedKey={category || null}
+                        onSelectionChange={(key) => {
+                          const next = String(key ?? '')
+                          if (next !== category) {
+                            setCategory(next)
+                            setSubcategory('')
+                          }
+                          setPurposeError('')
+                        }}
+                        description={option?.description}
+                        isInvalid={Boolean(fieldError('category'))}
+                        errorMessage={fieldError('category')}
+                      >
+                        {options.map((entry) => (
+                          <SelectOption id={entry.label} key={entry.label}>{entry.label}</SelectOption>
+                        ))}
+                      </Select>
+                      {!option?.requiresDetail && (
+                        <Select
+                          key={category || 'none'}
+                          label="Sub-category"
+                          placeholder="Choose a sub-category"
+                          isRequired
+                          isDisabled={!option}
+                          selectedKey={subcategory || null}
+                          onSelectionChange={(key) => {
+                            setSubcategory(String(key ?? ''))
+                            setPurposeError('')
+                          }}
+                          description={option ? undefined : 'Choose a category first.'}
+                          isInvalid={Boolean(fieldError('subcategory'))}
+                          errorMessage={fieldError('subcategory')}
+                        >
+                          {(option?.subcategories ?? []).map((sub) => (
+                            <SelectOption id={sub} key={sub}>{sub}</SelectOption>
+                          ))}
+                        </Select>
+                      )}
+                    </div>
                     <TextArea
-                      label="Topic"
-                      value={purpose}
+                      label={option?.requiresDetail ? 'What is it for?' : 'Note for your professor'}
+                      description={option?.requiresDetail ? 'Required. A few words.' : 'Optional.'}
+                      value={details}
                       onChange={(value) => {
-                        setPurpose(value)
+                        setDetails(value)
                         setPurposeError('')
                       }}
-                      maxLength={300}
+                      maxLength={appointmentDetailsMax}
                       showCount
-                      isRequired
-                      isInvalid={Boolean(purposeError)}
-                      errorMessage={purposeError}
+                      isRequired={option?.requiresDetail === true}
+                      isInvalid={Boolean(fieldError('details'))}
+                      errorMessage={fieldError('details')}
                     />
                   </Panel>
                 )}
@@ -1429,9 +1519,15 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
                         <dd>{chosen ? slotTime(chosen) : '—'}</dd>
                       </div>
                       <div className="sc-facts__wide">
-                        <dt>Topic</dt>
-                        <dd>{purpose.trim() || '—'}</dd>
+                        <dt>What it is for</dt>
+                        <dd>{chosenPurpose || '—'}</dd>
                       </div>
+                      {!option?.requiresDetail && details.trim() && (
+                        <div className="sc-facts__wide">
+                          <dt>Note</dt>
+                          <dd>{details.trim()}</dd>
+                        </div>
+                      )}
                     </dl>
                     <Alert
                       tone="neutral"
@@ -1578,13 +1674,13 @@ function RequestPage({
     <>
       <PageHeader
         crumbs={[
-          { label: 'Consultations', href: '/consultations' },
+          { label: 'Appointments', href: '/consultations' },
           { label: formatDate(consultation.slot.date) },
         ]}
         title={
           faculty
             ? `Request from ${consultation.student.name}`
-            : `Consultation with ${consultation.faculty.name}`
+            : `Appointment with ${consultation.faculty.name}`
         }
         description={slotTime(consultation.slot)}
         actions={<StatusBadge status={consultation.status} />}
@@ -1644,9 +1740,15 @@ function RequestPage({
                   <dd>{formatDateTime(consultation.createdAt)}</dd>
                 </div>
                 <div className="sc-facts__wide">
-                  <dt>Topic</dt>
-                  <dd>{consultation.purpose}</dd>
+                  <dt>What it is for</dt>
+                  <dd>{appointmentText(consultation) || '—'}</dd>
                 </div>
+                {appointmentNote(consultation) && (
+                  <div className="sc-facts__wide">
+                    <dt>Note</dt>
+                    <dd>{appointmentNote(consultation)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Last decision</dt>
                   <dd>
@@ -1664,7 +1766,7 @@ function RequestPage({
             <Panel title="Request history">
               <ol
                 className="accs-timeline sc-tl"
-                aria-label="Consultation request history"
+                aria-label="Appointment request history"
               >
                 {consultation.history.map((entry, index) => (
                   <li key={`${entry.at}-${index}`}>
@@ -1710,7 +1812,7 @@ function RequestPage({
         title={
           decision === 'Declined'
             ? 'Decline this request?'
-            : 'Cancel this consultation?'
+            : 'Cancel this appointment?'
         }
         role={decision === 'Cancelled' ? 'alertdialog' : 'dialog'}
         isOpen={Boolean(decision)}
@@ -1744,7 +1846,7 @@ function RequestPage({
           >
             {decision === 'Declined'
               ? 'Decline request'
-              : 'Cancel consultation'}
+              : 'Cancel appointment'}
           </Button>
         </ModalActions>
       </Modal>
@@ -1775,7 +1877,11 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const [start, setStart] = useState('09:00')
   const [end, setEnd] = useState('09:30')
   const [state, setState] = useState<'open' | 'unavailable'>('open')
+  const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
+  // A time being marked not available from the list waits here for its reason.
+  const [reasonFor, setReasonFor] = useState<Slot>()
+  const [quickReason, setQuickReason] = useState('')
   const times = Array.from(
     { length: 27 },
     (_, index) =>
@@ -1805,7 +1911,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         ? 'Available'
         : slot.state === 'unavailable'
           ? 'Unavailable'
-          : 'Consultation request',
+          : 'Appointment request',
     type: slotStateLabel[slot.state],
     tone:
       slot.state === 'open'
@@ -1828,13 +1934,18 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       setFieldError(`Overlaps ${slotRange(overlap)}.`)
       return
     }
+    if (state === 'unavailable' && !reason.trim()) {
+      setFieldError('Give a reason for marking this time not available.')
+      return
+    }
     try {
       await action.mutateAsync({
         action: 'saveAvailability',
-        payload: { date, start, end, state },
+        payload: { date, start, end, state, ...(state === 'unavailable' ? { reason: reason.trim() } : {}) },
       })
       setAddOpen(false)
       setDate('')
+      setReason('')
       setFieldError('')
     } catch {
       // The entered date and times remain available after an API error.
@@ -1844,6 +1955,13 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   async function changeSlot(slot: Slot, remove = false) {
     if (['booked', 'requested'].includes(slot.state)) {
       setSelectedSlot(slot)
+      return
+    }
+    // Marking a time not available needs a reason, asked for in a dialog.
+    if (!remove && slot.state === 'open') {
+      action.reset()
+      setQuickReason('')
+      setReasonFor(slot)
       return
     }
     try {
@@ -1865,10 +1983,26 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  async function markUnavailable() {
+    if (!reasonFor || !quickReason.trim()) return
+    try {
+      await action.mutateAsync({
+        action: 'saveAvailability',
+        recordId: reasonFor.id,
+        payload: { date: reasonFor.date, start: reasonFor.start, end: reasonFor.end, state: 'unavailable', reason: quickReason.trim() },
+      })
+      setReasonFor(undefined)
+      setSelectedSlot(undefined)
+    } catch {
+      // The dialog stays open with the API's message.
+    }
+  }
+
   function slotActions(slot: Slot) {
     return (
       <div className="sc-detail">
         <p>{slotTime(slot)}</p>
+        {slot.state === 'unavailable' && slot.reason && <p className="sc-reason">Reason: {slot.reason}</p>}
         <Button
           variant="secondary"
           loading={action.isPending}
@@ -1905,6 +2039,9 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         }
       />
       <div className="accs-stack accs-stagger">
+        {consultationsQuery.isError && (
+          <QueryProblem what="the appointment requests on your times" onRetry={() => void consultationsQuery.refetch()} retrying={consultationsQuery.isFetching} />
+        )}
         <p className="accs-meta" aria-live="polite">
           This week: {count('open')} open, {count('requested', 'booked')}{' '}
           requested or booked, {count('unavailable')} unavailable.
@@ -1949,7 +2086,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <EventCalendar
                 date={week}
                 view="week"
-                label="My consultation availability"
+                label="My appointment availability"
                 events={events}
                 startHour={6}
                 endHour={20}
@@ -1985,6 +2122,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                           </span>
                           <span className="accs-row__sub">
                             {dayHeading(slot.date)}
+                            {slot.state === 'unavailable' && slot.reason ? ` · ${slot.reason}` : ''}
                           </span>
                         </span>
                         <span className="sc-slotrow__actions">
@@ -2088,6 +2226,16 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 <Radio value="open">Available</Radio>
                 <Radio value="unavailable">Unavailable</Radio>
               </RadioGroup>
+              {state === 'unavailable' && (
+                <TextArea
+                  label="Reason"
+                  isRequired
+                  maxLength={300}
+                  value={reason}
+                  onChange={setReason}
+                  description="Only you and the CCS Secretary see this. Students see the time as not available."
+                />
+              )}
               <RadioGroup
                 label="Repeat"
                 value="once"
@@ -2118,6 +2266,33 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
             </Button>
           </ModalActions>
         </form>
+      </Modal>
+      <Modal
+        role="alertdialog"
+        title="Mark this time not available?"
+        isOpen={Boolean(reasonFor)}
+        onOpenChange={(open) => !open && setReasonFor(undefined)}
+      >
+        <ModalBody>
+          {reasonFor && <p>{slotTime(reasonFor)}</p>}
+          <TextArea
+            label="Reason"
+            isRequired
+            maxLength={300}
+            value={quickReason}
+            onChange={setQuickReason}
+            description="Only you and the CCS Secretary see this. Students see the time as not available."
+          />
+          <ActionError error={action.error} />
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setReasonFor(undefined)}>
+            Cancel
+          </Button>
+          <Button loading={action.isPending} isDisabled={!quickReason.trim()} onPress={() => void markUnavailable()}>
+            Mark not available
+          </Button>
+        </ModalActions>
       </Modal>
       <Modal
         title={

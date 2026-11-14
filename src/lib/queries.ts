@@ -1,3 +1,4 @@
+import { rememberRoleLabels } from '@/lib/role-labels'
 import { queryOptions } from '@tanstack/react-query'
 
 import { ApiError, getPage, getSession, type PageEnvelope } from './api'
@@ -5,7 +6,11 @@ import { ApiError, getPage, getSession, type PageEnvelope } from './api'
 export const sessionQuery = () =>
   queryOptions({
     queryKey: ['session'],
-    queryFn: getSession,
+    queryFn: async () => {
+      const session = await getSession()
+      rememberRoleLabels(session.roleLabels)
+      return session
+    },
     retry: false,
     staleTime: 30_000,
   })

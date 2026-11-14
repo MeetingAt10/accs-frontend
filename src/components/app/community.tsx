@@ -1,3 +1,5 @@
+import { AvatarFill, photoSrc } from '@/components/app/photo'
+import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
@@ -28,14 +30,16 @@ import {
   ViewState,
   toast,
   EmptyState,
+  type IconName,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker, useRouter, useRouterState } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
 import { RestrictedView } from '@/components/app/guards'
+import { PagedList } from '@/components/app/paging'
 import {
   DateTile,
   Empty,
@@ -44,7 +48,10 @@ import {
   StatusChip,
   toneFor,
 } from '@/components/app/page-shell'
-import { Comment, CommentThread, ReactionButton } from '@/components/ds-next'
+import { Comment, CommentThread } from '@/components/ds-next'
+import { SubjectList, SubjectMaterials } from '@/components/app/materials'
+import { QueryProblem } from '@/components/app/query-problem'
+import { ReactionBar, readReactions, topReactions } from '@/components/app/reactions'
 import {
   performPageAction,
   type PageAction,
@@ -71,12 +78,15 @@ interface PostComment {
   author: Person
   body: string
   at: string
+  /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
+  underReview?: boolean
 }
 
 export interface CommunityPost {
   id: string
   title: string
   body: string
+  underReview?: boolean
   audience: string
   kind: 'discussion' | 'announcement'
   label: string
@@ -110,6 +120,22 @@ interface Space {
   studentIds?: string[]
   students?: Person[]
   threadId?: string
+  /** A section space lists its subjects; a subject space carries its own materials. */
+  subjects?: Array<Record<string, unknown>>
+  materials?: Array<Record<string, unknown>>
+  canManageMaterials?: boolean
+}
+
+/** The section code a space belongs to (SBIT3A). A subject space is titled "Data Structures, SBIT3A"; a section group is "SBIT3A". */
+export function sectionCode(space: { title: string }) {
+  const parts = space.title.split(',')
+  return (parts.length > 1 ? parts[parts.length - 1] : space.title).trim()
+}
+/** True for a section's own group space, as opposed to one of its subjects. */
+export const isSectionGroup = (space: { title: string; subject: string }) => !space.title.includes(',') || /^section group$/i.test(space.subject)
+/** Spaces in one order: by section code, the section group first, then its subjects by name. */
+export function sortBySection<T extends { title: string; subject: string }>(spaces: T[]) {
+  return [...spaces].sort((a, b) => sectionCode(a).localeCompare(sectionCode(b)) || Number(isSectionGroup(b)) - Number(isSectionGroup(a)) || a.subject.localeCompare(b.subject))
 }
 
 interface Organization {
@@ -140,6 +166,8 @@ interface ScopeOption {
 }
 
 const postLabels = ['Discussion', 'Rant', 'Assistance', 'Support']
+/** The label as a key for its colour (Announcement, Discussion, Rant, Assistance, Support). */
+export const labelKey = (label: string) => label.toLowerCase().replace(/s$/, '').replace(/[^a-z]/g, '') || 'discussion'
 const participatingRoles = [
   'student',
   'organization',
@@ -157,9 +185,7 @@ const roleNames: Record<string, string> = {
   dean: 'Dean',
   guidance: 'Guidance',
   osas: 'OSAS',
-  administrator: 'Administrator',
-  staff: 'CCS Staff',
-  president: 'President’s Office',
+  administrator: 'System Administrator',
 }
 
 function list<T>(value: unknown): T[] {
@@ -173,7 +199,7 @@ function record<T>(value: unknown): T | undefined {
 }
 
 function personRole(person: Person) {
-  return (person.roles ?? []).map((role) => roleNames[role] ?? role).join(' · ')
+  return (person.roles ?? []).map((role) => roleLabelOf(role) || roleNames[role] || role).join(' · ')
 }
 
 function audienceName(
@@ -185,8 +211,10 @@ function audienceName(
   if (audience === 'faculty') return 'Faculty'
   const [kind, id] = audience.split(':')
   if (kind === 'program') return `${id} program`
-  if (kind === 'space')
-    return spaces.find((space) => space.id === id)?.title ?? 'Class space'
+  if (kind === 'space') {
+    const space = spaces.find((entry) => entry.id === id)
+    return space ? (isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} · ${space.subject}`) : 'Class space'
+  }
   if (kind === 'organization')
     return (
       organizations.find((organization) => organization.id === id)?.name ??
@@ -239,10 +267,10 @@ function ActionError({ error }: { error: unknown }) {
 const ease = [0.16, 1, 0.3, 1] as const
 const priorityRank = ['urgent', 'important', 'general']
 
-function Initials({ name, small }: { name: string; small?: boolean }) {
+function Initials({ name, small, photo }: { name: string; small?: boolean; photo?: unknown }) {
   return (
     <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} aria-hidden>
-      {initials(name) || '?'}
+      <AvatarFill photo={photo} fallback={initials(name) || '?'} />
     </span>
   )
 }
@@ -297,14 +325,14 @@ function ThreadList({
                   delay: reduce ? 0 : Math.min(index, 8) * 0.04,
                 }}
               >
-                <div className="fx-vote">
-                  <Icon name="caret-up" size={16} weight="bold" />
-                  <span className="accs-num">{post.reactionCount}</span>
-                  <span className="fx-sr">agreements</span>
+                <div className="fx-vote" title={`${readReactions(post as unknown as Record<string, unknown>).total} reactions`}>
+                  <span aria-hidden className="fx-vote__emoji">{topReactions(readReactions(post as unknown as Record<string, unknown>).counts, 1)[0]?.emoji ?? '👍'}</span>
+                  <span className="accs-num">{readReactions(post as unknown as Record<string, unknown>).total}</span>
+                  <span className="fx-sr">reactions</span>
                 </div>
                 <div className="fx-thread__body">
                   <div className="fx-thread__tags">
-                    <span className="accs-tag fx-tag--label">
+                    <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
                       {announcement ? 'Announcement' : post.label}
                     </span>
                     <span className="accs-tag">
@@ -328,8 +356,9 @@ function ThreadList({
                     </Link>
                   </h3>
                   <p className="fx-thread__excerpt">{post.body}</p>
+                  {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   <p className="fx-thread__meta">
-                    <Initials name={name} small />
+                    <Initials name={name} small photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
                     <span className="fx-thread__author">{name}</span>
                     <span aria-hidden>·</span>
                     <time dateTime={post.at} title={formatDateTime(post.at)}>
@@ -351,6 +380,30 @@ function ThreadList({
   )
 }
 
+/** A rail section's heading: its icon, its name and how many items it lists. */
+function RailTitle({ icon, children, count }: { icon: IconName; children: string; count?: number }) {
+  return (
+    <span className="fx-rail-title">
+      <span className="fx-rail-mark" aria-hidden><Icon name={icon} size={16} /></span>
+      {children}
+      {count ? <span className="fx-rail-count" aria-label={`${count} shown`}>{count}</span> : null}
+    </span>
+  )
+}
+
+/** One rail row: a tinted icon, then the title and a line under it. */
+function RailRow({ href, icon, title, sub }: { href: string; icon: IconName; title: ReactNode; sub: ReactNode }) {
+  return (
+    <Link variant="quiet" className="fx-mini__row" href={href}>
+      <span className="fx-mini__mark" aria-hidden><Icon name={icon} size={16} /></span>
+      <span className="fx-mini__text">
+        <span className="fx-mini__title">{title}</span>
+        <span className="fx-mini__sub">{sub}</span>
+      </span>
+    </Link>
+  )
+}
+
 function RailLink({ href, children }: { href: string; children: string }) {
   return (
     <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
@@ -359,14 +412,20 @@ function RailLink({ href, children }: { href: string; children: string }) {
   )
 }
 
+type Retry = { failed: boolean; retry: () => void; retrying: boolean }
+
 function FeedRail({
   posts,
   spaces,
   organizations,
+  spacesLoad,
+  organizationsLoad,
 }: {
   posts: CommunityPost[]
   spaces: Space[]
   organizations: Organization[]
+  spacesLoad?: Retry
+  organizationsLoad?: Retry
 }) {
   const announcements = posts
     .filter((post) => post.kind === 'announcement')
@@ -378,69 +437,82 @@ function FeedRail({
   return (
     <aside className="fx-rail accs-stagger" aria-label="Forum sidebar">
       {announcements.length > 0 && (
-        <Panel title="Announcements" flush>
+        <Panel title={<RailTitle icon="megaphone" count={announcements.length}>Announcements</RailTitle>} flush className="fx-rail-sec" data-tone="warn">
           <ul className="fx-mini">
             {announcements.map((post) => (
               <li key={post.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
+                <RailRow
                   href={`/feed/${encodeURIComponent(post.id)}`}
-                >
-                  <span className="fx-mini__title">{post.title}</span>
-                  <span className="fx-mini__sub">
-                    {priorityLabel(post.priority)} · {relativeTime(post.at)}
-                  </span>
-                </Link>
+                  icon="megaphone"
+                  title={post.title}
+                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
+                />
               </li>
             ))}
           </ul>
         </Panel>
       )}
+      {spacesLoad?.failed && (
+        <Panel title="Your spaces">
+          <QueryProblem what="your class spaces" onRetry={spacesLoad.retry} retrying={spacesLoad.retrying} />
+        </Panel>
+      )}
+      {organizationsLoad?.failed && (
+        <Panel title="Organizations">
+          <QueryProblem what="organizations" onRetry={organizationsLoad.retry} retrying={organizationsLoad.retrying} />
+        </Panel>
+      )}
       {spaces.length > 0 && (
         <Panel
-          title="Your spaces"
+          title={<RailTitle icon="graduation-cap" count={Math.min(spaces.length, 5)}>Your spaces</RailTitle>}
           flush
+          className="fx-rail-sec"
+          data-tone="info"
           action={<RailLink href="/spaces">View all</RailLink>}
         >
           <ul className="fx-mini">
-            {spaces.slice(0, 5).map((space) => (
-              <li key={space.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
-                  href={`/spaces/${encodeURIComponent(space.id)}`}
-                >
-                  <span className="fx-mini__title">{space.title}</span>
-                  <span className="fx-mini__sub">{space.subject}</span>
-                </Link>
-              </li>
-            ))}
+            {spaces.slice(0, 5).map((space) => {
+              // The section group is the whole class; a subject space is one subject of it, named by the subject.
+              const group = isSectionGroup(space)
+              return (
+                <li key={space.id}>
+                  <RailRow
+                    href={`/spaces/${encodeURIComponent(space.id)}`}
+                    icon={group ? 'chalkboard' : 'books'}
+                    title={group ? sectionCode(space) : space.subject}
+                    sub={group ? 'Whole section' : `${sectionCode(space)} · Subject`}
+                  />
+                </li>
+              )
+            })}
           </ul>
         </Panel>
       )}
       {orgs.length > 0 && (
         <Panel
-          title="Organizations"
+          title={<RailTitle icon="users" count={orgs.length}>Organizations</RailTitle>}
           flush
+          className="fx-rail-sec"
+          data-tone="ok"
           action={<RailLink href="/organizations">Browse</RailLink>}
         >
           <ul className="fx-mini">
-            {orgs.map((organization) => (
-              <li key={organization.id}>
-                <Link
-                  variant="quiet"
-                  className="fx-mini__row"
-                  href={`/organizations/${encodeURIComponent(organization.id)}`}
-                >
-                  <span className="fx-mini__title">{organization.name}</span>
-                  <span className="fx-mini__sub">
-                    {organization.memberCount ?? 0} members
-                    {organization.member ? ' · You’re a member' : ''}
-                  </span>
-                </Link>
-              </li>
-            ))}
+            {orgs.map((organization) => {
+              const count = organization.memberCount ?? 0
+              return (
+                <li key={organization.id}>
+                  <RailRow
+                    href={`/organizations/${encodeURIComponent(organization.id)}`}
+                    icon="users"
+                    title={organization.name}
+                    sub={<>
+                      {count} {count === 1 ? 'member' : 'members'}
+                      {organization.member && <span className="fx-mini__badge">Member</span>}
+                    </>}
+                  />
+                </li>
+              )
+            })}
           </ul>
         </Panel>
       )}
@@ -488,7 +560,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
             roles.includes('student') ||
             space.professorIds?.includes(session.user.id),
         )
-        .map((space) => ({ id: `space:${space.id}`, label: space.title })),
+        .map((space) => ({ id: `space:${space.id}`, label: isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} · ${space.subject}` })),
     )
   }
   if (roles.some((role) => ['professor', 'chair', 'dean'].includes(role))) {
@@ -636,6 +708,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                     type="button"
                     key={label}
                     className="accs-pill fx-cat"
+                    data-label={labelKey(label)}
                     aria-pressed={labels.includes(label)}
                     onClick={() => toggleLabel(label)}
                   >
@@ -686,7 +759,13 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
             </Panel>
           )}
         </div>
-        <FeedRail posts={allPosts} spaces={spaces} organizations={organizations} />
+        <FeedRail
+          posts={allPosts}
+          spaces={spaces}
+          organizations={organizations}
+          spacesLoad={{ failed: spacesQuery.isError, retry: () => void spacesQuery.refetch(), retrying: spacesQuery.isFetching }}
+          organizationsLoad={{ failed: organizationsQuery.isError, retry: () => void organizationsQuery.refetch(), retrying: organizationsQuery.isFetching }}
+        />
       </div>
     </div>
   )
@@ -713,6 +792,8 @@ export function PostComposer({
     organizationsQuery.data?.data.organizations,
   )
   const audiences = list<string>(page.data.audiences)
+  const audienceListsFailed = spacesQuery.isError || organizationsQuery.isError
+  const retryAudienceLists = () => { if (spacesQuery.isError) void spacesQuery.refetch(); if (organizationsQuery.isError) void organizationsQuery.refetch() }
   const announcementAudiences = list<string>(page.data.announcementAudiences)
   const requested = params.get('space') ?? ''
   const requestedAudience =
@@ -835,6 +916,9 @@ export function PostComposer({
               </p>
             </div>
             <div className="fx-group__body">
+              {audienceListsFailed && (
+                <QueryProblem what="the names of your spaces and organizations" onRetry={retryAudienceLists} retrying={spacesQuery.isFetching || organizationsQuery.isFetching} />
+              )}
               {announcementAudiences.length > 0 && (
                 <SegmentedControl
                   aria-label="Post type"
@@ -1076,7 +1160,7 @@ export function PostView({
   return (
     <article className="fx-post">
       <div className="fx-thread__tags">
-        <span className="accs-tag fx-tag--label">
+        <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
           {announcement ? 'Announcement' : post.label}
         </span>
         <span className="accs-tag">
@@ -1090,7 +1174,7 @@ export function PostView({
         {post.private && <span className="accs-tag">Members only</span>}
       </div>
       <div className="fx-post__author">
-        <Initials name={name} />
+        <Initials name={name} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
         <div className="fx-post__who">
           <strong>{name}</strong>
           <span>
@@ -1099,6 +1183,7 @@ export function PostView({
           </span>
         </div>
       </div>
+      {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
       <div className="fx-post__body">{post.body}</div>
       {post.eventDate && (
         <dl className="fx-facts">
@@ -1287,6 +1372,7 @@ function PostDetailPage({
         payload: {},
       })
       setDeleteOpen(false)
+      router.history.push('/feed')
     } catch {
       // Keep the confirmation open so the API error can be reviewed.
     }
@@ -1309,13 +1395,12 @@ function PostDetailPage({
         <Panel as="div" className="fx-post-panel">
           <PostView post={post} />
           <div className="fx-actions">
-            <ReactionButton
-              count={post.reactionCount}
-              isSelected={post.reacted}
-              isDisabled={page.data.canReact !== true}
-              loading={action.isPending}
-              onChange={() =>
-                action.mutate({ action: 'react', recordId: post.id, payload: {} })
+            <ReactionBar
+              item={post as unknown as Record<string, unknown>}
+              disabled={page.data.canReact !== true}
+              pending={action.isPending && action.variables?.action === 'react'}
+              onReact={(reaction) =>
+                action.mutate({ action: 'react', recordId: post.id, payload: { reaction } })
               }
             />
             {page.data.canComment === true && (
@@ -1329,6 +1414,11 @@ function PostDetailPage({
               </Link>
             )}
             <span className="fx-actions__spacer" />
+            {post.owned && (
+              <Button variant="tertiary" icon="trash" onPress={() => { action.reset(); setDeleteOpen(true) }}>
+                Delete
+              </Button>
+            )}
             <MenuButton
               iconOnly
               icon="dots-three"
@@ -1387,6 +1477,7 @@ function PostDetailPage({
                 {post.comments.slice(0, shownComments).map((comment) => (
                   <Comment
                     key={comment.id}
+                    photo={photoSrc((comment.author as { photo?: unknown } | undefined)?.photo)}
                     author={comment.author?.name ?? 'College member'}
                     role={personRole(comment.author ?? { name: '' })}
                     date={relativeTime(comment.at)}
@@ -1394,6 +1485,14 @@ function PostDetailPage({
                     dateTime={comment.at}
                     actions={
                       <>
+                        <ReactionBar
+                          size="sm"
+                          item={comment as unknown as Record<string, unknown>}
+                          disabled={page.data.canReact !== true}
+                          onReact={(reaction) =>
+                            action.mutate({ action: 'reactComment', recordId: post.id, payload: { commentId: comment.id, reaction } })
+                          }
+                        />
                         {page.data.canComment === true && (
                           <Button
                             variant="tertiary"
@@ -1415,6 +1514,7 @@ function PostDetailPage({
                     }
                   >
                     {comment.body}
+                    {comment.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
                   </Comment>
                 ))}
               </CommentThread>
@@ -1776,10 +1876,10 @@ function SpacesPage({
   const query = params.get('q') ?? ''
   const program = params.get('program') ?? ''
   const [year, setYear] = useState('')
-  const spaces = list<Space>(page.data.spaces).filter(
+  const spaces = sortBySection(list<Space>(page.data.spaces)).filter(
     (space) =>
       (!program || space.program === program) &&
-      (!year || String(space.year ?? space.title.match(/\d/)?.[0]) === year) &&
+      (!year || String(space.year ?? sectionCode(space).match(/\d/)?.[0]) === year) &&
       `${space.title} ${space.subject}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -1873,18 +1973,18 @@ function SpacesPage({
                           className="fx-table-link"
                           href={`/spaces/${encodeURIComponent(space.id)}`}
                         >
-                          {space.title}
+                          {sectionCode(space)}
                         </Link>
                       </td>
                       <td>
                         <span className="accs-tag">{space.program}</span>
                       </td>
-                      <td>{space.year ?? space.title.match(/\d/)?.[0] ?? '—'}</td>
+                      <td>{space.year ?? sectionCode(space).match(/\d/)?.[0] ?? '—'}</td>
                       <td>{adviserNames(space, 'Unassigned')}</td>
                       <td className="accs-num">
                         {space.studentCount ?? space.studentIds?.length ?? 0}
                       </td>
-                      <td>{space.subject}</td>
+                      <td>{isSectionGroup(space) ? <span className="fx-muted">Section group</span> : space.subject}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1916,7 +2016,7 @@ function SpacesPage({
                         </Link>
                       </p>
                       <p className="accs-row__sub">
-                        {space.program} · {space.title} ·{' '}
+                        {space.program} · {sectionCode(space)} ·{' '}
                         {adviserNames(space, 'No adviser assigned')} ·{' '}
                         <span className="accs-num">{studentTotal(space)}</span>{' '}
                         students
@@ -1984,9 +2084,9 @@ function SpacePage({
       <PageHeader
         crumbs={[
           { label: 'Classes and sections', href: '/spaces' },
-          { label: space.title },
+          { label: sectionCode(space) },
         ]}
-        title={`${space.title} · ${space.subject}`}
+        title={`${sectionCode(space)} · ${space.subject}`}
         description={`${adviserNames(space, 'No adviser assigned')} · ${studentTotal(space)} students`}
         actions={
           <>
@@ -2007,13 +2107,25 @@ function SpacePage({
           </>
         }
       />
-      <Tabs defaultSelectedKey="discussion">
+      <Tabs defaultSelectedKey={space.subjects ? 'subjects' : space.materials ? 'materials' : 'discussion'}>
         <TabList aria-label="Class space views">
+          {space.subjects && <Tab id="subjects">Subjects</Tab>}
+          {space.materials && <Tab id="materials">Materials</Tab>}
           <Tab id="discussion">Discussion</Tab>
           {!oversightOnly && <Tab id="announcements">Announcements</Tab>}
           <Tab id="members">{academic ? 'Roster' : 'Members'}</Tab>
           <Tab id="about">About</Tab>
         </TabList>
+        {space.subjects && (
+          <TabPanel id="subjects">
+            <div className="fx-tab"><SubjectList subjects={space.subjects} /></div>
+          </TabPanel>
+        )}
+        {space.materials && (
+          <TabPanel id="materials">
+            <div className="fx-tab"><SubjectMaterials spaceId={space.id} materials={space.materials} canManage={space.canManageMaterials === true} /></div>
+          </TabPanel>
+        )}
         <TabPanel id="discussion">
           <div className="fx-tab">
             <div className="fx-toolbar fx-toolbar--slim">
@@ -2076,7 +2188,7 @@ function SpacePage({
                 </div>
                 <div>
                   <dt>Section</dt>
-                  <dd>{space.title}</dd>
+                  <dd>{sectionCode(space)}</dd>
                 </div>
                 <div>
                   <dt>Program</dt>
@@ -2122,31 +2234,35 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
       </div>
       {organizations.length ? (
         <Panel flush>
-          <ul className="accs-rows" aria-label="Organizations">
-            {organizations.map((organization) => (
-              <li key={organization.id}>
-                <div className="accs-row fx-row">
-                  <div>
-                    <p className="accs-row__title">
-                      <Link
-                        variant="quiet"
-                        className="fx-table-link"
-                        href={`/organizations/${encodeURIComponent(organization.id)}`}
-                      >
-                        {organization.name}
-                      </Link>
-                    </p>
-                    <p className="accs-row__sub">{organization.description}</p>
+          <PagedList items={organizations} noun="organizations">
+            {(organizations) => (
+            <ul className="accs-rows" aria-label="Organizations">
+              {organizations.map((organization) => (
+                <li key={organization.id}>
+                  <div className="accs-row fx-row">
+                    <div>
+                      <p className="accs-row__title">
+                        <Link
+                          variant="quiet"
+                          className="fx-table-link"
+                          href={`/organizations/${encodeURIComponent(organization.id)}`}
+                        >
+                          {organization.name}
+                        </Link>
+                      </p>
+                      <p className="accs-row__sub">{organization.description}</p>
+                    </div>
+                    <span className="fx-count-label">
+                      <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
+                      members
+                      {organization.member ? ' · Member' : ''}
+                    </span>
                   </div>
-                  <span className="fx-count-label">
-                    <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
-                    members
-                    {organization.member ? ' · Member' : ''}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            )}
+          </PagedList>
         </Panel>
       ) : (
         <Panel>

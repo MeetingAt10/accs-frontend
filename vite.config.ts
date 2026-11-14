@@ -24,6 +24,29 @@ export default defineConfig(({ command }) => {
       ...(roleLauncherEnabled ? [localRoleLauncher()] : []),
     ],
     resolve: { alias: { '@': '/src' } },
+    build: {
+      rollupOptions: {
+        output: {
+          // Libraries go in their own chunks, so the app's entry stays small and each library is cached on its own
+          // between releases (MeetingAt10/accs-frontend#8). Routes are already split by the router plugin.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (/node_modules[\/](react|react-dom|scheduler)[\/]/.test(id)) return 'react'
+            if (id.includes('@tanstack')) return 'tanstack'
+            // React Aria is too big for one chunk: its components, hooks, state and date libraries load separately.
+            if (id.includes('react-aria-components')) return 'react-aria-components'
+            if (/@react-aria|node_modules[\/]react-aria[\/]/.test(id)) return 'react-aria'
+            if (/@react-stately|react-stately|@react-types/.test(id)) return 'react-stately'
+            if (id.includes('@internationalized')) return 'internationalized'
+            if (/node_modules[\/](motion|framer-motion|motion-dom|motion-utils)[\/]/.test(id)) return 'motion'
+            if (id.includes('@meetingat10/design-system')) return 'design-system'
+            if (id.includes('@phosphor-icons')) return 'icons'
+            if (/@grafana[\/]faro|@opentelemetry/.test(id)) return 'observability'
+            return 'vendor'
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       ...(roleLauncherEnabled ? { host: '127.0.0.1', strictPort: true } : {}),

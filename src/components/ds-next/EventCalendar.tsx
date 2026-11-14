@@ -51,8 +51,9 @@ function addDays(date: Date, days: number) {
   return next
 }
 
-function mondayOf(date: Date) {
-  return addDays(date, -((date.getDay() + 6) % 7))
+/** Weeks run Sunday to Saturday. */
+function sundayOf(date: Date) {
+  return addDays(date, -date.getDay())
 }
 
 function hours(value: string | undefined, fallback: number) {
@@ -170,7 +171,7 @@ function Month({
   const selected = parse(date)
   const first = new Date(selected.getFullYear(), selected.getMonth(), 1, 12)
   const last = new Date(selected.getFullYear(), selected.getMonth() + 1, 0, 12)
-  const start = mondayOf(first)
+  const start = sundayOf(first)
   const weeks = Math.ceil(
     (Math.round((last.getTime() - start.getTime()) / DAY) + 1) / 7,
   )
@@ -344,7 +345,7 @@ function Week({
   startHour: number
   endHour: number
 }) {
-  const start = mondayOf(parse(date))
+  const start = sundayOf(parse(date))
   const days = Array.from({ length: 7 }, (_, index) => addDays(start, index))
   const span = endHour - startHour
   const today = iso(new Date())
@@ -494,7 +495,7 @@ export function EventCalendar({
   const anchor = parse(date)
   const key =
     view === 'week'
-      ? `week:${iso(mondayOf(anchor))}`
+      ? `week:${iso(sundayOf(anchor))}`
       : `${view}:${date.slice(0, 7)}`
   const monthPrefix = date.slice(0, 7)
   const monthLabel = anchor.toLocaleDateString('en-PH', {

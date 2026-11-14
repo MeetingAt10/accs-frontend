@@ -1,3 +1,5 @@
+import { AvatarFill } from "@/components/app/photo";
+import { roleLabelOf } from "@/lib/role-labels";
 import {
   IconButton,
   Kbd,
@@ -5,7 +7,7 @@ import {
   TextArea,
 } from "@meetingat10/design-system/react";
 import { motion, useReducedMotion } from "motion/react";
-import { Children, useEffect, useRef, type ReactNode } from "react";
+import { Children, useEffect, useRef, type ReactNode, useState } from "react";
 
 import { formatDateTime, initials, relativeTime } from "@/lib/format";
 import "./chat.css";
@@ -32,7 +34,7 @@ function words(value: unknown, fallback = ""): string {
 
 function roleNames(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((role): role is string => typeof role === "string")
+    ? value.filter((role): role is string => typeof role === "string").map(roleLabelOf)
     : [];
 }
 
@@ -48,10 +50,10 @@ function clock(value: string): string {
       });
 }
 
-function Mark({ name }: { name: string }) {
+function Mark({ name, photo }: { name: string; photo?: string }) {
   return (
     <span className="accs-avatar ds-next-chat-avatar" aria-hidden>
-      {initials(name) || "?"}
+      <AvatarFill photo={photo} fallback={initials(name) || "?"} />
     </span>
   );
 }
@@ -193,7 +195,9 @@ export function MessageBubble({
   own = false,
   actions,
   children,
+  photo,
 }: {
+  photo?: string;
   sender: string;
   role?: string;
   body: string;
@@ -215,7 +219,7 @@ export function MessageBubble({
       animate={{ opacity: 1, y: 0, x: 0 }}
       transition={{ duration: 0.36, ease }}
     >
-      {!own && <Mark name={sender} />}
+      {!own && <Mark name={sender} photo={photo} />}
       <div className="ds-next-message-bubble__col">
         {!own && (
           <header className="ds-next-message-bubble__who">
@@ -225,7 +229,7 @@ export function MessageBubble({
         )}
         <div className="ds-next-message-bubble__line">
           <div className="ds-next-message-bubble__text">
-            <p>{body}</p>
+            {body && <p>{body}</p>}
             {children}
           </div>
           {actions && (
@@ -244,6 +248,12 @@ export function MessageBubble({
   );
 }
 
+/** The name being typed after an @ at the end of the message, or undefined when there is none. */
+export function mentionQuery(value: string) {
+  const match = /(?:^|\s)@([^\s@]{0,30})$/.exec(value);
+  return match ? match[1] : undefined;
+}
+
 export function MessageComposer({
   value,
   onChange,
@@ -252,6 +262,12 @@ export function MessageComposer({
   label = "Message",
   attachments = false,
   maxLength = 4000,
+  mentions = [],
+  onAddFiles,
+  fileAccept,
+  files,
+  hasFiles = false,
+  filesBusy = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -260,13 +276,36 @@ export function MessageComposer({
   label?: string;
   attachments?: boolean;
   maxLength?: number;
+  /** Called with the files chosen with the paperclip; without it the paperclip is off. */
+  onAddFiles?: (files: File[]) => void;
+  /** The file types the paperclip offers. */
+  fileAccept?: string;
+  /** The files waiting to go with the message, shown above the bar. */
+  files?: ReactNode;
+  /** Files are ready, so the message may be sent without words. */
+  hasFiles?: boolean;
+  /** A file is still uploading, so the message waits. */
+  filesBusy?: boolean;
+  /** People who can be named with @ in this conversation. */
+  mentions?: { id: string; name: string }[];
 }) {
+  const typed = mentionQuery(value);
+  const matches = typed === undefined ? [] : mentions.filter((person) => person.name.toLowerCase().split(/\s+/).some((part) => part.startsWith(typed.toLowerCase()))).slice(0, 6);
+  const [active, setActive] = useState(0);
+  const [dismissed, setDismissed] = useState("");
+  const open = matches.length > 0 && dismissed !== value;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const canSend = (Boolean(value.trim()) || hasFiles) && !isPending && !filesBusy;
+  const pick = (name: string) => {
+    onChange(value.replace(/@([^\s@]*)$/, "@" + name + " "));
+    setActive(0);
+  };
   return (
     <form
       className="ds-next-composer"
       onSubmit={(event) => {
         event.preventDefault();
-        onSend();
+        if (canSend) onSend();
       }}
     >
       <TextArea
@@ -276,30 +315,81 @@ export function MessageComposer({
         onChange={onChange}
         maxLength={maxLength}
         showCount
-        isRequired
+        isRequired={!hasFiles}
         isDisabled={isPending}
         onKeyDown={(event) => {
+          if (open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+            event.preventDefault();
+            setActive((index) => (index + (event.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+            return;
+          }
+          if (open && (event.key === "Enter" || event.key === "Tab")) {
+            event.preventDefault();
+            pick(matches[Math.min(active, matches.length - 1)].name);
+            return;
+          }
+          if (open && event.key === "Escape") {
+            event.preventDefault();
+            setDismissed(value);
+            return;
+          }
           if (
             event.key === "Enter" &&
             !event.shiftKey &&
             !event.nativeEvent.isComposing
           ) {
             event.preventDefault();
-            onSend();
+            if (canSend) onSend();
           }
         }}
       />
+      {files}
+      {open && (
+        <ul className="ds-next-mentions" role="listbox" aria-label="People to mention">
+          {matches.map((person, index) => (
+            <li key={person.id} role="option" aria-selected={index === active}>
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(person.name)}>
+                <Mark name={person.name} />
+                <span>{person.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="ds-next-composer__bar">
         <small className="ds-next-composer__hint">
           <Kbd keys="Enter" /> sends · <Kbd keys={["Shift", "Enter"]} /> adds a
           line
         </small>
         <div className="ds-next-composer__buttons">
-          {/* TBD(D-08): attachments require approved access and retention rules. */}
-          {attachments && (
+          {attachments && onAddFiles && (
+            <>
+              <input
+                ref={fileInput}
+                className="mf-input"
+                type="file"
+                multiple
+                accept={fileAccept}
+                tabIndex={-1}
+                aria-hidden
+                onChange={(event) => {
+                  const chosen = Array.from(event.target.files ?? []);
+                  event.target.value = "";
+                  if (chosen.length) onAddFiles(chosen);
+                }}
+              />
+              <IconButton
+                icon="paperclip"
+                label="Attach pictures or files"
+                isDisabled={isPending}
+                onPress={() => fileInput.current?.click()}
+              />
+            </>
+          )}
+          {attachments && !onAddFiles && (
             <IconButton
               icon="paperclip"
-              label="Attachments are not enabled while access rules are being defined"
+              label="Attachments aren't available yet"
               isDisabled
             />
           )}
@@ -307,8 +397,8 @@ export function MessageComposer({
             type="submit"
             variant="solid"
             icon="arrow-right"
-            label={isPending ? "Sending message" : "Send"}
-            isDisabled={!value.trim() || isPending}
+            label={isPending ? "Sending message" : filesBusy ? "Waiting for files to upload" : "Send"}
+            isDisabled={!canSend}
           />
         </div>
       </div>

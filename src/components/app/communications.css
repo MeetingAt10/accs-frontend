@@ -31,7 +31,7 @@
 .cm-msg { display: flex; align-items: flex-start; gap: 10px; }
 .cm-msg[data-own] { justify-content: flex-end; }
 .cm-msg__bubble { display: grid; gap: 4px; max-width: min(100%, 34rem); padding: 10px 14px 12px; border: 1px solid var(--accs-line); border-radius: 16px 16px 16px 4px; background: var(--accs-sunken); }
-.cm-msg[data-own] .cm-msg__bubble { border-color: transparent; border-radius: 16px 16px 4px 16px; background: var(--accs-ink); color: #fff; }
+.cm-msg[data-own] .cm-msg__bubble { border-color: transparent; border-radius: 16px 16px 4px 16px; background: var(--accs-ink); color: var(--accs-on-accent); }
 .cm-msg__who { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; opacity: 0.65; }
 .cm-msg__bubble p { margin: 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cm-msg__bubble p.cm-msg__sources { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--accs-line); font-size: 0.75rem; color: var(--accs-muted); white-space: normal; }
@@ -74,3 +74,6 @@
   .cm-chat__scroll { padding: 16px 12px; }
   .cm-chat__foot { padding: 12px; }
 }
+/* A category that cannot be turned off is tagged Required next to its choices. */
+.cm-pref { position: relative; }
+.cm-required { position: absolute; top: 16px; right: 20px; }
