@@ -986,7 +986,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [sort, setSort] = useState<SortDescriptor>({ column: 'updatedAt', direction: 'descending' })
   const records = items(page.data.cases)
-  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...(roles.includes('professor') ? [['teaching', 'Teaching assignments']] : []), ['history', 'Handled by me']]
+  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...(roles.includes('professor') ? [['teaching', 'Teaching assignments']] : []), ['history', 'Handled by me'], ['closed', 'Closed']]
     : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]

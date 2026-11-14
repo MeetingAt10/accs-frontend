@@ -28,10 +28,19 @@ export const messageFilesPerMessage = 5
 export const messageFileAccept = Object.keys(messageFileExtensions).join(',')
 
 /** What is wrong with a chosen file, or an empty string. Short: it shows under the file's name. */
-export function messageFileProblem(file: { name: string; type: string; size: number }) {
-  const allowed = messageFileExtensions[file.type]
+/**
+ * The type to send for a file: the browser's, or, when the browser gives none (common for Office files), the one its
+ * extension stands for. Undefined when the file is not an allowed type or its type and extension disagree.
+ */
+export function messageFileType(file: { name: string; type: string }) {
   const extension = file.name.toLowerCase().split('.').pop() ?? ''
-  if (!allowed || !allowed.includes(extension)) return 'Not a picture, PDF, Office or text file.'
+  if (messageFileExtensions[file.type]?.includes(extension)) return file.type
+  if (file.type && file.type !== 'application/octet-stream') return undefined
+  return Object.entries(messageFileExtensions).find(([, extensions]) => extensions.includes(extension))?.[0]
+}
+
+export function messageFileProblem(file: { name: string; type: string; size: number }) {
+  if (!messageFileType(file)) return 'Not a picture, PDF, Office or text file.'
   if (file.size > messageFileMaxBytes) return 'Larger than 10 MB.'
   if (file.size === 0) return 'This file is empty.'
   return ''
@@ -138,7 +147,7 @@ export function useFileUploads(max: number, initial: MessageFile[] = []) {
       const preview = !problem && file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
       setFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? 'failed' : 'uploading', problem }])
       if (problem) continue
-      uploadMessageFile(file)
+      uploadMessageFile(file, messageFileType(file))
         .then((uploaded) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'ready', file: uploaded } : item))))
         .catch((error) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'failed', problem: apiErrorText(error) } : item))))
     }

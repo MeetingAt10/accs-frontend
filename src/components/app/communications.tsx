@@ -1,4 +1,4 @@
-import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
+import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFileType, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
 import { roleLabelOf } from '@/lib/role-labels'
 import { Pager, usePaged } from '@/components/app/paging'
 import {
@@ -241,7 +241,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       const preview = !problem && file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
       setPendingFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? "failed" : "uploading", problem }]);
       if (problem) continue;
-      uploadMessageFile(file)
+      uploadMessageFile(file, messageFileType(file))
         .then((uploaded) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "ready", file: uploaded } : item))))
         .catch((error) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "failed", problem: apiErrorText(error) } : item))));
     }

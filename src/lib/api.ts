@@ -272,8 +272,8 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
 export type MessageFile = { id: string; fileName: string; contentType: string; size: number }
 
 /** Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`. */
-export async function uploadMessageFile(file: File): Promise<MessageFile> {
-  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType: file.type, size: file.size })
+export async function uploadMessageFile(file: File, contentType = file.type): Promise<MessageFile> {
+  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType, size: file.size })
   await sendMaterialFile(started.record.upload, file)
   return started.record.attachment
 }
