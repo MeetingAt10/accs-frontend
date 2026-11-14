@@ -8,7 +8,7 @@
 .pt-pills { gap: 4px; padding: 4px; width: fit-content; max-width: 100%; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-surface); box-shadow: 0 1px 2px rgb(11 18 32 / 4%); }
 .pt-pill { position: relative; isolation: isolate; min-height: 36px; border-color: transparent; background: transparent; }
 .pt-pill:hover { background: var(--accs-sunken); border-color: transparent; }
-.pt-pill[aria-pressed='true'] { background: transparent; border-color: transparent; color: #fff; }
+.pt-pill[aria-pressed='true'] { background: transparent; border-color: transparent; color: var(--accs-on-accent); }
 .pt-pill__indicator { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accs-ink); box-shadow: 0 4px 12px -4px rgb(11 18 32 / 45%); }
 .pt-pill__label { position: relative; }
 

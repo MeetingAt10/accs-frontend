@@ -25,11 +25,12 @@ import {
   toast,
 } from '@meetingat10/design-system/react'
 import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useBlocker } from '@tanstack/react-router'
+import { useBlocker, useSearch } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { RequirePermission } from '@/components/app/guards'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
+import { PagedList } from '@/components/app/paging'
 import {
   chunk,
   columnLabels,
@@ -329,6 +330,16 @@ function DeanAccounts() {
         description="The secretary creates and manages every other account, so start by activating the secretary."
       />
       <Gate queries={[types]} what="accounts">
+        <Panel title="Step 1: Activate the secretary">
+          <div className="accs-stack accs-stack--tight">
+            <p className="acct-lead">
+              {secretary
+                ? `${secretary.name} is the secretary. Their temporary sign-in details are shown once, so give them to the secretary right away.`
+                : 'No secretary has been set up yet. Activating the secretary shows their temporary sign-in details once.'}
+            </p>
+            <SecretaryState account={secretary} onOpen={() => setActivating(true)} />
+          </div>
+        </Panel>
         <Panel flush title="Account types">
           <div className="acct-scroll">
             <table className="accs-table acct-table acct-stack" aria-label="Account types">
@@ -361,7 +372,7 @@ function DeanAccounts() {
                     </td>
                     <td data-label="Status">
                       {row.type === 'secretary' ? (
-                        <SecretaryState account={secretary} onOpen={() => setActivating(true)} />
+                        <span className="acct-muted">Set up above</span>
                       ) : (
                         <span className="acct-muted">Managed by the secretary</span>
                       )}
@@ -1319,39 +1330,43 @@ function StudentsTab() {
                   Fix the problems listed below in the file and upload it again.
                 </Alert>
               )}
-              <div className="acct-scroll acct-scroll--tall">
-                <table className="accs-table acct-table acct-stack" aria-label="Class list">
-                  <thead>
-                    <tr>
-                      <th scope="col">Row</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Student ID</th>
-                      <th scope="col">Program</th>
-                      <th scope="col">Year</th>
-                      <th scope="col">Section</th>
-                      <th scope="col">Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((student) => (
-                      <tr key={student.row}>
-                        <td data-label="Row" className="accs-num">
-                          {student.row}
-                        </td>
-                        {(['name', 'email', 'studentId', 'program', 'year', 'section'] as const).map((field) => (
-                          <td key={field} data-label={columnLabels[field]} data-bad={student.problems[field] ? true : undefined}>
-                            {student.draft[field] || '—'}
-                          </td>
-                        ))}
-                        <td data-label="Result">
-                          <ResultCell problems={student.problems} outcome={outcome[student.row]} running={running} />
-                        </td>
+              <PagedList items={students} noun="rows">
+                {(students) => (
+                <div className="acct-scroll acct-scroll--tall">
+                  <table className="accs-table acct-table acct-stack" aria-label="Class list">
+                    <thead>
+                      <tr>
+                        <th scope="col">Row</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Student ID</th>
+                        <th scope="col">Program</th>
+                        <th scope="col">Year</th>
+                        <th scope="col">Section</th>
+                        <th scope="col">Result</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {students.map((student) => (
+                        <tr key={student.row}>
+                          <td data-label="Row" className="accs-num">
+                            {student.row}
+                          </td>
+                          {(['name', 'email', 'studentId', 'program', 'year', 'section'] as const).map((field) => (
+                            <td key={field} data-label={columnLabels[field]} data-bad={student.problems[field] ? true : undefined}>
+                              {student.draft[field] || '—'}
+                            </td>
+                          ))}
+                          <td data-label="Result">
+                            <ResultCell problems={student.problems} outcome={outcome[student.row]} running={running} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                )}
+              </PagedList>
               {!started && ready.length > 0 && (
                 <div className="acct-actions">
                   <Button onPress={() => void send(ready)}>Create {plural(ready.length, 'account')}</Button>
@@ -1444,35 +1459,101 @@ function StudentsTab() {
   )
 }
 
+// --- secretary: account status -----------------------------------------------------------------------------------------
+
+/** Where the setup stands, from the counts the server already keeps for each account type. */
+function StatusTab() {
+  const types = useQuery(typesQuery)
+  const rows = types.data?.types ?? []
+  return (
+    <Gate queries={[types]} what="account status">
+      <Panel flush title="Setup progress">
+        <PagedList items={rows} noun="accounts">
+          {(rows) => (
+          <div className="acct-scroll">
+            <table className="accs-table acct-table acct-stack" aria-label="Setup progress">
+              <thead>
+                <tr>
+                  <th scope="col">Account type</th>
+                  <th scope="col" className="accs-num">
+                    Active
+                  </th>
+                  <th scope="col" className="accs-num">
+                    Not active
+                  </th>
+                  <th scope="col">Setup</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.type}>
+                    <td className="acct-main">
+                      <strong>{row.label}</strong>
+                    </td>
+                    <td data-label="Active" className="accs-num">
+                      {row.active}
+                    </td>
+                    <td data-label="Not active" className="accs-num">
+                      {row.inactive}
+                    </td>
+                    <td data-label="Setup">
+                      <StatusChip tone={row.active > 0 ? 'ok' : 'neutral'}>{row.active > 0 ? 'Done' : 'To do'}</StatusChip>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
+        <p className="acct-foot">Switch one account on or off from its row in the Faculty or Students tab.</p>
+      </Panel>
+    </Gate>
+  )
+}
+
 // --- screens -----------------------------------------------------------------------------------------------------------
 
+const secretaryTabs = ['faculty', 'advisors', 'chairs', 'students', 'status']
+
 function SecretaryAccounts() {
-  const [tab, setTab] = useState('faculty')
+  // The Home tiles open a tab with ?tab=; anything else starts at the first step.
+  const asked = String((useSearch({ strict: false }) as { tab?: unknown }).tab ?? '')
+  const [tab, setTab] = useState(secretaryTabs.includes(asked) ? asked : 'faculty')
   return (
     <div className="accs-stack accs-stagger">
       <PageHeader
         title="Accounts"
-        description="Create faculty and student accounts, choose advisors and program chairs, and switch accounts on or off."
+        description="Set up the college in order: faculty, advisors, program chairs, then students. Check where it all stands under Account status."
       />
       <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
-        <TabList aria-label="Account tasks">
-          <Tab id="faculty">Faculty</Tab>
-          <Tab id="advisors">Advisors</Tab>
-          <Tab id="chairs">Program chairs</Tab>
-          <Tab id="students">Students</Tab>
+        <TabList aria-label="Account setup steps">
+          <Tab id="faculty">1. Faculty</Tab>
+          <Tab id="advisors">2. Advisors</Tab>
+          <Tab id="chairs">3. Program chairs</Tab>
+          <Tab id="students">4. Students / import</Tab>
+          <Tab id="status">5. Account status</Tab>
         </TabList>
         <TabPanel id="faculty">
+          <p className="acct-lead">Create an account for each faculty member. Their temporary sign-in details are shown once.</p>
           <FacultyTab />
         </TabPanel>
         <TabPanel id="advisors">
+          <p className="acct-lead">Choose the faculty who advise each year level. Faculty accounts must exist first.</p>
           <AdvisorsTab />
         </TabPanel>
         <TabPanel id="chairs">
+          <p className="acct-lead">Choose the program chair for each program. A chair is a faculty account.</p>
           <ChairsTab />
         </TabPanel>
         {/* Kept mounted so a finished import and its sign-in details survive a switch of tab. */}
         <TabPanel id="students" shouldForceMount className="acct-keep">
+          <p className="acct-lead">Import a class list from Excel, or add one student at a time.</p>
           <StudentsTab />
+        </TabPanel>
+        <TabPanel id="status">
+          <p className="acct-lead">How many accounts of each type are on, and which setup steps are still to do.</p>
+          <StatusTab />
         </TabPanel>
       </Tabs>
     </div>

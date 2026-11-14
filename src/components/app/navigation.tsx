@@ -8,19 +8,20 @@ import {
   Popover,
   Search,
   Stack,
+  toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AssistantPanel,
   notificationHref,
 } from "@/components/app/communications";
 import {
+  AccountMenu,
   DrawerNav,
-  SiteRail,
-  SiteSidebar,
+  SitePanel,
   type Destination,
   type NavEntry,
   type NavGroup,
@@ -35,7 +36,7 @@ import {
   type Role,
   type Session,
 } from "@/lib/api";
-import { notificationsFromQuery, pageQuery } from "@/lib/queries";
+import { newNotifications, notificationsFromQuery, pageQuery } from "@/lib/queries";
 import {
   allowsPath,
   canOpenSite,
@@ -140,7 +141,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",
@@ -218,7 +219,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "calendar",
         },
         {
-          label: "Consultations",
+          label: "Appointments",
           href: "/consultations",
           pageId: "P14",
           icon: "chalkboard",
@@ -239,21 +240,6 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/evaluations",
           pageId: "P26",
           icon: "list-checks",
-        },
-      ],
-    },
-  ],
-  staff: [
-    {
-      label: "Workspace",
-      entries: [
-        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
-        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-        {
-          label: "Organizations",
-          href: "/organizations",
-          pageId: "P09",
-          icon: "flag",
         },
       ],
     },
@@ -307,6 +293,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P33",
           icon: "archive",
         },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
       ],
     },
   ],
@@ -352,6 +344,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           href: "/records",
           pageId: "P33",
           icon: "archive",
+        },
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },
@@ -501,6 +499,12 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           icon: "archive",
         },
         {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
+        },
+        {
           label: "Restrictions",
           href: "/restrictions",
           pageId: "P35",
@@ -509,23 +513,13 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
-  president: [
+  staff: [
     {
       label: "Workspace",
       entries: [
         { label: "Home", href: "/home", pageId: "P03", icon: "house" },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
-      ],
-    },
-    {
-      label: "Cases",
-      entries: [
-        {
-          label: "Executive cases",
-          href: "/cases",
-          pageId: "P21",
-          icon: "tray",
-        },
+        { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
       ],
     },
   ],
@@ -535,12 +529,35 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       entries: [
         { label: "Home", href: "/home", pageId: "P03", icon: "house" },
         { label: "Accounts", href: "/accounts", icon: "users" },
+        {
+          label: "Faculty load",
+          href: "/faculty-load",
+          pageId: "P54",
+          icon: "calendar",
+        },
+        {
+          label: "Referred items",
+          href: "/admin/moderation",
+          pageId: "P49",
+          icon: "flag",
+        },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
         {
           label: "Organizations",
           href: "/organizations",
           pageId: "P09",
           icon: "flag",
+        },
+      ],
+    },
+    {
+      label: "Records",
+      entries: [
+        {
+          label: "Clearance",
+          href: "/clearance",
+          pageId: "P53",
+          icon: "list-checks",
         },
       ],
     },
@@ -562,6 +579,9 @@ export const accountNavigation: RoleGroup[] = [
 ];
 
 
+/** Account and utility pages. They sit in the top bar (or are the Home site), not in the main navigation panel. */
+const utilityHrefs = ["/home", "/notifications", "/assistant", "/profile", "/help", "/settings"];
+
 // Only a successful sign-out clears the cache and leaves the page - a failed request must
 // keep the person right where they are, with the server session (and the cache) intact.
 function useSignOut() {
@@ -576,20 +596,81 @@ function useSignOut() {
   });
 }
 
+/** The theme a saved setting resolves to right now ("system" follows the device). */
+function resolvedTheme(theme: string) {
+  if (theme === "light" || theme === "dark") return theme;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Light / dark switch in the top bar. It applies at once and saves the choice with the same settings action as the
+ * Settings page (Settings keeps "Match my device" for following the device again).
+ */
+function ThemeToggle() {
+  const queryClient = useQueryClient();
+  const appearance = useQuery(pageQuery("P43"));
+  const settings = appearance.data?.data.settings as { theme?: unknown; density?: unknown } | undefined;
+  const saved = typeof settings?.theme === "string" ? settings.theme : "system";
+  const density = typeof settings?.density === "string" ? settings.density : "comfortable";
+  const [current, setCurrent] = useState(() => resolvedTheme(saved));
+  useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
+  // Following the device: track its light/dark changes so the switch offers the other theme.
+  useEffect(() => {
+    if (saved !== "system" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const follow = () => setCurrent(media.matches ? "dark" : "light");
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, [saved]);
+  const save = useMutation({
+    mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
+    // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
+    onError: (error) => {
+      const restored = resolvedTheme(saved);
+      if (saved === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", restored);
+      setCurrent(restored);
+      toast(apiErrorText(error));
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
+  });
+  const next = current === "dark" ? "light" : "dark";
+  return (
+    <IconButton
+      icon={current === "dark" ? "sun" : "moon"}
+      label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
+      // Off until the saved settings are known, so saving the theme never replaces the saved density with a default.
+      isDisabled={!appearance.isSuccess || save.isPending}
+      onPress={() => {
+        document.documentElement.setAttribute("data-theme", next);
+        setCurrent(next);
+        save.mutate(next);
+      }}
+    />
+  );
+}
+
 function Topbar({
   title,
   site,
+  session,
+  accountLinks,
   onMenu,
+  onSignOut,
 }: {
   title: string;
   site: SiteId;
+  session: Session;
+  accountLinks: NavEntry[];
   onMenu: () => void;
+  onSignOut: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const notifications = useQuery(pageQuery("P40"));
+  // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
+  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
     mutationFn: (action: {
       action: "markNotification";
@@ -626,6 +707,27 @@ function Topbar({
 
   const { recent: recentNotifications, unreadCount } =
     notificationsFromQuery(notifications);
+
+  // A pop-up for each notification that arrives while the portal is open; the ones already there on load stay quiet.
+  const seenNotifications = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const fresh = newNotifications(seenNotifications, notifications.isSuccess ? notifications.data?.data.notifications : undefined);
+    if (!fresh.length) return;
+    // An open conversation or message list shows the new message right away.
+    if (fresh.some((notice) => notice.kind === "message")) {
+      void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
+    }
+    for (const notice of fresh.slice(0, 3)) {
+      const body = String(notice.body ?? "");
+      toast(String(notice.title ?? "New update"), {
+        ...(body && !body.startsWith("Open this update") ? { description: body } : {}),
+        action: { label: "Open", onAction: () => void openNotification(notice) },
+      });
+    }
+    if (fresh.length > 3) toast(`${fresh.length - 3} more new notifications`, { action: { label: "View all", onAction: () => router.history.push("/notifications") } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifications.data]);
   const siteLabel = siteById[site].label;
 
   return (
@@ -665,6 +767,7 @@ function Topbar({
               onChange={setSearch}
             />
           </form>
+          <ThemeToggle />
           <IconButton
             icon="chat"
             label="Assistant"
@@ -674,7 +777,8 @@ function Topbar({
             trigger={
               <IconButton
                 icon="bell"
-                dot={unreadCount > 0}
+                className="shell-bell"
+                data-count={unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : undefined}
                 label={
                   unreadCount
                     ? `Notifications, ${unreadCount} unread`
@@ -729,6 +833,7 @@ function Topbar({
               </Stack>
             )}
           </Popover>
+          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
         </div>
       </header>
       <Drawer
@@ -769,6 +874,20 @@ export function AppChrome({
     { label: "Settings", href: "/settings", pageId: "P43", icon: "gear" },
     { label: "Help", href: "/help", pageId: "P42", icon: "question" },
   ].filter((link) => allowed.has(link.pageId));
+  // The top bar already has the bell, so its account menu leaves Notifications out. The drawer lists everything.
+  const menuLinks = accountLinks.filter((link) => link.href !== "/notifications");
+  // These live in the top bar (Assistant, Notifications, the account menu) or are Home itself, so the panel does not repeat them.
+  const panelGroups = groups
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
+    }))
+    .filter((group) => group.entries.length > 0);
+  const panelCurrent = panelGroups.some((group) =>
+    group.entries.some((entry) => entry.href === current),
+  )
+    ? current
+    : undefined;
   const restricted =
     session.user.restrictions.length > 0 &&
     session.user.roles.includes("student");
@@ -793,7 +912,6 @@ export function AppChrome({
       "dean",
       "guidance",
       "osas",
-      "president",
     ].includes(role),
   )
     ? "compact"
@@ -864,26 +982,22 @@ export function AppChrome({
           {apiErrorText(signOutAction.error)} You&apos;re still signed in on this device.
         </Alert>
       )}
-      <div className="shell-frame" data-sidebar={groups.length > 0}>
-        <SiteRail
+      <div className="shell-frame">
+        <SitePanel
           destinations={destinations}
           current={site}
-          session={session}
-          accountLinks={accountLinks}
-          onSignOut={() => void onSignOut()}
+          groups={panelGroups}
+          currentHref={panelCurrent}
         />
-        {groups.length > 0 && (
-          <SiteSidebar
+        <div className="shell-main">
+          <Topbar
+            title={title}
             site={site}
-            groups={groups}
-            current={current}
             session={session}
-            profileHref={allowed.has("P39") ? "/profile" : undefined}
+            accountLinks={menuLinks}
+            onMenu={() => setMenuOpen(true)}
             onSignOut={() => void onSignOut()}
           />
-        )}
-        <div className="shell-main">
-          <Topbar title={title} site={site} onMenu={() => setMenuOpen(true)} />
           <main className="shell-content" id="main-content" tabIndex={-1}>
             <div className="shell-content__inner">
               <div className="shell-page">{children}</div>

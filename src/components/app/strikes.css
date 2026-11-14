@@ -1,0 +1,13 @@
+/* Strikes on the case page (P22) and the student record (P34). */
+.st-hint { margin: 0; color: var(--accs-muted); font-size: 0.875rem; line-height: 1.5; }
+.st-list { display: grid; gap: 4px; margin: 0; padding-inline-start: 20px; color: var(--accs-ink-2); font-size: 0.875rem; }
+.st-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.st-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.st-row__body { display: grid; gap: 4px; min-width: 0; }
+.st-row__title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; font-weight: 600; color: var(--accs-ink); }
+.st-row__meta { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }
+.st-row__note { margin: 0; color: var(--accs-ink-2); font-size: 0.875rem; overflow-wrap: anywhere; }
+.st-row__time { flex: none; color: var(--accs-muted); font-size: 0.8125rem; white-space: nowrap; }
+.st-decide { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--accs-line); }
+.st-decide p { margin: 0; }
+.st-clearance { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; }

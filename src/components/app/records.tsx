@@ -1,3 +1,5 @@
+import { PagedList } from '@/components/app/paging'
+import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
   Alert,
   Button,
@@ -30,6 +32,7 @@ import {
   StatusChip,
   siteCrumb,
   toneFor,
+  type Tone,
 } from "@/components/app/page-shell";
 import { BarChart, CountUp, TrendChart } from "@/components/ds-next/charts";
 import {
@@ -392,45 +395,49 @@ export function RestrictionPanel({
   return (
     <Panel flush title={title}>
       {ordered.length ? (
-        <ul className="accs-rows">
-          {ordered.map((restriction, index) => (
-            <li key={word(restriction.id, String(index))}>
-              <div className="accs-row rc-row">
-                <div>
-                  <p className="accs-row__title">
-                    {features(restriction).join(", ") || "Restricted features"}
-                  </p>
-                  <p className="accs-row__sub">
-                    {word(restriction.basis, "No basis given")}
-                    {Boolean(restriction.decisionReference) && (
-                      <>
-                        {" · "}
-                        <span className="accs-mono">
-                          {word(restriction.decisionReference)}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                  <p className="accs-row__sub">
-                    {firstRole(
-                      object(restriction.authorizer).roles,
-                      word(restriction.actorRole, "Office not recorded"),
-                    )}
-                  </p>
+        <PagedList items={ordered} noun="restrictions">
+          {(ordered) => (
+          <ul className="accs-rows">
+            {ordered.map((restriction, index) => (
+              <li key={word(restriction.id, String(index))}>
+                <div className="accs-row rc-row">
+                  <div>
+                    <p className="accs-row__title">
+                      {features(restriction).join(", ") || "Restricted features"}
+                    </p>
+                    <p className="accs-row__sub">
+                      {word(restriction.basis, "No basis given")}
+                      {Boolean(restriction.decisionReference) && (
+                        <>
+                          {" · "}
+                          <span className="accs-mono">
+                            {word(restriction.decisionReference)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    <p className="accs-row__sub">
+                      {firstRole(
+                        object(restriction.authorizer).roles,
+                        word(restriction.actorRole, "Office not recorded"),
+                      )}
+                    </p>
+                  </div>
+                  <div className="rc-row__aside">
+                    <StatusChip tone={restriction.active === true ? "warn" : "neutral"}>
+                      {restriction.active === true ? "Active" : "Ended"}
+                    </StatusChip>
+                    <span className="accs-mono">
+                      {formatDate(restriction.starts)} to{" "}
+                      {formatDate(restriction.until)}
+                    </span>
+                  </div>
                 </div>
-                <div className="rc-row__aside">
-                  <StatusChip tone={restriction.active === true ? "warn" : "neutral"}>
-                    {restriction.active === true ? "Active" : "Ended"}
-                  </StatusChip>
-                  <span className="accs-mono">
-                    {formatDate(restriction.starts)} to{" "}
-                    {formatDate(restriction.until)}
-                  </span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No restrictions">
           This student has no restrictions on record.
@@ -454,32 +461,36 @@ export function AuditLog({
       action={<span className="accs-mono rc-muted">{entries.length}</span>}
     >
       {entries.length ? (
-        <div className="rc-scroll">
-          <table className="accs-table">
-            <thead>
-              <tr>
-                <th scope="col">When</th>
-                <th scope="col">Actor</th>
-                <th scope="col">Action</th>
-                <th scope="col">Module</th>
-                <th scope="col">Reference</th>
-                <th scope="col">Purpose</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry, index) => (
-                <tr key={word(entry.id, String(index))}>
-                  <td className="accs-mono">{formatDateTime(entry.at)}</td>
-                  <td>{word(object(entry.actor).name, "Unknown user")}</td>
-                  <td>{word(entry.action, "—")}</td>
-                  <td>{word(entry.module, "—")}</td>
-                  <td className="accs-mono">{word(entry.reference, "—")}</td>
-                  <td>{word(entry.purpose, "—")}</td>
+        <PagedList items={entries} noun="entries">
+          {(entries) => (
+          <div className="rc-scroll">
+            <table className="accs-table">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Actor</th>
+                  <th scope="col">Action</th>
+                  <th scope="col">Module</th>
+                  <th scope="col">Reference</th>
+                  <th scope="col">Purpose</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {entries.map((entry, index) => (
+                  <tr key={word(entry.id, String(index))}>
+                    <td className="accs-mono">{formatDateTime(entry.at)}</td>
+                    <td>{word(object(entry.actor).name, "Unknown user")}</td>
+                    <td>{word(entry.action, "—")}</td>
+                    <td>{word(entry.module, "—")}</td>
+                    <td className="accs-mono">{word(entry.reference, "—")}</td>
+                    <td>{word(entry.purpose, "—")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No entries yet" />
       )}
@@ -571,11 +582,15 @@ function ClusterList({ page }: { page: PageEnvelope }) {
       </Note>
       {clusters.length ? (
         <Panel flush>
-          <ul className="accs-rows">
-            {clusters.map((cluster) => (
-              <ClusterRow key={word(cluster.id)} cluster={cluster} />
-            ))}
-          </ul>
+          <PagedList items={clusters} noun="groups">
+            {(clusters) => (
+            <ul className="accs-rows">
+              {clusters.map((cluster) => (
+                <ClusterRow key={word(cluster.id)} cluster={cluster} />
+              ))}
+            </ul>
+            )}
+          </PagedList>
         </Panel>
       ) : (
         <Panel>
@@ -750,7 +765,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 
 /* ---------- Analytics ---------- */
 
-const stages = ["adviser", "chair", "dean", "guidance", "osas", "executive"];
+const stages = ["adviser", "chair", "dean", "guidance", "osas"];
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 function Analytics({ page }: { page: PageEnvelope }) {
@@ -762,6 +777,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const stageRows = items(page.data.byStage);
   const categories = items(page.data.byCategory);
   const trend = items(page.data.trend);
+  const waiting = items(page.data.waitingByStage);
   const cases = items(page.data.cases);
   const updateFilter = (name: string, value: string) => {
     const next = new URLSearchParams(location.searchStr);
@@ -908,6 +924,21 @@ function Analytics({ page }: { page: PageEnvelope }) {
             Categories with too few cases show as suppressed.
           </p>
         </Panel>
+        {waiting.length > 0 && (
+          <Panel title="Median days waiting by stage" className="rc-span">
+            <BarChart
+              title="Median days waiting by stage"
+              hideTitle
+              data={waiting.map((row) => ({
+                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
+                value: Number(row.value ?? 0),
+              }))}
+            />
+            <p className="rc-policy">
+              Days since each open concern reached its current stage, as the median for that stage.
+            </p>
+          </Panel>
+        )}
         <Panel title="Opened and resolved reports" className="rc-span">
           <TrendChart
             title="Opened and resolved reports"
@@ -930,42 +961,46 @@ function Analytics({ page }: { page: PageEnvelope }) {
         action={<span className="accs-mono rc-muted">{cases.length}</span>}
       >
         {cases.length ? (
-          <div className="rc-scroll">
-            <table className="accs-table">
-              <thead>
-                <tr>
-                  <th scope="col">Reference</th>
-                  <th scope="col">Stage</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cases.map((entry) => (
-                  <tr key={word(entry.id)}>
-                    <td>
-                      <Link
-                        variant="quiet"
-                        className="rc-ref accs-mono"
-                        href={"/cases/" + encodeURIComponent(word(entry.id))}
-                      >
-                        {word(entry.id)}
-                      </Link>
-                    </td>
-                    <td>
-                      {cap(word(entry.stage, "—"))}
-                    </td>
-                    <td>
-                      <StatusChip tone={toneFor(word(entry.status))}>
-                        {word(entry.status, "—")}
-                      </StatusChip>
-                    </td>
-                    <td className="accs-mono">{formatDate(entry.createdAt)}</td>
+          <PagedList items={cases} noun="cases">
+            {(cases) => (
+            <div className="rc-scroll">
+              <table className="accs-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Stage</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Opened</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {cases.map((entry) => (
+                    <tr key={word(entry.id)}>
+                      <td>
+                        <Link
+                          variant="quiet"
+                          className="rc-ref accs-mono"
+                          href={"/cases/" + encodeURIComponent(word(entry.id))}
+                        >
+                          {word(entry.id)}
+                        </Link>
+                      </td>
+                      <td>
+                        {cap(word(entry.stage, "—"))}
+                      </td>
+                      <td>
+                        <StatusChip tone={toneFor(word(entry.status))}>
+                          {word(entry.status, "—")}
+                        </StatusChip>
+                      </td>
+                      <td className="accs-mono">{formatDate(entry.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Empty title="No cases match these filters">
             Change or clear a filter.
@@ -1083,77 +1118,81 @@ function RecordList({ page }: { page: PageEnvelope }) {
         {students.length === 1 ? "student" : "students"}
       </p>
       {matching.length ? (
-        <div className="accs-table-wrap rc-table-wrap">
-          <table className="accs-table rc-table">
-            <caption className="rc-sr">Student records</caption>
-            <thead>
-              <tr>
-                <th scope="col">Student</th>
-                <th scope="col">Student ID</th>
-                <th scope="col">Program</th>
-                <th scope="col">Standing</th>
-                <th scope="col" className="accs-num">
-                  Restrictions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <AnimatePresence initial>
-                {matching.map((student, index) => {
-                  const count = Array.isArray(student.restrictions)
-                    ? student.restrictions.length
-                    : undefined;
-                  return (
-                    <motion.tr
-                      key={word(student.id)}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                        transition: {
-                          duration: 0.28,
-                          ease,
-                          delay: Math.min(index, 8) * 0.03,
-                        },
-                      }}
-                      exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                    >
-                      <td>
-                        <PersonCell
-                          name={word(student.name, "—")}
-                          href={"/records/" + encodeURIComponent(word(student.id))}
-                        />
-                      </td>
-                      <td className="accs-mono">{word(student.studentId, "—")}</td>
-                      <td>
-                        <span className="rc-tags">
-                          <span className="accs-tag">{word(student.program, "—")}</span>
-                          <span className="rc-muted">Section {word(student.section, "—")}</span>
-                        </span>
-                      </td>
-                      <td>
-                        {isPaused(student.standing) ? (
-                          <StandingBadge standing={student.standing} />
-                        ) : (
-                          <span className="rc-muted">Good standing</span>
-                        )}
-                      </td>
-                      <td className="accs-num">
-                        {count ? (
-                          count
-                        ) : hasRestrictions(student) ? (
-                          <StatusChip tone="warn">Active</StatusChip>
-                        ) : (
-                          <span className="rc-muted">None</span>
-                        )}
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </AnimatePresence>
-            </tbody>
-          </table>
-        </div>
+        <PagedList items={matching} noun="students">
+          {(matching) => (
+          <div className="accs-table-wrap rc-table-wrap">
+            <table className="accs-table rc-table">
+              <caption className="rc-sr">Student records</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Student</th>
+                  <th scope="col">Student ID</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Standing</th>
+                  <th scope="col" className="accs-num">
+                    Restrictions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence initial>
+                  {matching.map((student, index) => {
+                    const count = Array.isArray(student.restrictions)
+                      ? student.restrictions.length
+                      : undefined;
+                    return (
+                      <motion.tr
+                        key={word(student.id)}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                          transition: {
+                            duration: 0.28,
+                            ease,
+                            delay: Math.min(index, 8) * 0.03,
+                          },
+                        }}
+                        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                      >
+                        <td>
+                          <PersonCell
+                            name={word(student.name, "—")}
+                            href={"/records/" + encodeURIComponent(word(student.id))}
+                          />
+                        </td>
+                        <td className="accs-mono">{word(student.studentId, "—")}</td>
+                        <td>
+                          <span className="rc-tags">
+                            <span className="accs-tag">{word(student.program, "—")}</span>
+                            <span className="rc-muted">Section {word(student.section, "—")}</span>
+                          </span>
+                        </td>
+                        <td>
+                          {isPaused(student.standing) ? (
+                            <StandingBadge standing={student.standing} />
+                          ) : (
+                            <span className="rc-muted">Good standing</span>
+                          )}
+                        </td>
+                        <td className="accs-num">
+                          {count ? (
+                            count
+                          ) : hasRestrictions(student) ? (
+                            <StatusChip tone="warn">Active</StatusChip>
+                          ) : (
+                            <span className="rc-muted">None</span>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Panel>
           <Empty
@@ -1360,6 +1399,11 @@ function StudentRecord({
   const tabs: TabDef[] = [
     { id: "overview", label: "Overview" },
     { id: "offenses", label: "Offenses", count: offenses.length },
+    {
+      id: "strikes",
+      label: "Strikes and clearance",
+      count: items(record.strikes).filter((strike) => strikeStatus(strike) === "confirmed" && strike.settled !== true).length,
+    },
     { id: "restrictions", label: "Restrictions", count: activeRestrictions.length },
     ...(canGoodMoral ? [{ id: "good-moral", label: "Good Moral" }] : []),
     ...(accessHistory
@@ -1427,6 +1471,9 @@ function StudentRecord({
           actions={
             <>
               <StandingBadge standing={record.standing} />
+              {object(record.clearanceStatus).status === "on_hold" && (
+                <StatusChip tone="warn">Clearance on hold</StatusChip>
+              )}
               {activeRestrictions.length > 0 && (
                 <StatusChip tone="warn">Restriction active</StatusChip>
               )}
@@ -1466,6 +1513,9 @@ function StudentRecord({
             </div>
           )}
           {selectedTab === "offenses" && <OffenseHistory offenses={offenses} />}
+          {selectedTab === "strikes" && (
+            <StudentStrikes record={record} studentId={word(record.id, studentId)} />
+          )}
           {selectedTab === "restrictions" && (
             <>
               <RestrictionPanel restrictions={restrictions} />
@@ -1791,94 +1841,98 @@ function RestrictionRows({
       </Panel>
     );
   return (
-    <div className="accs-table-wrap rc-table-wrap">
-      <table className="accs-table rc-table">
-        <caption className="rc-sr">Restrictions</caption>
-        <thead>
-          <tr>
-            <th scope="col">Student</th>
-            <th scope="col">Paused features</th>
-            <th scope="col">Basis</th>
-            <th scope="col">Period</th>
-            <th scope="col">Status</th>
-            <th scope="col">
-              <span className="rc-sr">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((restriction, index) => {
-            const id = word(restriction.id, String(index));
-            const isActive = Boolean(restriction.active);
-            return (
-              <Fragment key={id}>
-                <tr>
-                  <td>
-                    <PersonCell
-                      name={word(object(restriction.student).name, "—")}
-                      sub={firstRole(object(restriction.authorizer).roles)}
-                    />
-                  </td>
-                  <td>{features(restriction).join(", ") || "—"}</td>
-                  <td className="rc-wrap">
-                    {word(restriction.basis, "—")}
-                    <p className="rc-person__sub accs-mono">
-                      {word(restriction.decisionReference, "—")}
-                    </p>
-                  </td>
-                  <td className="accs-mono">
-                    {formatDate(restriction.starts)} to{" "}
-                    {formatDate(restriction.until)}
-                  </td>
-                  <td>
-                    <StatusChip tone={isActive ? "warn" : "neutral"}>
-                      {isActive ? "Active" : "Ended"}
-                    </StatusChip>
-                  </td>
-                  <td className="rc-actions">
-                    {isActive && roles.includes("administrator") && (
-                      <Button
-                        variant="secondary"
-                        onPress={() => onLift(word(restriction.id))}
-                      >
-                        Lift restriction
-                      </Button>
-                    )}
-                    {isActive && canRefer && (
-                      <Button
-                        variant="secondary"
-                        onPress={() =>
-                          setRequestId(requestId === id ? "" : id)
-                        }
-                      >
-                        Request change
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-                {requestId === id && (
-                  <tr className="rc-form-row">
-                    <td colSpan={6}>
-                      <motion.div
-                        className="rc-expand"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        transition={{ duration: 0.32, ease }}
-                      >
-                        <RestrictionRequestForm
-                          restriction={restriction}
-                          onClose={() => setRequestId("")}
-                        />
-                      </motion.div>
+    <PagedList items={rows} noun="restrictions">
+      {(rows) => (
+      <div className="accs-table-wrap rc-table-wrap">
+        <table className="accs-table rc-table">
+          <caption className="rc-sr">Restrictions</caption>
+          <thead>
+            <tr>
+              <th scope="col">Student</th>
+              <th scope="col">Paused features</th>
+              <th scope="col">Basis</th>
+              <th scope="col">Period</th>
+              <th scope="col">Status</th>
+              <th scope="col">
+                <span className="rc-sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((restriction, index) => {
+              const id = word(restriction.id, String(index));
+              const isActive = Boolean(restriction.active);
+              return (
+                <Fragment key={id}>
+                  <tr>
+                    <td>
+                      <PersonCell
+                        name={word(object(restriction.student).name, "—")}
+                        sub={firstRole(object(restriction.authorizer).roles)}
+                      />
+                    </td>
+                    <td>{features(restriction).join(", ") || "—"}</td>
+                    <td className="rc-wrap">
+                      {word(restriction.basis, "—")}
+                      <p className="rc-person__sub accs-mono">
+                        {word(restriction.decisionReference, "—")}
+                      </p>
+                    </td>
+                    <td className="accs-mono">
+                      {formatDate(restriction.starts)} to{" "}
+                      {formatDate(restriction.until)}
+                    </td>
+                    <td>
+                      <StatusChip tone={isActive ? "warn" : "neutral"}>
+                        {isActive ? "Active" : "Ended"}
+                      </StatusChip>
+                    </td>
+                    <td className="rc-actions">
+                      {isActive && roles.includes("administrator") && (
+                        <Button
+                          variant="secondary"
+                          onPress={() => onLift(word(restriction.id))}
+                        >
+                          Lift restriction
+                        </Button>
+                      )}
+                      {isActive && canRefer && (
+                        <Button
+                          variant="secondary"
+                          onPress={() =>
+                            setRequestId(requestId === id ? "" : id)
+                          }
+                        >
+                          Request change
+                        </Button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  {requestId === id && (
+                    <tr className="rc-form-row">
+                      <td colSpan={6}>
+                        <motion.div
+                          className="rc-expand"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          transition={{ duration: 0.32, ease }}
+                        >
+                          <RestrictionRequestForm
+                            restriction={restriction}
+                            onClose={() => setRequestId("")}
+                          />
+                        </motion.div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      )}
+    </PagedList>
   );
 }
 
@@ -2046,6 +2100,25 @@ function StandingPage({ page }: { page: PageEnvelope }) {
         />
       }
     >
+      {Object.keys(object(record.clearance)).length > 0 && (
+        <Panel title="Clearance">
+          <p className="rc-clearance">
+            <ClearanceChip clearance={object(record.clearance)} />
+            <span>
+              {word(object(record.clearance).status) === "on_hold"
+                ? "Your clearance is on hold until these are done:"
+                : "Nothing is holding your clearance."}
+            </span>
+          </p>
+          {items(object(record.clearance).reasons).length > 0 && (
+            <ul className="rc-hold-reasons">
+              {items(object(record.clearance).reasons).map((reason, index) => (
+                <li key={index}>{word(reason.message)}</li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
       {restrictions.length > 0 && (
         <>
           <Panel flush title="Paused features">
@@ -2095,6 +2168,160 @@ function StandingPage({ page }: { page: PageEnvelope }) {
           Contact the Guidance Office
         </Link>
       </p>
+    </Screen>
+  );
+}
+
+/* ---------- Clearance (P53) ---------- */
+
+const evaluationTone: Record<string, Tone> = { submitted: "ok", pending: "warn", missing: "danger", none: "neutral" };
+
+/** "Finished", "Not finished: 1 of 2", "Missing: 0 of 2", or the label the API sent. */
+export function evaluationText(evaluation: Item) {
+  const status = word(evaluation.status);
+  const label = word(evaluation.label, status ? status : "—");
+  return status === "pending" || status === "missing"
+    ? `${label}: ${word(evaluation.submitted, "0")} of ${word(evaluation.total, "0")}`
+    : label;
+}
+
+function ClearanceChip({ clearance }: { clearance: Item }) {
+  const onHold = word(clearance.status) === "on_hold";
+  return <StatusChip tone={onHold ? "warn" : "ok"}>{word(clearance.label, onHold ? "On hold" : "Clear")}</StatusChip>;
+}
+
+function ClearanceList({ page }: { page: PageEnvelope }) {
+  const router = useRouter();
+  const location = useRouterState({ select: (state) => state.location });
+  const params = new URLSearchParams(location.searchStr);
+  const session = useQuery(sessionQuery());
+  const canOpenRecord = (session.data?.allowedPages ?? []).includes("P34");
+  const rows = items(page.data.students);
+  const cycles = items(page.data.cycles);
+  const cycle = object(page.data.cycle);
+  const summary = object(page.data.summary);
+  const clearanceSummary = object(page.data.clearanceSummary);
+  const filters = object(page.data.filters);
+  const programs = Array.isArray(filters.programs) ? filters.programs.map(String) : [];
+  // Every section in scope, plus the chosen one, so the filter stays visible and switchable when no student matches.
+  const sections = [...new Set([...(Array.isArray(filters.sections) ? filters.sections.map(String) : []), ...rows.map((row) => word(row.section)), params.get("section") ?? ""].filter(Boolean))].sort();
+  const [search, setSearch] = useState("");
+  const setParam = (changes: Record<string, string>) => {
+    const next = new URLSearchParams(location.searchStr);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    router.history.replace(location.pathname + (next.size ? "?" + next.toString() : ""));
+  };
+  const quick = params.get("clearance") === "on_hold" ? "hold" : params.get("status") === "pending,missing" ? "unfinished" : "all";
+  const needle = search.trim().toLowerCase();
+  const shown = rows.filter((row) => {
+    const student = object(row.student);
+    return !needle || `${word(student.name)} ${word(student.studentId)}`.toLowerCase().includes(needle);
+  });
+  const select = (label: string, key: string, options: Array<[string, string]>, all: string) => (
+    <Select label={label} selectedKey={params.get(key) ?? ""} onSelectionChange={(value) => setParam({ [key]: String(value ?? "") })}>
+      {[["", all] as [string, string], ...options].map(([id, name]) => <SelectOption id={id} key={id || "all"}>{name}</SelectOption>)}
+    </Select>
+  );
+  return (
+    <Screen
+      header={
+        <PageHeader
+          crumbs={[siteCrumb("/clearance"), { label: "Clearance" }]}
+          title="Clearance"
+          description={[word(filters.scope), word(cycle.title) && "Evaluation: " + word(cycle.title)].filter(Boolean).join(" · ")}
+        />
+      }
+    >
+      <Kpis label="Clearance summary">
+        <Kpi label="Finished evaluation" value={word(summary.submitted, "0")} />
+        <Kpi label="Not finished" value={word(summary.pending, "0")} note={word(cycle.status) === "Closed" ? undefined : "The cycle is still open"} />
+        <Kpi label="Missing" value={word(summary.missing, "0")} note="Cycle closed, not finished" />
+        <Kpi label="Clear" value={word(clearanceSummary.clear, "0")} />
+        <Kpi label="On hold" value={word(clearanceSummary.onHold, "0")} />
+      </Kpis>
+      <div className="accs-toolbar rc-toolbar" role="search">
+        <div className="accs-grow">
+          <Search label="Search by name or student ID" placeholder="Search name or student ID" size="sm" value={search} onChange={setSearch} />
+        </div>
+        <FilterField label="Show">
+          <Seg
+            label="Show"
+            value={quick}
+            onChange={(value) => setParam(value === "hold" ? { clearance: "on_hold", status: "" } : value === "unfinished" ? { status: "pending,missing", clearance: "" } : { status: "", clearance: "" })}
+            options={[
+              { id: "all", label: "All" },
+              { id: "unfinished", label: "Not finished" },
+              { id: "hold", label: "On hold" },
+            ]}
+          />
+        </FilterField>
+      </div>
+      <div className="rc-filters">
+        {cycles.length > 1 && select("Evaluation cycle", "cycle", cycles.map((entry) => [word(entry.id), word(entry.title)]), "Current cycle")}
+        {programs.length > 1 && select("Program", "program", programs.map((entry) => [entry, entry]), "All programs")}
+        {select("Year", "year", ["1", "2", "3", "4"].map((year) => [year, "Year " + year]), "All years")}
+        {sections.length > 0 && select("Section", "section", sections.map((entry) => [entry, "Section " + entry]), "All sections")}
+        {select("Evaluation", "status", [["submitted", "Finished"], ["pending", "Not finished"], ["missing", "Missing"], ["none", "Nothing to evaluate"], ["pending,missing", "Not finished or missing"]], "Any")}
+        {select("Clearance", "clearance", [["clear", "Clear"], ["on_hold", "On hold"]], "Any")}
+      </div>
+      <p className="rc-count" aria-live="polite">
+        {shown.length} {shown.length === 1 ? "student" : "students"}
+      </p>
+      {shown.length ? (
+        <PagedList items={shown} noun="students" resetKey={location.searchStr + needle}>
+          {(shown) => (
+            <div className="accs-table-wrap rc-table-wrap">
+              <table className="accs-table rc-table">
+                <caption className="rc-sr">Clearance</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Student</th>
+                    <th scope="col">Student ID</th>
+                    <th scope="col">Program</th>
+                    <th scope="col">Year</th>
+                    <th scope="col">Section</th>
+                    <th scope="col">Evaluation</th>
+                    <th scope="col">Clearance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((row, index) => {
+                    const student = object(row.student);
+                    const evaluation = object(row.evaluation);
+                    const clearance = object(row.clearance);
+                    const reasons = items(clearance.reasons);
+                    const name = word(student.name, "Student");
+                    return (
+                      <tr key={word(student.id, String(index))}>
+                        <td>
+                          {canOpenRecord && word(student.id)
+                            ? <Link variant="quiet" href={"/records/" + encodeURIComponent(word(student.id))}>{name}</Link>
+                            : name}
+                        </td>
+                        <td className="accs-mono">{word(student.studentId, "—")}</td>
+                        <td>{word(row.program, "—")}</td>
+                        <td>{word(row.year, "—")}</td>
+                        <td>{word(object(student).sectionName, word(row.section, "—"))}</td>
+                        <td>{row.evaluation ? <StatusChip tone={evaluationTone[word(evaluation.status)] ?? "neutral"}>{evaluationText(evaluation)}</StatusChip> : "—"}</td>
+                        <td>
+                          <ClearanceChip clearance={clearance} />
+                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i}>{word(reason.message)}</li>)}</ul>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </PagedList>
+      ) : (
+        <Empty title="No students match">Change the filters to see more students.</Empty>
+      )}
+      <Note>Clearance is on hold when the last closed evaluation cycle is not finished, or when strikes are not settled with OSAS.</Note>
     </Screen>
   );
 }
@@ -2150,6 +2377,8 @@ export function OversightScreen({ pageId }: { pageId: string }) {
       <StudentRecord page={page.data} studentId={recordId ?? ""} />
     ) : pageId === "P35" ? (
       <RestrictionManagement page={page.data} />
+    ) : pageId === "P53" ? (
+      <ClearanceList page={page.data} />
     ) : (
       <StandingPage page={page.data} />
     );

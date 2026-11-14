@@ -49,7 +49,7 @@ export function dateParts(value: unknown) {
   }
 }
 
-/** "Mira Solis" -> "MS". */
+/** "Demo Student Foxtrot" -> "DS". */
 export function initials(name: string) {
   return name
     .replace(/^(Prof\.|Dr\.)\s+/, '')

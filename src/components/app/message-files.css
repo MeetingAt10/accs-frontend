@@ -1,0 +1,61 @@
+/* Files in Messages: picture thumbnails, file chips, and the files waiting in the composer. */
+.mf-files { display: grid; gap: 6px; margin-top: 6px; justify-items: start; }
+.mf-pictures { display: grid; grid-template-columns: repeat(var(--mf-cols, 1), minmax(0, 1fr)); gap: 4px; width: min(100%, 22rem); }
+.mf-pictures[data-count='2'] { --mf-cols: 2; }
+.mf-pictures[data-count='3'] { --mf-cols: 3; }
+.mf-picture { display: block; overflow: hidden; border: 1px solid var(--accs-line); border-radius: 12px; background: var(--accs-sunken); aspect-ratio: 4 / 3; }
+.mf-pictures[data-count='1'] .mf-picture { aspect-ratio: auto; max-height: 18rem; }
+.mf-picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mf-pictures[data-count='1'] .mf-picture img { height: auto; max-height: 18rem; object-fit: contain; }
+.mf-picture__wait { display: grid; place-items: center; height: 100%; min-height: 6rem; color: var(--accs-faint); }
+.mf-picture:focus-visible, .mf-chip:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+
+.mf-chip {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  max-width: min(100%, 22rem);
+  padding: 8px 12px;
+  border: 1px solid var(--accs-line);
+  border-radius: 12px;
+  background: var(--accs-surface);
+  color: var(--accs-ink-2);
+  text-decoration: none;
+  transition: border-color 150ms var(--accs-ease-out), background 150ms var(--accs-ease-out);
+}
+.mf-chip:hover { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
+.mf-chip > svg:first-child { color: var(--site-accent-ink); }
+.mf-chip > svg:last-child { color: var(--accs-faint); }
+.mf-chip__text { display: grid; min-width: 0; }
+.mf-chip__text strong { overflow: hidden; color: var(--accs-ink); font-size: 0.875rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.mf-chip__text small { color: var(--accs-muted); font-size: 0.75rem; }
+
+.mf-pending { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mf-pending__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: 16rem;
+  padding: 6px 6px 6px 8px;
+  border: 1px solid var(--accs-line);
+  border-radius: 10px;
+  background: var(--accs-surface);
+}
+.mf-pending__item[data-state='uploading'] { opacity: 0.7; }
+.mf-pending__item[data-state='failed'] { border-color: var(--accs-danger); }
+.mf-pending__item[data-state='failed'] small { color: var(--accs-danger); }
+.mf-pending__item img, .mf-pending__icon { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.mf-pending__icon { display: grid; place-items: center; background: var(--accs-sunken); color: var(--accs-muted); }
+.mf-pending__remove { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--accs-muted); cursor: pointer; }
+.mf-pending__remove:hover { background: var(--accs-sunken); color: var(--accs-ink); }
+.mf-pending__remove:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 1px; }
+.mf-input { display: none; }
+
+.mf-picker { display: grid; gap: 10px; }
+.mf-picker__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mf-picker__bar small { color: var(--accs-muted); font-size: 0.8125rem; }
+.fx-post .mf-files { margin-top: 0; }
+.fx-post .mf-pictures { width: min(100%, 36rem); }
+.fx-post .mf-pictures[data-count='1'] .mf-picture, .fx-post .mf-pictures[data-count='1'] .mf-picture img { max-height: 28rem; }

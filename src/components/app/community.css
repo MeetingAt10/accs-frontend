@@ -129,7 +129,7 @@
   padding: 0 14px;
   border-radius: var(--accs-radius-control);
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
   font-size: 0.8125rem;
   font-weight: 650;
 }
@@ -694,3 +694,53 @@
     display: none;
   }
 }
+
+/* A flagged item its author can still see while it waits for review. */
+.fx-review { display: block; margin-top: 6px; color: var(--accs-warn-ink, var(--accs-muted)); font-size: 0.8125rem; }
+.fx-muted { color: var(--accs-muted); }
+
+/* ---------- Rail sections: each has its own colour and icon, so Announcements, spaces and organizations read apart. */
+.fx-rail-sec[data-tone='warn'] { --rail-ink: var(--accs-warn); --rail-wash: var(--accs-warn-bg); }
+.fx-rail-sec[data-tone='info'] { --rail-ink: var(--accs-info); --rail-wash: var(--accs-info-bg); }
+.fx-rail-sec[data-tone='ok'] { --rail-ink: var(--accs-ok); --rail-wash: var(--accs-ok-bg); }
+.fx-rail-title { display: inline-flex; align-items: center; gap: 8px; }
+.fx-rail-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--rail-ink, var(--accs-ink));
+  color: var(--accs-surface);
+}
+.fx-rail-count {
+  padding: 0 7px;
+  border-radius: var(--accs-radius-pill);
+  background: var(--rail-wash, var(--accs-sunken));
+  color: var(--rail-ink, var(--accs-muted));
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.fx-page a.fx-mini__row { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.fx-mini__mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--rail-wash, var(--accs-sunken));
+  color: var(--rail-ink, var(--accs-muted));
+}
+.fx-mini__text { display: grid; gap: 2px; min-width: 0; }
+.fx-mini__badge {
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border-radius: var(--accs-radius-pill);
+  background: var(--rail-wash, var(--accs-sunken));
+  color: var(--rail-ink, var(--accs-ink));
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.fx-rail { gap: 28px; }

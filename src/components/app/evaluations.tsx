@@ -1,8 +1,8 @@
+import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
   Checkbox,
-  CheckboxGroup,
   DatePicker,
   Disclosure,
   Icon,
@@ -117,12 +117,9 @@ function number(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-/** Drops server notes that describe the data as sample or prototype material. */
+/** A server note, or undefined when there is none. */
 function cleanNote(value: unknown): string | undefined {
-  const note = words(value);
-  return note && !/synthetic|sample|prototype|demo/i.test(note)
-    ? note
-    : undefined;
+  return words(value) || undefined;
 }
 
 function questions(value: unknown): EvaluationQuestion[] {
@@ -583,7 +580,35 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
       ) : (
         forms
       )}
-      {/* TBD(D-01): participation rules are undecided; no penalty or enforcement state is shown. */}
+      {Array.isArray(page.data.completion) && page.data.completion.length > 0 && (
+        <Panel flush title="Your completion">
+          <ul className="accs-rows">
+            {items(page.data.completion).map((entry) => {
+              const status = words(entry.status);
+              const label = words(entry.label, status);
+              const text = status === "pending" || status === "missing"
+                ? `${label}: ${words(entry.submitted, "0")} of ${words(entry.total, "0")}`
+                : label;
+              const tone = status === "submitted" ? "ok" : status === "missing" ? "danger" : status === "pending" ? "warn" : "neutral";
+              return (
+                <li key={words(entry.cycleId)}>
+                  <div className="accs-row ev-row">
+                    <div>
+                      <p className="accs-row__title">{words(entry.cycleTitle, "Evaluation cycle")}</p>
+                      <p className="accs-row__sub">
+                        {words(entry.cycleStatus)}
+                        {words(entry.closes) ? ` · closes ${formatDate(entry.closes)}` : ""}
+                      </p>
+                    </div>
+                    <StatusChip tone={tone}>{text}</StatusChip>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="ev-note">Finishing your evaluations is required for clearance once a cycle closes.</p>
+        </Panel>
+      )}
     </div>
   );
 }
@@ -908,6 +933,13 @@ function FacultyResults({
               data={criteria}
               referenceLabel={`${words(programAverage.program, "Program")} average`}
             />
+            {programAverage.released === false && (
+              <p className="ev-note">
+                {words(programAverage.program, "Program")} average available
+                when all evaluations are in ({number(programAverage.submitted)}{" "}
+                of {number(programAverage.assigned)}).
+              </p>
+            )}
           </Panel>
           <Panel flush title="Feedback themes">
             {themes.length ? (
@@ -1109,56 +1141,60 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
       </div>
       {responses > 0 ? (
         filtered.length ? (
-          <div className="accs-table-wrap">
-            <table className="accs-table" aria-label="Faculty evaluation results">
-              <thead>
-                <tr>
-                  <th scope="col">Faculty</th>
-                  <th scope="col">Program</th>
-                  <th scope="col" className="accs-num">
-                    Responses
-                  </th>
-                  <th scope="col">Overall average</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((result, index) => {
-                  const faculty = object(result.faculty);
-                  const name = words(faculty.name);
-                  return (
-                    <tr key={words(result.id)}>
-                      <td>
-                        <div className="ev-person">
-                          <Link
-                            href={
-                              "/evaluations/results/" +
-                              encodeURIComponent(words(result.id))
-                            }
-                          >
-                            {name}
-                          </Link>
-                        </div>
-                      </td>
-                      <td>{words(faculty.program, "CCS")}</td>
-                      <td className="accs-num">{number(result.responses)}</td>
-                      <td>
-                        <div className="ev-avg">
-                          <span className="accs-num">
-                            {number(result.average).toFixed(2)}
-                          </span>
-                          <Bar
-                            value={number(result.average)}
-                            max={5}
-                            index={Math.min(index, 8)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <PagedList items={filtered} noun="faculty">
+            {(filtered) => (
+            <div className="accs-table-wrap">
+              <table className="accs-table" aria-label="Faculty evaluation results">
+                <thead>
+                  <tr>
+                    <th scope="col">Faculty</th>
+                    <th scope="col">Program</th>
+                    <th scope="col" className="accs-num">
+                      Responses
+                    </th>
+                    <th scope="col">Overall average</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((result, index) => {
+                    const faculty = object(result.faculty);
+                    const name = words(faculty.name);
+                    return (
+                      <tr key={words(result.id)}>
+                        <td>
+                          <div className="ev-person">
+                            <Link
+                              href={
+                                "/evaluations/results/" +
+                                encodeURIComponent(words(result.id))
+                              }
+                            >
+                              {name}
+                            </Link>
+                          </div>
+                        </td>
+                        <td>{words(faculty.program, "CCS")}</td>
+                        <td className="accs-num">{number(result.responses)}</td>
+                        <td>
+                          <div className="ev-avg">
+                            <span className="accs-num">
+                              {number(result.average).toFixed(2)}
+                            </span>
+                            <Bar
+                              value={number(result.average)}
+                              max={5}
+                              index={Math.min(index, 8)}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Panel>
             <Empty title="No faculty match">Try a different name.</Empty>
@@ -1249,64 +1285,68 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
       )}
       {cycles.length ? (
         visible.length ? (
-          <div className="accs-table-wrap">
-            <table className="accs-table" aria-label="Evaluation cycles">
-              <thead>
-                <tr>
-                  <th scope="col">Cycle</th>
-                  <th scope="col">Term</th>
-                  <th scope="col">Dates</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Responses</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((cycle) => (
-                  <tr key={words(cycle.id)}>
-                    <td>
-                      <p className="ev-table-title">
-                        <Link
-                          href={
-                            "/evaluations/cycles/" +
-                            encodeURIComponent(words(cycle.id))
-                          }
-                        >
-                          {words(cycle.title)}
-                        </Link>
-                      </p>
-                      <p className="ev-table-sub">
-                        {strings(cycle.forms)
-                          .map(
-                            (form) => formLabels[form as EvaluationForm] ?? form,
-                          )
-                          .join(", ") || "No forms chosen"}
-                      </p>
-                    </td>
-                    <td>{words(cycle.term, "—")}</td>
-                    <td className="ev-dates">
-                      {formatDate(cycle.opens)} to {formatDate(cycle.closes)}
-                    </td>
-                    <td>
-                      <StatusChip tone={cycleTone(words(cycle.status))}>
-                        {words(cycle.status, "—")}
-                      </StatusChip>
-                    </td>
-                    <td>
-                      <div className="ev-comp">
-                        <Bar
-                          value={number(cycle.completion)}
-                          max={Math.max(1, number(cycle.assigned))}
-                        />
-                        <span>
-                          {number(cycle.completion)} of {number(cycle.assigned)}
-                        </span>
-                      </div>
-                    </td>
+          <PagedList items={visible} noun="cycles">
+            {(visible) => (
+            <div className="accs-table-wrap">
+              <table className="accs-table" aria-label="Evaluation cycles">
+                <thead>
+                  <tr>
+                    <th scope="col">Cycle</th>
+                    <th scope="col">Term</th>
+                    <th scope="col">Dates</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Responses</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visible.map((cycle) => (
+                    <tr key={words(cycle.id)}>
+                      <td>
+                        <p className="ev-table-title">
+                          <Link
+                            href={
+                              "/evaluations/cycles/" +
+                              encodeURIComponent(words(cycle.id))
+                            }
+                          >
+                            {words(cycle.title)}
+                          </Link>
+                        </p>
+                        <p className="ev-table-sub">
+                          {strings(cycle.forms)
+                            .map(
+                              (form) => formLabels[form as EvaluationForm] ?? form,
+                            )
+                            .join(", ") || "No forms chosen"}
+                        </p>
+                      </td>
+                      <td>{words(cycle.term, "—")}</td>
+                      <td className="ev-dates">
+                        {formatDate(cycle.opens)} to {formatDate(cycle.closes)}
+                      </td>
+                      <td>
+                        <StatusChip tone={cycleTone(words(cycle.status))}>
+                          {words(cycle.status, "—")}
+                        </StatusChip>
+                      </td>
+                      <td>
+                        <div className="ev-comp">
+                          <Bar
+                            value={number(cycle.completion)}
+                            max={Math.max(1, number(cycle.assigned))}
+                          />
+                          <span>
+                            {number(cycle.completion)} of {number(cycle.assigned)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </PagedList>
         ) : (
           <Panel>
             <Empty title="No cycles match">Change the search or status.</Empty>
@@ -1561,44 +1601,48 @@ function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
   return (
     <Panel flush title={title}>
       {rows.length ? (
-        <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
-          <table className="accs-table" aria-label={title}>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Program</th>
-                <th scope="col" className="accs-num">
-                  Assigned
-                </th>
-                <th scope="col" className="accs-num">
-                  Submitted
-                </th>
-                <th scope="col">Completion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((entry) => (
-                <tr key={words(entry.id)}>
-                  <td>{words(entry.title, words(entry.name))}</td>
-                  <td>{words(entry.program, "CCS")}</td>
-                  <td className="accs-num">{number(entry.assigned)}</td>
-                  <td className="accs-num">{number(entry.submitted)}</td>
-                  <td>
-                    <div className="ev-comp">
-                      <Bar
-                        value={number(entry.submitted)}
-                        max={Math.max(1, number(entry.assigned))}
-                      />
-                      <span>
-                        {number(entry.submitted)} of {number(entry.assigned)}
-                      </span>
-                    </div>
-                  </td>
+        <PagedList items={rows} noun="students">
+          {(rows) => (
+          <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
+            <table className="accs-table" aria-label={title}>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Program</th>
+                  <th scope="col" className="accs-num">
+                    Assigned
+                  </th>
+                  <th scope="col" className="accs-num">
+                    Submitted
+                  </th>
+                  <th scope="col">Completion</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((entry) => (
+                  <tr key={words(entry.id)}>
+                    <td>{words(entry.title, words(entry.name))}</td>
+                    <td>{words(entry.program, "CCS")}</td>
+                    <td className="accs-num">{number(entry.assigned)}</td>
+                    <td className="accs-num">{number(entry.submitted)}</td>
+                    <td>
+                      <div className="ev-comp">
+                        <Bar
+                          value={number(entry.submitted)}
+                          max={Math.max(1, number(entry.assigned))}
+                        />
+                        <span>
+                          {number(entry.submitted)} of {number(entry.assigned)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <Empty title="No assignments in this scope" />
       )}
@@ -1612,7 +1656,6 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const [instructions, setInstructions] = useState(words(record.instructions));
   const [opens, setOpens] = useState(words(record.opens));
   const [closes, setCloses] = useState(words(record.closes));
-  const [forms, setForms] = useState(strings(record.forms));
   const [formQuestions, setFormQuestions] = useState(
     questions(record.questions),
   );
@@ -1629,7 +1672,6 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     ...(!opens || !closes || closes < opens
       ? ["Open and close dates (close on or after open)"]
       : []),
-    ...(!forms.length ? ["At least one form"] : []),
     ...(!formQuestions.length ||
     formQuestions.some(
       (question) => !question.text.trim() || !question.criterion.trim(),
@@ -1653,7 +1695,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     instructions,
     opens,
     closes,
-    forms,
+    // Cycles use the student evaluation form only (MeetingAt10/accs-backend#47).
+    forms: ["student"],
     questions: formQuestions,
   };
 
@@ -1746,19 +1789,10 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             isDisabled={!editable}
           />
         </div>
-        <CheckboxGroup
-          label="Forms"
-          value={forms}
-          onChange={setForms}
-          isDisabled={!editable}
-          isRequired
-        >
-          {Object.entries(formLabels).map(([key, label]) => (
-            <Checkbox value={key} key={key}>
-              {label}
-            </Checkbox>
-          ))}
-        </CheckboxGroup>
+        <p className="ev-note">
+          Form: <strong>{formLabels.student}</strong>. Students evaluate the
+          faculty who teach their sections; it is the only form a cycle uses.
+        </p>
       </Panel>
       <Panel title="Participation">
         {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}

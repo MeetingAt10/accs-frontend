@@ -135,7 +135,7 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
   border: 0;
   border-radius: var(--accs-radius-control);
   background: var(--accs-navy);
-  color: #fff;
+  color: var(--accs-on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -166,7 +166,7 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
 }
 .au-seg label + label span { border-inline-start: 1px solid var(--accs-line-strong); }
 .au-seg label:hover input:not(:checked) ~ span { background: var(--accs-sunken); }
-.au-seg input:checked ~ span { color: #fff; }
+.au-seg input:checked ~ span { color: var(--accs-on-accent); }
 .au-seg__pill { position: absolute; inset: 0; background: var(--accs-navy); }
 .au-seg label:has(input:focus-visible) { outline: 2px solid var(--accs-navy); outline-offset: -2px; }
 .au-trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }

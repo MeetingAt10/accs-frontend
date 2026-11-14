@@ -1,3 +1,6 @@
+import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFileType, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
+import { roleLabelOf } from '@/lib/role-labels'
+import { Pager, usePaged } from '@/components/app/paging'
 import {
   Alert,
   Avatar,
@@ -42,6 +45,9 @@ import {
 } from "@/components/app/guards";
 import {
   ApiError,
+  apiErrorText,
+  uploadMessageFile,
+  type MessageFile,
   performPageAction,
   type PageAction,
   type PageEnvelope,
@@ -127,6 +133,14 @@ function Heading({
   );
 }
 
+/** A person matches when every word typed starts a word of their name. A leading @ is ignored, so "@rob" finds Robin. */
+export function matchesPerson(name: string, input: string) {
+  const typed = input.trim().replace(/^@/, '').toLowerCase().split(/\s+/).filter(Boolean)
+  if (!typed.length) return true
+  const parts = name.toLowerCase().split(/[\s.,-]+/).filter(Boolean)
+  return typed.every((word) => parts.some((part) => part.startsWith(word)))
+}
+
 function MessagesPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -175,6 +189,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     roles(member.roles).some((role) => ["guidance", "osas"].includes(role)),
   );
 
+  // New messages show without notifications too: muting a conversation must not stop it from updating while open.
+  useEffect(() => {
+    const timer = window.setInterval(() => void queryClient.invalidateQueries({ queryKey: ["page", page.pageId] }), 15_000);
+    return () => window.clearInterval(timer);
+  }, [queryClient, page.pageId]);
+
   useEffect(() => {
     if (!isThread || !conversationId) return;
     void performPageAction("P12", {
@@ -203,17 +223,61 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  // Files chosen with the paperclip upload right away; the message names the ones that finished.
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const readyFiles = pendingFiles.filter((file) => file.state === "ready");
+  const filesBusy = pendingFiles.some((file) => file.state === "uploading");
+  // Previews still open when Messages is left are released.
+  const latestFiles = useRef(pendingFiles);
+  latestFiles.current = pendingFiles;
+  useEffect(() => () => { for (const file of latestFiles.current) if (file.preview) URL.revokeObjectURL(file.preview); }, []);
+  // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
+  useEffect(() => {
+    setBody("");
+    setPendingFiles((current) => {
+      for (const file of current) if (file.preview) URL.revokeObjectURL(file.preview);
+      return [];
+    });
+  }, [conversationId]);
+  function removePendingFile(key: string) {
+    setPendingFiles((current) => {
+      const gone = current.find((file) => file.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return current.filter((file) => file.key !== key);
+    });
+  }
+  function addFiles(chosen: File[]) {
+    const room = messageFilesPerMessage - pendingFiles.length;
+    if (room <= 0) {
+      toast(`Send at most ${messageFilesPerMessage} files at a time.`);
+      return;
+    }
+    if (chosen.length > room) toast(`Only ${room} more ${room === 1 ? "file fits" : "files fit"} in this message.`);
+    for (const file of chosen.slice(0, room)) {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const problem = messageFileProblem(file);
+      const preview = !problem && file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+      setPendingFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? "failed" : "uploading", problem }]);
+      if (problem) continue;
+      uploadMessageFile(file, messageFileType(file))
+        .then((uploaded) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "ready", file: uploaded } : item))))
+        .catch((error) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "failed", problem: apiErrorText(error) } : item))));
+    }
+  }
+
   async function sendMessage() {
-    if (!body.trim() || action.isPending) return;
+    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending) return;
     try {
       await action.mutateAsync({
         action: "sendMessage",
         recordId: words(conversation.id),
-        payload: { body: body.trim() },
+        payload: { body: body.trim(), attachments: readyFiles.map((file) => file.file!) },
       });
       setBody("");
+      for (const file of pendingFiles) if (file.preview) URL.revokeObjectURL(file.preview);
+      setPendingFiles([]);
     } catch {
-      // The composer keeps the entered text after an error.
+      // The composer keeps the entered text and files after an error.
     }
   }
 
@@ -275,32 +339,19 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               <TabList aria-label="Conversation types">
                 <Tab
                   id="all"
-                  count={allThreads.reduce(
-                    (sum, thread) => sum + Number(thread.unread ?? 0),
-                    0,
-                  )}
+                  count={allThreads.length}
                 >
                   All
                 </Tab>
                 <Tab
                   id="direct"
-                  count={allThreads
-                    .filter((thread) => thread.kind === "direct")
-                    .reduce(
-                      (sum, thread) => sum + Number(thread.unread ?? 0),
-                      0,
-                    )}
+                  count={allThreads.filter((thread) => thread.kind === "direct").length}
                 >
                   Direct
                 </Tab>
                 <Tab
                   id="group"
-                  count={allThreads
-                    .filter((thread) => thread.kind === "group")
-                    .reduce(
-                      (sum, thread) => sum + Number(thread.unread ?? 0),
-                      0,
-                    )}
+                  count={allThreads.filter((thread) => thread.kind === "group").length}
                 >
                   Groups
                 </Tab>
@@ -398,11 +449,19 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                             />
                           )}
                           <MessageBubble
+                            photo={words(sender.photo)}
                             sender={words(sender.name, "ACCS member")}
-                            role={roles(sender.roles).join(" · ")}
-                            body={words(message.body)}
+                            role={roles(sender.roles).map(roleLabelOf).join(" · ")}
+                            body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
                             at={words(message.at)}
                             own={sender.id === session.data?.user.id}
+                            children={
+                              <MessageFiles
+                                threadId={words(conversation.id)}
+                                messageId={words(message.id)}
+                                files={(Array.isArray(message.attachments) ? message.attachments : []) as MessageFile[]}
+                              />
+                            }
                             actions={
                               <MenuButton
                                 label="Message actions"
@@ -444,6 +503,14 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                 onSend={() => void sendMessage()}
                 isPending={action.isPending}
                 attachments
+                onAddFiles={addFiles}
+                fileAccept={messageFileAccept}
+                files={<PendingFiles files={pendingFiles} onRemove={removePendingFile} />}
+                hasFiles={readyFiles.length > 0}
+                filesBusy={filesBusy}
+                mentions={members
+                  .filter((member) => member.id !== session.data?.user.id)
+                  .map((member) => ({ id: words(member.id), name: words(member.name) }))}
               />
             </Stack>
           )}
@@ -454,6 +521,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           <Stack gap={16}>
             <ComboBox
               label="To"
+              placeholder="Search people"
+              description="Type a name, or @ and a name."
+              defaultFilter={matchesPerson}
               selectedKey={recipientId || null}
               onSelectionChange={(key) => setRecipientId(String(key ?? ""))}
               emptyMessage="No matching recipients"
@@ -465,7 +535,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   key={words(recipient.id)}
                   textValue={words(recipient.name)}
                 >
-                  {words(recipient.name)} · {roles(recipient.roles).join(", ")}
+                  {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
                 </SelectOption>
               ))}
             </ComboBox>
@@ -624,7 +694,6 @@ const dayOf = (value: unknown) => {
 function NotificationsPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const [filter, setFilter] = useState("all");
-  const [shown, setShown] = useState(10);
   const [restrictedSource, setRestrictedSource] = useState(false);
   const action = useCommunicationAction("P40", false);
   const today = dayOf(new Date().toISOString());
@@ -643,7 +712,9 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
       (filter === "unread" && notice.read !== true) ||
       filter === "kind:" + words(notice.kind),
   );
-  const visible = filtered.slice(0, shown);
+  // Ten notifications a page; a new filter starts again at page 1.
+  const paged = usePaged(filtered, 10, filter);
+  const visible = paged.shown;
   const rows: ReactNode[] = [];
   visible.forEach((notice, index) => {
     const group = dayOf(notice.at) === today ? "Today" : "Earlier";
@@ -730,7 +801,6 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         value={filter}
         onChange={(next) => {
           setFilter(next);
-          setShown(10);
         }}
         options={[
           { id: "all", label: "All" },
@@ -750,19 +820,12 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         ) : (
           <Empty title="No notifications">
             {filter === "all"
-              ? "Updates about your reports, consultations, and messages show up here."
+              ? "Updates about your reports, appointments, and messages show up here."
               : "Nothing matches this filter."}
           </Empty>
         )}
       </Panel>
-      {filtered.length > shown && (
-        <Button
-          variant="secondary"
-          onPress={() => setShown((count) => count + 10)}
-        >
-          Load more
-        </Button>
-      )}
+      <Pager paged={paged} noun="notifications" />
     </div>
   );
 }
@@ -943,14 +1006,15 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
   const settings = object(page.data.settings);
   const saved = object(settings.priorities);
   const categories = roles(page.data.categories);
+  // Categories the server says cannot be turned off (for example report, case and evaluation updates).
+  const required = new Set(roles(page.data.requiredCategories));
   const [priorities, setPriorities] = useState<Record<string, Priority>>(() =>
     Object.fromEntries(
-      categories.map((category) => [
-        category,
-        ["high", "normal", "muted"].includes(words(saved[category]))
-          ? (saved[category] as Priority)
-          : "normal",
-      ]),
+      categories.map((category) => {
+        const value = words(saved[category]);
+        const known = ["high", "normal", "muted"].includes(value) ? (value as Priority) : "normal";
+        return [category, required.has(category) && known === "muted" ? "normal" : known];
+      }),
     ),
   );
   const action = useCommunicationAction("P44");
@@ -959,7 +1023,7 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
       ? "Report replies"
       : "New assigned reports",
     case: "Case milestones",
-    consultation: "Consultation updates",
+    consultation: "Appointment updates",
     message: "Messages",
     announcement: "Announcements",
     evaluation: "Evaluations",
@@ -992,6 +1056,7 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
                   <RadioGroup
                     row
                     label={categoryNames[category] ?? category}
+                    description={required.has(category) ? "Required. These updates can't be turned off." : undefined}
                     value={priorities[category] ?? "normal"}
                     onChange={(priority) =>
                       setPriorities((current) => ({
@@ -1002,14 +1067,14 @@ function NotificationPrioritiesPage({ page }: { page: PageEnvelope }) {
                   >
                     <Radio value="high">Urgent</Radio>
                     <Radio value="normal">Normal</Radio>
-                    <Radio value="muted">Off</Radio>
+                    {!required.has(category) && <Radio value="muted">Off</Radio>}
                   </RadioGroup>
+                  {required.has(category) && <span className="accs-tag cm-required">Required</span>}
                 </div>
               ))}
             </div>
           </Panel>
         ))}
-        {/* TBD(D-06): no category is marked mandatory until the required-category policy is approved. */}
         <p className="pt-scope">
           Email and other delivery channels are not set up yet. Priority
           choices never change your access to a report or case.

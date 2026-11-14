@@ -36,7 +36,7 @@
   padding: 0 6px;
   border-radius: var(--accs-radius-pill);
   background: var(--accs-ink);
-  color: #fff;
+  color: var(--accs-on-accent);
   font-size: 0.6875rem;
   line-height: 20px;
   text-align: center;
@@ -137,7 +137,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 .adm-pill { position: relative; isolation: isolate; min-height: 36px; }
 .accs-pill.adm-pill[aria-pressed='true'] { background: transparent; border-color: transparent; }
 .adm-pill__bg { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accs-ink); }
-.adm-pill[aria-pressed='true'] { color: #fff; }
+.adm-pill[aria-pressed='true'] { color: var(--accs-on-accent); }
 
 /* ---------- Tables ---------- */
 .adm-table-panel { overflow: hidden; }
@@ -294,7 +294,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 14px;
   background: var(--accs-ink);
-  color: #fff;
+  color: var(--accs-on-accent);
   box-shadow: var(--accs-shadow-pop);
 }
 .adm-proposed__head { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
@@ -357,3 +357,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 .adm-skeleton .accs-skeleton:nth-child(1) { height: 36px; width: min(320px, 70%); }
 .adm-skeleton .accs-skeleton:nth-child(2) { height: 84px; }
 .adm-skeleton .accs-skeleton:nth-child(3) { height: 280px; }
+
+/* A one-time reset code, large enough to read out to the account holder. */
+.adm-code { margin: 0 0 12px; font-size: 1.75rem; font-weight: 600; letter-spacing: 0.12em; color: var(--accs-ink); }
+.adm-hint { margin: 0 0 10px; color: var(--accs-muted); font-size: 0.875rem; line-height: 1.5; }

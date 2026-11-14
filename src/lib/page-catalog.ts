@@ -10,9 +10,9 @@ export const pageTitles: Record<string, string> = {
   P11: 'Messages',
   P12: 'Conversation',
   P13: 'Calendar',
-  P14: 'Consultations',
+  P14: 'Appointments',
   P15: 'Faculty availability',
-  P16: 'Consultation request',
+  P16: 'Appointment request',
   P17: 'Manage availability',
   P18: 'My reports',
   P19: 'New report',
@@ -49,6 +49,8 @@ export const pageTitles: Record<string, string> = {
   P50: 'Moderation review',
   P51: 'Audit trail',
   P52: 'Monitoring',
+  P54: 'Faculty load',
+  P53: 'Clearance',
   accounts: 'Accounts',
 }
 
@@ -99,10 +101,13 @@ export const routePermission: Record<string, string | string[]> = {
   P46: 'role.manage',
   P47: 'role.manage',
   P48: 'role.manage',
-  P49: 'moderation.review',
-  P50: 'moderation.review',
+  // The CCS Secretary decides items referred to them (D-04), as the API allows.
+  P49: ['moderation.review', 'moderation.referral'],
+  P50: ['moderation.review', 'moderation.referral'],
   P51: 'audit.view',
   P52: 'audit.view',
+  P54: 'load.manage',
+  P53: 'clearance.view',
   accounts: ['account.activateSecretary', 'account.provision'],
 }
 
@@ -117,6 +122,8 @@ export function pageAllowed(session: { allowedPages: string[]; permissions?: str
 
 export function pageIdForPath(path: string) {
   const rules: Array<[RegExp, string]> = [
+    [/^\/clearance$/, 'P53'],
+    [/^\/faculty-load$/, 'P54'],
     [/^\/admin\/users\/[^/]+$/, 'P47'],
     [/^\/admin\/users$/, 'P46'],
     [/^\/admin\/moderation\/[^/]+$/, 'P50'],

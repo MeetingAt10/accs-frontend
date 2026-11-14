@@ -1,3 +1,5 @@
+import { roleLabelOf } from '@/lib/role-labels'
+import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
@@ -41,6 +43,7 @@ import {
 } from "@/components/app/page-shell";
 import {
   ApiError,
+  issueResetCode,
   performPageAction,
   type PageAction,
   type PageEnvelope,
@@ -84,20 +87,18 @@ const roles: Role[] = [
   "administrator",
   "guidance",
   "osas",
-  "president",
   "secretary",
 ];
 const SHORT: Record<string, string> = {
   student: "Student",
   organization: "Student org",
   professor: "Professor",
-  staff: "CCS staff",
+  staff: "Staff",
   chair: "Chair",
   dean: "Dean",
-  administrator: "Admin",
+  administrator: "System admin",
   guidance: "Guidance",
   osas: "OSAS",
-  president: "President",
   secretary: "Secretary",
 };
 const FULL: Record<string, string> = {
@@ -107,14 +108,13 @@ const FULL: Record<string, string> = {
   staff: "CCS staff",
   chair: "Program chair",
   dean: "Dean",
-  administrator: "Administrator / Moderator",
+  administrator: "System Administrator",
   guidance: "Guidance",
   osas: "OSAS",
-  president: "President's Office",
   secretary: "CCS secretary",
 };
 const roleShort = (role: string) => SHORT[role] ?? cap(role);
-const roleFull = (role: string) => FULL[role] ?? cap(role);
+const roleFull = (role: string) => roleLabelOf(role) || FULL[role] || cap(role);
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -309,7 +309,7 @@ const DECISIONS: Record<string, string> = {
   keep: "Kept, no action",
   remove: "Content removed",
   warn: "Removed, author warned",
-  refer: "Referred for authorized review",
+  refer: "Referred to the CCS Secretary",
 };
 
 /* ---------- P48 Permission matrix ---------- */
@@ -651,34 +651,38 @@ const NAV: Array<{ href: string; label: string }> = [
 
 function AuditTable({ rows }: { rows: Item[] }) {
   return (
-    <div className="adm-scroll">
-      <table className="accs-table adm-stack adm-table">
-        <thead>
-          <tr>
-            <th scope="col">Time</th>
-            <th scope="col">Actor</th>
-            <th scope="col">Action</th>
-            <th scope="col">Module</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((entry, index) => (
-            <tr key={word(entry.id, String(index))}>
-              <td data-label="Time">
-                <Time value={entry.at} />
-              </td>
-              <td data-label="Actor">
-                {word(object(entry.actor).name, "System")}
-              </td>
-              <td data-label="Action">{word(entry.action)}</td>
-              <td data-label="Module">
-                <span className="accs-tag">{word(entry.module, "—")}</span>
-              </td>
+    <PagedList items={rows} noun="events">
+      {(rows) => (
+      <div className="adm-scroll">
+        <table className="accs-table adm-stack adm-table">
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Actor</th>
+              <th scope="col">Action</th>
+              <th scope="col">Module</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((entry, index) => (
+              <tr key={word(entry.id, String(index))}>
+                <td data-label="Time">
+                  <Time value={entry.at} />
+                </td>
+                <td data-label="Actor">
+                  {word(object(entry.actor).name, "System")}
+                </td>
+                <td data-label="Action">{word(entry.action)}</td>
+                <td data-label="Module">
+                  <span className="accs-tag">{word(entry.module, "—")}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      )}
+    </PagedList>
   );
 }
 
@@ -906,60 +910,64 @@ function UsersPage({ page }: { page: PageEnvelope }) {
         </span>
       </div>
       {results.length ? (
-        <div className="accs-table-wrap">
-          <table className="accs-table adm-stack adm-table">
-            <thead>
-              <tr>
-                <th scope="col">User</th>
-                <th scope="col">Email</th>
-                <th scope="col">Roles</th>
-                <th scope="col">Program</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((user) => {
-                const name = word(user.name, "Unnamed account");
-                const active = user.active !== false;
-                return (
-                  <tr key={word(user.id)}>
-                    <td>
-                      <div className="adm-person">
-                        <span className="accs-avatar" aria-hidden>
-                          {initials(name)}
-                        </span>
-                        <span className="adm-person__text">
-                          <Link
-                            className="adm-link"
-                            variant="quiet"
-                            href={`/admin/users/${encodeURIComponent(word(user.id))}`}
-                          >
-                            {name}
-                          </Link>
-                          <span className="adm-person__sub accs-mono">
-                            {word(user.id)}
+        <PagedList items={results} noun="users">
+          {(results) => (
+          <div className="accs-table-wrap">
+            <table className="accs-table adm-stack adm-table">
+              <thead>
+                <tr>
+                  <th scope="col">User</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Roles</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((user) => {
+                  const name = word(user.name, "Unnamed account");
+                  const active = user.active !== false;
+                  return (
+                    <tr key={word(user.id)}>
+                      <td>
+                        <div className="adm-person">
+                          <span className="accs-avatar" aria-hidden>
+                            {initials(name)}
                           </span>
-                        </span>
-                      </div>
-                    </td>
-                    <td data-label="Email">{word(user.email, "—")}</td>
-                    <td data-label="Roles">
-                      <Tags values={strings(user.roles)} />
-                    </td>
-                    <td data-label="Program">
-                      {word(user.program, word(user.office, "—"))}
-                    </td>
-                    <td data-label="Status">
-                      <StatusChip tone={active ? "ok" : "neutral"}>
-                        {active ? "Active" : "Inactive"}
-                      </StatusChip>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                          <span className="adm-person__text">
+                            <Link
+                              className="adm-link"
+                              variant="quiet"
+                              href={`/admin/users/${encodeURIComponent(word(user.id))}`}
+                            >
+                              {name}
+                            </Link>
+                            <span className="adm-person__sub accs-mono">
+                              {word(user.id)}
+                            </span>
+                          </span>
+                        </div>
+                      </td>
+                      <td data-label="Email">{word(user.email, "—")}</td>
+                      <td data-label="Roles">
+                        <Tags values={strings(user.roles)} />
+                      </td>
+                      <td data-label="Program">
+                        {word(user.program, word(user.office, "—"))}
+                      </td>
+                      <td data-label="Status">
+                        <StatusChip tone={active ? "ok" : "neutral"}>
+                          {active ? "Active" : "Inactive"}
+                        </StatusChip>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <div className="accs-panel">
           <Empty
@@ -1024,6 +1032,63 @@ function UsersPage({ page }: { page: PageEnvelope }) {
 }
 
 /* ---------- P47 User detail ---------- */
+
+/**
+ * Issues a password reset code for an account (POST /api/admin/accounts/:id/reset-code), for when email is not set up or
+ * the account has a sample address. The code is shown once, in the dialog, and dropped when the dialog closes.
+ */
+function ResetCodePanel({ accountId, name }: { accountId: string; name: string }) {
+  const session = useQuery(sessionQuery());
+  const [confirming, setConfirming] = useState(false);
+  const [issued, setIssued] = useState<{ code: string; expiresAt: string }>();
+  const [copied, setCopied] = useState(false);
+  const issue = useMutation({ mutationFn: () => issueResetCode(accountId) });
+  if (!session.data?.permissions.includes("role.manage")) return null;
+  const close = () => { setIssued(undefined); setCopied(false); issue.reset(); };
+  return (
+    <Panel title="Password reset">
+      <p className="adm-hint">
+        Give the account holder a one-time code to set a new password on the sign-in page. It expires in 15 minutes.
+      </p>
+      <Button variant="secondary" size="sm" onPress={() => { issue.reset(); setConfirming(true); }}>
+        Issue reset code
+      </Button>
+      <Modal role="alertdialog" title={`Issue a reset code for ${name}?`} isOpen={confirming} onOpenChange={setConfirming}>
+        <ModalBody>
+          <p>A new code replaces any earlier one. The audit trail records that you issued it.</p>
+          {issue.error && <Alert tone="danger" title="No code was issued">{issue.error.message}</Alert>}
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setConfirming(false)} isDisabled={issue.isPending}>Cancel</Button>
+          <Button
+            loading={issue.isPending}
+            onPress={() => issue.mutate(undefined, { onSuccess: (result) => { setIssued(result.record); setConfirming(false); } })}
+          >
+            Issue code
+          </Button>
+        </ModalActions>
+      </Modal>
+      <Modal title="Reset code" isOpen={Boolean(issued)} onOpenChange={(open) => !open && close()}>
+        <ModalBody>
+          <p className="adm-code accs-mono" aria-label="Reset code">{issued?.code}</p>
+          <p>
+            Give this code to {name}. It works once and expires at {issued ? formatDateTime(issued.expiresAt) : ""}. It is not
+            shown again after you close this.
+          </p>
+        </ModalBody>
+        <ModalActions>
+          <Button
+            variant="secondary"
+            onPress={() => { void navigator.clipboard?.writeText(issued?.code ?? "").then(() => setCopied(true)).catch(() => undefined); }}
+          >
+            {copied ? "Copied" : "Copy code"}
+          </Button>
+          <Button onPress={close}>Done</Button>
+        </ModalActions>
+      </Modal>
+    </Panel>
+  );
+}
 
 function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const record = object(page.data.record);
@@ -1148,6 +1213,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               ]}
             />
           </Panel>
+          {active && <ResetCodePanel accountId={word(record.id)} name={name} />}
           <Panel title="Restrictions">
             <Facts
               rows={[
@@ -1254,59 +1320,63 @@ function ModerationQueue({ page }: { page: PageEnvelope }) {
         </span>
       </div>
       {visible.length ? (
-        <div className="accs-table-wrap">
-          <table className="accs-table adm-stack adm-table">
-            <thead>
-              <tr>
-                <th scope="col">Content</th>
-                <th scope="col">Type</th>
-                <th scope="col">Reason</th>
-                <th scope="col">Source</th>
-                <th scope="col">Status</th>
-                <th scope="col">Reported</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((item) => (
-                <tr key={word(item.id)}>
-                  <td>
-                    <span className="adm-person__text">
-                      <Link
-                        className="adm-link"
-                        variant="quiet"
-                        href={`/admin/moderation/${encodeURIComponent(word(item.id))}`}
-                      >
-                        <span className="adm-trunc adm-trunc--wide">
-                          {word(item.excerpt, cap(word(item.itemType, "Item")))}
-                        </span>
-                      </Link>
-                      <span className="adm-person__sub accs-mono">
-                        {word(item.id)}
-                      </span>
-                    </span>
-                  </td>
-                  <td data-label="Type">
-                    <span className="accs-tag">
-                      {cap(word(item.itemType, "—"))}
-                    </span>
-                  </td>
-                  <td data-label="Reason">{word(item.reason, "—")}</td>
-                  <td data-label="Source">{word(item.source, "—")}</td>
-                  <td data-label="Status">
-                    <StatusChip tone={modTone(word(item.status))}>
-                      {word(item.status, "—")}
-                    </StatusChip>
-                  </td>
-                  <td data-label="Reported">
-                    <span className="adm-time" title={formatDateTime(item.at)}>
-                      {relativeTime(item.at)}
-                    </span>
-                  </td>
+        <PagedList items={visible} noun="items">
+          {(visible) => (
+          <div className="accs-table-wrap">
+            <table className="accs-table adm-stack adm-table">
+              <thead>
+                <tr>
+                  <th scope="col">Content</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Reported</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visible.map((item) => (
+                  <tr key={word(item.id)}>
+                    <td>
+                      <span className="adm-person__text">
+                        <Link
+                          className="adm-link"
+                          variant="quiet"
+                          href={`/admin/moderation/${encodeURIComponent(word(item.id))}`}
+                        >
+                          <span className="adm-trunc adm-trunc--wide">
+                            {word(item.excerpt, cap(word(item.itemType, "Item")))}
+                          </span>
+                        </Link>
+                        <span className="adm-person__sub accs-mono">
+                          {word(item.id)}
+                        </span>
+                      </span>
+                    </td>
+                    <td data-label="Type">
+                      <span className="accs-tag">
+                        {cap(word(item.itemType, "—"))}
+                      </span>
+                    </td>
+                    <td data-label="Reason">{word(item.reason, "—")}</td>
+                    <td data-label="Source">{word(item.source, "—")}</td>
+                    <td data-label="Status">
+                      <StatusChip tone={modTone(word(item.status))}>
+                        {word(item.status, "—")}
+                      </StatusChip>
+                    </td>
+                    <td data-label="Reported">
+                      <span className="adm-time" title={formatDateTime(item.at)}>
+                        {relativeTime(item.at)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+        </PagedList>
       ) : (
         <div className="accs-panel">
           <Empty title="Nothing to review">
@@ -1329,6 +1399,9 @@ function ModerationReview({
   page: PageEnvelope;
   itemId: string;
 }) {
+  const secretaryRole = useQuery(sessionQuery()).data?.user.roles ?? [];
+  // The CCS Secretary decides referred items; only moderators refer.
+  const secretary = secretaryRole.includes("secretary") && !secretaryRole.includes("administrator");
   const record = object(page.data.record);
   const action = useAction("P50");
   const [decision, setDecision] = useState("keep");
@@ -1411,11 +1484,13 @@ function ModerationReview({
                   <Radio value="warn" card>
                     Remove and warn the author
                   </Radio>
-                  <Radio value="refer" card isDisabled={!userReport}>
-                    {userReport
-                      ? "Refer as a possible grievance"
-                      : "Refer as a possible grievance (user reports only)"}
-                  </Radio>
+                  {!secretary && (
+                    <Radio value="refer" card isDisabled={!userReport} description="The CCS Secretary reviews it and decides.">
+                      {userReport
+                        ? "Refer to the CCS Secretary"
+                        : "Refer to the CCS Secretary (user reports only)"}
+                    </Radio>
+                  )}
                 </RadioGroup>
                 <TextArea
                   label="Reason"
@@ -1876,8 +1951,10 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     ),
   );
   const session = useQuery(sessionQuery());
+  // Moderation pages are also the Secretary's, for referred items; the rest of administration is the administrator's.
   const roleAllowed =
-    session.data?.user.roles.includes("administrator") === true;
+    session.data?.user.roles.includes("administrator") === true ||
+    (["P49", "P50"].includes(pageId) && session.data?.permissions.includes("moderation.referral") === true);
   if (session.isPending || page.isPending)
     return (
       <div

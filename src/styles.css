@@ -201,7 +201,7 @@ a.accs-kpi:hover { background: var(--accs-sunken); }
 .accs-pill[aria-pressed='true'], .accs-pill[aria-current='page'], .accs-pill[aria-selected='true'] {
   border-color: var(--accs-ink);
   background: var(--accs-ink);
-  color: #fff;
+  color: var(--accs-on-accent);
 }
 .accs-pill__count { font-variant-numeric: tabular-nums; opacity: 0.7; }
 
@@ -371,6 +371,49 @@ a.accs-row:hover, .accs-row--link:hover { background: var(--accs-sunken); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* Dark theme: the app's own tokens follow the design system's, so panels and text change together.
+   Without this the design-system text turns light on the fixed white panels above. */
+:root[data-theme='dark'] {
+  --accs-ink: var(--ds-text-primary);
+  --accs-ink-2: var(--ds-text-secondary);
+  --accs-muted: var(--ds-text-secondary);
+  --accs-faint: var(--ds-text-secondary);
+  --accs-paper: var(--ds-canvas);
+  --accs-surface: var(--ds-surface);
+  --accs-sunken: var(--ds-canvas);
+  --accs-line: var(--ds-border-subtle);
+  --accs-line-strong: var(--ds-border-default);
+  --accs-ok: var(--ds-success-fg);
+  --accs-ok-bg: var(--ds-success-bg);
+  --accs-warn: var(--ds-warning-fg);
+  --accs-warn-bg: var(--ds-warning-bg);
+  --accs-danger: var(--ds-danger-fg);
+  --accs-danger-bg: var(--ds-danger-bg);
+  --accs-info: var(--ds-info-fg);
+  --accs-info-bg: var(--ds-info-bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --accs-ink: var(--ds-text-primary);
+    --accs-ink-2: var(--ds-text-secondary);
+    --accs-muted: var(--ds-text-secondary);
+    --accs-faint: var(--ds-text-secondary);
+    --accs-paper: var(--ds-canvas);
+    --accs-surface: var(--ds-surface);
+    --accs-sunken: var(--ds-canvas);
+    --accs-line: var(--ds-border-subtle);
+    --accs-line-strong: var(--ds-border-default);
+    --accs-ok: var(--ds-success-fg);
+    --accs-ok-bg: var(--ds-success-bg);
+    --accs-warn: var(--ds-warning-fg);
+    --accs-warn-bg: var(--ds-warning-bg);
+    --accs-danger: var(--ds-danger-fg);
+    --accs-danger-bg: var(--ds-danger-bg);
+    --accs-info: var(--ds-info-fg);
+    --accs-info-bg: var(--ds-info-bg);
+  }
 }
 
 /* ---------- Legacy app rules (kept for existing markup) ---------- */

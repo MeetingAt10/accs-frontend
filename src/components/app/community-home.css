@@ -1,0 +1,73 @@
+/* Community Home (students and faculty). Built from the existing tokens and panels; only the header, tabs and composer are new. */
+
+.ch-head {
+  display: grid;
+  gap: 16px;
+  padding: 20px 20px 0;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-card);
+  background: var(--accs-surface);
+}
+.ch-head__eyebrow { margin: 0 0 4px; color: var(--accs-muted); font-size: 0.8125rem; }
+.ch-head__title { margin: 0; font-family: var(--accs-font-display); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; overflow-wrap: anywhere; }
+.ch-head__about { margin: 6px 0 0; max-width: 46rem; color: var(--accs-ink-2); line-height: 1.5; text-wrap: pretty; }
+.ch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Section tabs: a row of links with the current one underlined in the site accent. Scrolls sideways on a phone. */
+.ch-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 -20px;
+  padding: 0 12px;
+  border-top: 1px solid var(--accs-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ch-tab {
+  flex: none;
+  padding: 12px 12px 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--accs-ink-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 160ms var(--accs-ease), border-color 160ms var(--accs-ease);
+}
+a.ch-tab:hover { color: var(--accs-ink); border-bottom-color: var(--accs-line-strong); }
+.ch-tab[aria-current='page'] { border-bottom-color: var(--site-accent); color: var(--site-accent-ink); }
+
+.ch-composer { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px; }
+.ch-composer__field {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-pill);
+  background: var(--accs-sunken);
+  color: var(--accs-muted);
+  text-decoration: none;
+}
+.ch-composer__field:hover { border-color: var(--accs-line-strong); color: var(--accs-ink-2); }
+@media (max-width: 520px) {
+  .ch-composer { grid-template-columns: auto minmax(0, 1fr); }
+  .ch-composer > :last-child { grid-column: 1 / -1; justify-self: start; }
+}
+
+.ch-about { margin: 0; color: var(--accs-ink-2); line-height: 1.5; }
+.ch-about--meta { display: flex; align-items: flex-start; gap: 8px; color: var(--accs-muted); font-size: 0.8125rem; }
+.ch-about--meta svg { flex: none; margin-top: 2px; }
+.ch-links { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ch-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--accs-ink-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.ch-link:hover { background: var(--accs-sunken); color: var(--accs-ink); }

@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
+import { pageQuery } from '@/lib/queries'
+import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
@@ -43,61 +46,69 @@ export function NavLink({
   )
 }
 
-/** Dark 72px rail: one button per site the person may open, a sliding accent pill on the current one. */
-export function SiteRail({
+/** The primary navigation panel: the sites the person may open, with the current site's own links nested under it.
+ *  Account and utility links (profile, settings, help) live in the top bar, not here. */
+export function SitePanel({
   destinations,
   current,
-  session,
-  accountLinks,
-  onSignOut,
+  groups,
+  currentHref,
 }: {
   destinations: Destination[]
   current: SiteId
-  session: Session
-  accountLinks: NavEntry[]
-  onSignOut: () => void
+  groups: NavGroup[]
+  currentHref?: string
 }) {
   const slide = useSlide()
   return (
-    <div className="shell-rail">
-      <span className="shell-mark" aria-hidden>
-        A
-      </span>
-      <nav className="shell-rail__nav" aria-label="ACCS sites">
-        <LayoutGroup id="rail">
+    <aside className="shell-side" aria-label="Main navigation">
+      <div className="shell-side__head">
+        <span className="shell-mark" aria-hidden>
+          A
+        </span>
+        <p className="shell-side__name">ACCS</p>
+      </div>
+      <nav className="shell-side__nav" aria-label="ACCS sites">
+        <LayoutGroup id="panel">
           {destinations.map(({ site, href }) => {
             const isCurrent = site.id === current
+            // With a link under it highlighted, the site only reads as the section; otherwise it is the page.
+            const isPage = isCurrent && !currentHref
             return (
-              <NavLink
-                key={site.id}
-                href={href}
-                className="shell-rail__item"
-                title={`${site.label}. ${site.purpose}`}
-                aria-current={isCurrent ? 'page' : undefined}
-              >
-                {isCurrent && (
-                  <>
-                    <motion.span layoutId="rail-pill" className="shell-rail__pill" transition={slide} aria-hidden />
-                    <motion.span layoutId="rail-bar" className="shell-rail__bar" transition={slide} aria-hidden />
-                  </>
+              <div className="shell-group" key={site.id}>
+                <NavLink
+                  href={href}
+                  className="shell-nav-item"
+                  title={`${site.label}. ${site.purpose}`}
+                  data-section={isCurrent || undefined}
+                  aria-current={isPage ? 'page' : undefined}
+                >
+                  {isPage && <motion.span layoutId="panel-pill" className="shell-nav-item__pill" transition={slide} aria-hidden />}
+                  <Icon name={site.icon as never} size={20} weight={isCurrent ? 'fill' : 'regular'} />
+                  {site.label}
+                </NavLink>
+                {isCurrent && groups.length > 0 && (
+                  <div className="shell-sub">
+                    <SiteNav groups={groups} current={currentHref} />
+                  </div>
                 )}
-                <Icon name={site.icon as never} size={24} weight={isCurrent ? 'fill' : 'regular'} />
-                <span className="shell-rail__label">{site.label}</span>
-              </NavLink>
+              </div>
             )
           })}
         </LayoutGroup>
       </nav>
-      <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
-    </div>
+    </aside>
   )
 }
 
 /** Avatar button that pops a small account panel (scale-in). */
-function AccountMenu({ session, links, onSignOut }: { session: Session; links: NavEntry[]; onSignOut: () => void }) {
+export function AccountMenu({ session, links, onSignOut }: { session: Session; links: NavEntry[]; onSignOut: () => void }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
+  // The session leaves photos out (it is checked on every request); My profile has yours.
+  const own = useQuery({ ...pageQuery('P39'), enabled: session.allowedPages.includes('P39'), staleTime: 300_000 })
+  const ownPhoto = (own.data?.data.record as { photo?: unknown } | undefined)?.photo
   useEffect(() => {
     if (!open) return
     const away = (event: PointerEvent) => root.current?.contains(event.target as Node) || setOpen(false)
@@ -120,7 +131,7 @@ function AccountMenu({ session, links, onSignOut }: { session: Session; links: N
         title={session.user.name}
         onClick={() => setOpen((value) => !value)}
       >
-        {initials(session.user.name)}
+        <AvatarFill photo={ownPhoto} fallback={initials(session.user.name)} />
       </button>
       <AnimatePresence>
         {open && (
@@ -128,9 +139,9 @@ function AccountMenu({ session, links, onSignOut }: { session: Session; links: N
             className="shell-menu"
             role="group"
             aria-label="Account"
-            initial={reduce ? false : { opacity: 0, scale: 0.94, y: 6 }}
+            initial={reduce ? false : { opacity: 0, scale: 0.94, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={reduce ? undefined : { opacity: 0, scale: 0.96, y: 4 }}
+            exit={reduce ? undefined : { opacity: 0, scale: 0.96, y: -4 }}
             transition={{ duration: 0.2, ease: EASE }}
           >
             <div className="shell-menu__who">
@@ -192,58 +203,6 @@ export function SiteNav({
         </div>
       ))}
     </LayoutGroup>
-  )
-}
-
-/** Light sidebar: site name, nav groups, then the signed-in person. */
-export function SiteSidebar({
-  site,
-  groups,
-  current,
-  session,
-  profileHref,
-  onSignOut,
-}: {
-  site: SiteId
-  groups: NavGroup[]
-  current?: string
-  session: Session
-  profileHref?: string
-  onSignOut: () => void
-}) {
-  const info = siteById[site]
-  const who = (
-    <>
-      <span className="accs-avatar" aria-hidden>
-        {initials(session.user.name)}
-      </span>
-      <span className="shell-person__text">
-        <span className="shell-person__name">{session.user.name}</span>
-        <span className="shell-person__role">{session.user.roles.map(roleLabel).join(' · ')}</span>
-      </span>
-    </>
-  )
-  return (
-    <aside className="shell-side" aria-label={`${info.label} sidebar`}>
-      <div className="shell-side__head">
-        <p className="shell-side__name">{info.label}</p>
-      </div>
-      <nav className="shell-side__nav" aria-label={`${info.label} navigation`}>
-        <SiteNav groups={groups} current={current} />
-      </nav>
-      <div className="shell-person">
-        {profileHref ? (
-          <NavLink href={profileHref} className="shell-person__link">
-            {who}
-          </NavLink>
-        ) : (
-          <div className="shell-person__link">{who}</div>
-        )}
-        <button type="button" className="accs-icon-btn" aria-label="Sign out" title="Sign out" onClick={onSignOut}>
-          <Icon name="sign-out" size={20} />
-        </button>
-      </div>
-    </aside>
   )
 }
 

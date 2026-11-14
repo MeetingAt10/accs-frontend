@@ -1,4 +1,4 @@
-import { Alert, Button, Icon, ViewState } from '@meetingat10/design-system/react'
+import { Button, Icon, ViewState } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { useState, type ReactNode } from 'react'
@@ -9,6 +9,8 @@ import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
+import { CommunityHeader, dashboardStats, isCommunityRole } from '@/components/app/community-home'
+import { GettingStarted } from '@/components/app/getting-started'
 import { ModulePicker } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
@@ -107,37 +109,50 @@ function Sub({ children }: { children: ReactNode }) {
 function kpiTarget(label: string) {
   if (/queue/i.test(label)) return '/cases'
   if (/report|case/i.test(label)) return '/reports'
-  if (/consult/i.test(label)) return '/consultations'
+  if (/appoint|consult/i.test(label)) return '/consultations'
   if (/evaluation/i.test(label)) return '/evaluations'
   if (/unread|update|notification/i.test(label)) return '/notifications'
   if (/event|calendar/i.test(label)) return '/calendar'
   return undefined
 }
 
-function DashboardPanel({ data, role }: { data: Item; role: string }) {
+/** `lead` goes at the top of the main column and `intro` at the top of the side column (the community Home puts the composer and About there). */
+function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string; lead?: ReactNode; intro?: ReactNode }) {
   const allow = useAllow()
   const session = useQuery(sessionQuery())
   const me = session.data?.user.id
-  const stats = asItems(data.stats)
-  const announcements = asItems(data.announcements)
-  const posts = asItems(data.posts)
-  const reports = asItems(data.reports)
-  const cases = asItems(data.cases)
-  const sections = asItems(data.sections)
-  const consultations = asItems(data.consultations)
-  const todos = asItems(data.todos)
+  const community = isCommunityRole(role)
+  const stats = dashboardStats(asItems(data.stats), role)
+  // Each list on the home shows its five newest items; "View all" opens the rest.
+  const top = (items: Item[]) => items.slice(0, 5)
+  const announcements = top(asItems(data.announcements))
+  // A post already listed as an announcement is not repeated under "From your spaces".
+  const announced = new Set(asItems(data.announcements).map((item) => text(item.id)))
+  const posts = top(asItems(data.posts).filter((item) => !announced.has(text(item.id))))
+  const reports = top(asItems(data.reports))
+  const cases = top(asItems(data.cases))
+  const sections: Item[] = []
+  const consultations = top(asItems(data.consultations))
+  // To-dos live on the calendar and updates under the bell, so the home leaves them out.
+  const todos: Item[] = []
   const assignments = asItems(data.assignments)
-  const notes = asItems(data.notifications)
+  const notes: Item[] = []
   const today = manilaToday()
   const events = asItems(data.events)
     .filter((event) => dayKey(event.date) >= today)
     .sort((a, b) => dayKey(a.date).localeCompare(dayKey(b.date)) || text(a.start).localeCompare(text(b.start)))
-    .slice(0, 5)
+    .slice(0, 3)
   const submitted = assignments.filter((item) => /submitted/i.test(text(item.status))).length
   const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
   const empty =
     reports.length + cases.length + sections.length + consultations.length + announcements.length + posts.length +
       events.length + assignments.length + todos.length + notes.length === 0
+
+  // Students and faculty have no strip of summary cards; each count sits in the title of the card it counts.
+  const counted = (title: string, label: RegExp): ReactNode => {
+    const stat = community ? stats.find((entry) => label.test(text(entry.label))) : undefined
+    return stat ? <>{title} <span className="accs-tag">{text(stat.value)}</span></> : title
+  }
 
   const recordRows = (items: Item[], route: string) => (
     <Rows>
@@ -156,7 +171,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
 
   return (
     <div className="accs-stack">
-      {stats.length > 0 && (
+      {stats.length > 0 && !community && (
         <Kpis label="Overview">
           {stats.map((stat, index) => {
             const label = text(stat.label, 'Overview')
@@ -167,7 +182,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
                 key={text(stat.id, label + index)}
                 label={label}
                 value={<Counter value={stat.value} />}
-                note={/synthetic|demo|sample|prototype/i.test(note) ? undefined : note || undefined}
+                note={note || undefined}
                 href={target && allow(target) ? target : undefined}
               />
             )
@@ -175,12 +190,19 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
         </Kpis>
       )}
       {empty ? (
-        <Panel>
-          <Empty title="Nothing here yet">Reports, events, and announcements for your role show up here once they exist.</Empty>
-        </Panel>
+        <div className={lead || intro ? 'accs-split' : undefined}>
+          <div className="accs-stack">
+            {lead}
+            <Panel>
+              <Empty title="Nothing here yet">Reports, events, and announcements for your role show up here once they exist.</Empty>
+            </Panel>
+          </div>
+          {intro && <aside className="accs-stack">{intro}</aside>}
+        </div>
       ) : (
         <div className="accs-split">
           <div className="accs-stack accs-stagger">
+            {lead}
             {events.length > 0 && (
               <Panel
                 flush
@@ -273,8 +295,9 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
             )}
           </div>
           <aside className="accs-stack accs-stagger">
+            {intro}
             {reports.length > 0 && (
-              <Panel flush title="My reports" action={<PanelLink href="/reports">View all</PanelLink>}>
+              <Panel flush title={counted('My reports', /report/i)} action={<PanelLink href="/reports">View all</PanelLink>}>
                 {recordRows(reports, '/reports/')}
               </Panel>
             )}
@@ -284,7 +307,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
               </Panel>
             )}
             {consultations.length > 0 && (
-              <Panel flush title="Consultations" action={<PanelLink href="/consultations">View all</PanelLink>}>
+              <Panel flush title={counted('Appointments', /appoint|consult/i)} action={<PanelLink href="/consultations">View all</PanelLink>}>
                 <Rows>
                   {consultations.map((item, index) => {
                     const student = asItem(item.student)
@@ -292,8 +315,8 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
                     const slot = asItem(item.slot)
                     const status = text(item.status, 'Requested')
                     return (
-                      <Entry key={text(item.id, 'consultation-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
-                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Consultation'))}</p>
+                      <Entry key={text(item.id, 'appointment-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
+                        <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Appointment'))}</p>
                         <Sub>
                           <StatusChip tone={toneFor(status)}>{status}</StatusChip>
                           {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
@@ -305,7 +328,7 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
               </Panel>
             )}
             {assignments.length > 0 && (
-              <Panel flush title="Evaluations due" action={<PanelLink href="/evaluations">Open evaluations</PanelLink>}>
+              <Panel flush title={counted('Evaluations due', /evaluation/i)} action={<PanelLink href="/evaluations">Open evaluations</PanelLink>}>
                 <div className="pt-progress">
                   <p><strong>{submitted} of {assignments.length} submitted</strong><span className="accs-num">{Math.round((submitted / assignments.length) * 100)}%</span></p>
                   <div className="accs-progress" role="progressbar" aria-label="Evaluations submitted" aria-valuemin={0} aria-valuemax={assignments.length} aria-valuenow={submitted}>
@@ -360,12 +383,6 @@ function DashboardPanel({ data, role }: { data: Item; role: string }) {
                 </ol>
               </Panel>
             )}
-            {/* Staff content beyond CCS-wide material is still being defined (D-06). */}
-            {role === 'staff' && (
-              <Alert tone="neutral" title="Staff view">
-                Staff see CCS-wide material.
-              </Alert>
-            )}
           </aside>
         </div>
       )}
@@ -387,10 +404,10 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
 
   const shortcuts: { label: string; href: string; icon: 'plus' | 'calendar' | 'megaphone' | 'list-checks' | 'clock'; when?: string[] }[] = [
     { label: 'New report', href: '/reports/new', icon: 'plus', when: ['student'] },
-    { label: 'Book consultation', href: '/consultations', icon: 'calendar', when: ['student'] },
+    { label: 'Book appointment', href: '/consultations', icon: 'calendar', when: ['student'] },
     { label: 'Post announcement', href: '/feed/new', icon: 'megaphone' },
     { label: 'Manage availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
-    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas', 'president'] },
+    { label: 'Open case queue', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
   ]
   const actions = shortcuts
     .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href))
@@ -398,8 +415,16 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
   const name = firstName(session.data?.user.name ?? '')
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
 
+  const community = isCommunityRole(role) && Boolean(session.data)
+  // The home stays short: posting lives in Forums, and the sidebar already leads to classes and help.
+  const communityLead = undefined
+  const communityIntro = undefined
+
   return (
     <div className="accs-stack">
+      {community && session.data ? (
+        <CommunityHeader session={session.data} greeting={name ? `${greeting()}, ${name}` : greeting()} date={date} />
+      ) : (
       <PageHeader
         title={name ? `${greeting()}, ${name}` : greeting()}
         description={[date, page.scope].filter(Boolean).join(' · ')}
@@ -415,7 +440,9 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
           )
         }
       />
-      {session.data && <ModulePicker session={session.data} />}
+      )}
+      {!community && session.data && <ModulePicker session={session.data} />}
+      {!community && session.data && <GettingStarted session={session.data} />}
       {tabbed && (
         <SlidePills
           label="Dashboard role views"
@@ -427,11 +454,12 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
       {tabbed && text(panel.description) && <p className="pt-scope">{text(panel.description)}</p>}
       {tabbed ? (
         <SwapView id={role}>
-          <DashboardPanel data={panel} role={role} />
+          <DashboardPanel data={panel} role={role} lead={communityLead} intro={communityIntro} />
         </SwapView>
       ) : (
-        <DashboardPanel data={panel} role={role} />
+        <DashboardPanel data={panel} role={role} lead={communityLead} intro={communityIntro} />
       )}
+      {community && session.data && <GettingStarted session={session.data} />}
     </div>
   )
 }

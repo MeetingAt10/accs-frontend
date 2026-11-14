@@ -186,3 +186,50 @@
   color: var(--ds-text-primary);
   font-weight: 700;
 }
+
+.dev-toolbox__reset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ds-space-8);
+}
+.dev-toolbox__reset p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Escalation lab dialog. */
+.esc-lab {
+  box-sizing: border-box;
+  width: min(56rem, calc(100vw - 2 * var(--ds-space-16)));
+  max-height: calc(100dvh - 4rem);
+  padding: var(--ds-space-16);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--ds-radius-overlay);
+  background: var(--ds-overlay-bg);
+  box-shadow: var(--ds-overlay-shadow);
+  color: var(--ds-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.esc-lab::backdrop { background: rgb(0 0 0 / 0.45); }
+.esc-lab__close { margin-inline-start: auto; }
+.esc-lab__form, .esc-lab__result { display: flex; flex-direction: column; gap: var(--ds-space-12); margin-top: var(--ds-space-12); }
+.esc-lab__form label { display: flex; flex-direction: column; gap: var(--ds-space-4); font-weight: 600; }
+.esc-lab__form select, .esc-lab__form textarea {
+  font: inherit; font-weight: 400; color: inherit; padding: var(--ds-space-8);
+  border: 1px solid var(--ds-border-subtle); border-radius: var(--ds-radius-control, 6px); background: transparent;
+}
+.esc-lab__check { flex-direction: row !important; align-items: center; font-weight: 400 !important; }
+.esc-lab__samples { display: flex; flex-wrap: wrap; gap: var(--ds-space-8); }
+.esc-lab__office { font-size: 1.125rem; display: flex; gap: var(--ds-space-8); align-items: center; }
+.esc-lab__student, .esc-lab caption { color: var(--ds-text-secondary); }
+.esc-lab__held { padding: var(--ds-space-8); border-inline-start: 3px solid var(--ds-warning, #c58a00); }
+.esc-lab__facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--ds-space-4) var(--ds-space-12); margin: 0; }
+.esc-lab__facts dt { font-weight: 600; }
+.esc-lab__facts dd { margin: 0; }
+.esc-lab__table { width: 100%; border-collapse: collapse; }
+.esc-lab__table caption { text-align: start; padding-bottom: var(--ds-space-4); }
+.esc-lab__table th, .esc-lab__table td { text-align: start; vertical-align: top; padding: var(--ds-space-4) var(--ds-space-8); border-bottom: 1px solid var(--ds-border-subtle); }
+.esc-lab__hot td { background: color-mix(in srgb, var(--ds-warning, #c58a00) 14%, transparent); }
+.esc-lab__roster { margin: var(--ds-space-8) 0 0; padding-inline-start: var(--ds-space-16); }

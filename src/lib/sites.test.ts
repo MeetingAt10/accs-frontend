@@ -15,13 +15,13 @@ const samplePaths: Record<string, string> = {
   P34: '/records/S-1', P35: '/restrictions', P36: '/standing', P37: '/directory', P38: '/people/U-1', P39: '/profile',
   P40: '/notifications', P41: '/assistant', P42: '/help', P43: '/settings', P44: '/settings/notifications', P45: '/admin',
   P46: '/admin/users', P47: '/admin/users/U-1', P48: '/admin/roles', P49: '/admin/moderation', P50: '/admin/moderation/M-1',
-  P51: '/admin/audit', P52: '/admin/monitoring',
+  P51: '/admin/audit', P52: '/admin/monitoring', P54: '/faculty-load', P53: '/clearance',
 }
 
 describe('module sites follow DOC003', () => {
-  it('assigns each of the 58 inventory modules to exactly one site', () => {
+  it('assigns each of the 55 inventory modules to exactly one site', () => {
     const assigned = sites.flatMap((site) => site.modules)
-    expect(inventory.modules).toHaveLength(58)
+    expect(inventory.modules).toHaveLength(55)
     expect([...assigned].sort()).toEqual(inventory.modules.map((m) => m.id).sort())
   })
 
@@ -107,5 +107,16 @@ describe('accounts page', () => {
 
   it('sends temporary sign-in details to the first-login page', () => {
     expect(landingFor({ ...secretary, user: { roles: ['secretary'], mustChangeCredentials: true } })).toBe('/first-login')
+  })
+})
+
+describe('role names', () => {
+  it('come from the session, with the API names before it loads', async () => {
+    const { rememberRoleLabels, roleLabelOf } = await import('./role-labels')
+    expect(roleLabelOf('administrator')).toBe('System Administrator')
+    rememberRoleLabels({ administrator: 'Sys Admin', bad: 3 })
+    expect(roleLabelOf('administrator')).toBe('Sys Admin')
+    expect(roleLabelOf('bad')).toBe('Bad')
+    rememberRoleLabels({ administrator: 'System Administrator' })
   })
 })

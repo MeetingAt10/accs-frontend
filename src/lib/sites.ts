@@ -1,3 +1,4 @@
+import { roleLabelOf } from '@/lib/role-labels'
 import { pageAllowed, pageIdForPath } from '@/lib/page-catalog'
 import type { Role } from '@/lib/api'
 
@@ -29,7 +30,7 @@ export const sites: Site[] = [
     lane: 'navy',
     prefixes: ['/home', '/notifications', '/assistant', '/help', '/settings', '/profile', '/standing'],
     landings: ['/home', '/notifications'],
-    modules: ['ALL-01', 'ALL-04', 'ALL-05', 'STU-11', 'STU-12', 'STF-01', 'CHR-01', 'DEAN-01'],
+    modules: ['ALL-01', 'ALL-04', 'ALL-05', 'STU-11', 'STU-12', 'CHR-01', 'DEAN-01'],
   },
   {
     id: 'forums',
@@ -44,7 +45,7 @@ export const sites: Site[] = [
   {
     id: 'schedule',
     label: 'Schedule',
-    purpose: 'Calendars, faculty availability, and consultation requests.',
+    purpose: 'Calendars, faculty availability, and appointment requests.',
     icon: 'calendar',
     lane: 'consult',
     prefixes: ['/calendar', '/consultations'],
@@ -59,7 +60,7 @@ export const sites: Site[] = [
     lane: 'neutral',
     prefixes: ['/reports', '/cases'],
     landings: ['/cases', '/reports'],
-    modules: ['STU-06', 'STU-07', 'STU-08', 'STU-09', 'PRO-06', 'CHR-02', 'CHR-07', 'DEAN-02', 'GUD-01', 'GUD-02', 'OSAS-01', 'PRES-01', 'PRES-02'],
+    modules: ['STU-06', 'STU-07', 'STU-08', 'STU-09', 'PRO-06', 'CHR-02', 'CHR-07', 'DEAN-02', 'GUD-01', 'GUD-02', 'OSAS-01'],
   },
   {
     id: 'evaluations',
@@ -68,7 +69,8 @@ export const sites: Site[] = [
     icon: 'list-checks',
     lane: 'navy',
     prefixes: ['/evaluations'],
-    landings: ['/evaluations'],
+    // A Program Chair has results but no evaluations of their own, and the Dean manages cycles: both still open the site.
+    landings: ['/evaluations', '/evaluations/results', '/evaluations/cycles'],
     modules: ['STU-10', 'PRO-07', 'PRO-08', 'CHR-04', 'DEAN-03', 'DEAN-04'],
   },
   {
@@ -77,8 +79,8 @@ export const sites: Site[] = [
     purpose: 'Authorized student records, restrictions, and program analytics.',
     icon: 'archive',
     lane: 'neutral',
-    prefixes: ['/records', '/restrictions', '/analytics'],
-    landings: ['/analytics', '/records', '/restrictions'],
+    prefixes: ['/records', '/restrictions', '/analytics', '/clearance'],
+    landings: ['/analytics', '/records', '/restrictions', '/clearance'],
     modules: ['CHR-03', 'CHR-05', 'DEAN-05', 'GUD-03', 'GUD-04', 'OSAS-02', 'OSAS-03', 'ADM-03'],
   },
   {
@@ -87,8 +89,8 @@ export const sites: Site[] = [
     purpose: 'Accounts, roles, moderation, restrictions, audit, and monitoring.',
     icon: 'gear',
     lane: 'navy',
-    prefixes: ['/admin', '/accounts'],
-    landings: ['/admin', '/accounts'],
+    prefixes: ['/admin', '/accounts', '/faculty-load'],
+    landings: ['/admin', '/accounts', '/faculty-load'],
     modules: ['ADM-01', 'ADM-02', 'ADM-04', 'ADM-05', 'ADM-06'],
   },
 ]
@@ -114,9 +116,9 @@ export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   portal: 'all',
   forums: 'all',
   schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas'],
-  cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas', 'president'],
+  cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas'],
   evaluations: ['student', 'professor', 'chair', 'dean'],
-  records: ['chair', 'dean', 'guidance', 'osas', 'president', 'administrator'],
+  records: ['chair', 'dean', 'guidance', 'osas', 'administrator', 'secretary'],
   admin: ['administrator', 'dean', 'secretary'],
 }
 
@@ -137,13 +139,9 @@ export const canOpenPath = (session: Access, path: string) => allowsPath(session
 
 const roleLabels: Partial<Record<string, string>> = {
   professor: 'Faculty',
-  staff: 'CCS staff',
-  secretary: 'CCS secretary',
-  osas: 'OSAS',
-  president: "President's Office",
 }
 
-export const roleLabel = (role: string) => roleLabels[role] ?? role[0].toUpperCase() + role.slice(1)
+export const roleLabel = (role: string) => roleLabels[role] ?? roleLabelOf(role)
 
 /** Where a signed-in person lands: Home (Admin for administrators). Temporary sign-in details come first. */
 export function landingFor(session: Access) {

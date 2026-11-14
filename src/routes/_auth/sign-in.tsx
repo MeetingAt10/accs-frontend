@@ -121,7 +121,6 @@ function SignInForm({
   return (
     <>
       <Title>Sign in</Title>
-      <Sub>Use your QCU email, your student or employee ID, or your username.</Sub>
       <Form formRef={form} onSubmit={submit}>
         {notice && <Rise><Alert tone="success" title={notice} /></Rise>}
         <TextInput
@@ -154,7 +153,6 @@ function SignInForm({
         </Reveal>
         <SubmitButton loading={mutation.isPending}>Sign in</SubmitButton>
       </Form>
-      <Foot>Your account is provided by the CCS secretary.</Foot>
     </>
   )
 }

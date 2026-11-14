@@ -140,7 +140,7 @@
 .ec-table td[data-outside] .ec-daybtn { color: var(--accs-faint); }
 .ec-table td[data-today] .ec-daybtn {
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
   box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--site-accent) 70%, transparent);
 }
 
@@ -223,7 +223,7 @@
 .ec-wk__dayhead[data-today] { color: var(--site-accent-ink); }
 .ec-wk__dayhead[data-today] b {
   background: var(--site-accent);
-  color: #fff;
+  color: var(--accs-on-accent);
   box-shadow: 0 3px 10px -3px color-mix(in srgb, var(--site-accent) 70%, transparent);
 }
 .ec-wk__allday { border-bottom: 1px solid var(--accs-line); }

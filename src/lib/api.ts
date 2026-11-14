@@ -8,7 +8,6 @@ export type Role =
   | 'administrator'
   | 'guidance'
   | 'osas'
-  | 'president'
   | 'secretary'
 
 export interface SessionUser {
@@ -31,14 +30,14 @@ export interface Session {
   user: SessionUser
   permissions: string[]
   allowedPages: string[]
-  sampleData: true
+  /** The name of each role, for example "System Administrator". */
+  roleLabels?: Record<string, string>
 }
 
 export interface PageEnvelope {
   pageId: string
   title: string
   scope: string
-  sampleData: true
   data: Record<string, unknown>
 }
 
@@ -247,3 +246,63 @@ export const setAdvisors = (yearLevel: number, facultyIds: string[]) =>
 
 export const setChair = (program: Program, facultyId: string) =>
   put<Recorded<{ program: Program; chairId: string; previousChairIds: string[] }>>('/accounts/chairs/' + program, { facultyId })
+
+/** A class material file the API is waiting for, and the signed address to send it to. */
+export type MaterialUpload = {
+  material: { id: string; title: string; fileName?: string; status?: string }
+  upload: { url: string; method: 'PUT'; headers: Record<string, string>; expiresInSeconds: number }
+}
+
+/** Starts a class material file upload (MeetingAt10/accs-backend#77). */
+export const startMaterialUpload = (input: { spaceId: string; title: string; note?: string; fileName: string; contentType: string; size: number }) =>
+  post<Recorded<MaterialUpload>>('/materials/uploads', input)
+
+/** Confirms a material file once it has been sent to the signed address. */
+export const completeMaterialUpload = (id: string) =>
+  post<Recorded<Record<string, unknown>>>('/materials/' + encodeURIComponent(id) + '/complete', {})
+
+/** Sends the file itself to the signed storage address. The address carries its own credentials, so no cookies go with it. */
+export async function sendMaterialFile(upload: MaterialUpload['upload'], file: File) {
+  const headers = Object.fromEntries(Object.entries(upload.headers).filter(([name]) => name.toLowerCase() !== 'content-length'))
+  const response = await fetch(upload.url, { method: upload.method, headers, body: file })
+  if (!response.ok) throw new ApiError("The file couldn't be uploaded. Try again.", response.status)
+}
+
+/** A file sent with a message (MeetingAt10/accs-backend#90). */
+export type MessageFile = { id: string; fileName: string; contentType: string; size: number }
+
+/** Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`. */
+export async function uploadMessageFile(file: File, contentType = file.type): Promise<MessageFile> {
+  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType, size: file.size })
+  await sendMaterialFile(started.record.upload, file)
+  return started.record.attachment
+}
+
+/** Downloads a class material file (the API checks access, then redirects to a short-lived link). On the API's own origin. */
+export const materialFilePath = (materialId: string) => `${baseUrl}/materials/${encodeURIComponent(materialId)}/file`
+
+/** Downloads a file from a conversation (the API checks membership, then redirects to a short-lived link). */
+export const messageFilePath = (threadId: string, messageId: string, fileId: string) =>
+  `${baseUrl}/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/files/${encodeURIComponent(fileId)}`
+
+/** A short-lived link that shows a picture in the browser. */
+export const messageFileLink = async (threadId: string, messageId: string, fileId: string) =>
+  (await request<Recorded<{ url: string }>>(messageFilePath(threadId, messageId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
+
+/** Downloads a file from a post (the API checks the post can be read, then redirects to a short-lived link). */
+export const postFilePath = (postId: string, fileId: string) =>
+  `${baseUrl}/posts/${encodeURIComponent(postId)}/files/${encodeURIComponent(fileId)}`
+
+/** A short-lived link that shows a post's picture in the browser. */
+export const postFileLink = async (postId: string, fileId: string) =>
+  (await request<Recorded<{ url: string }>>(postFilePath(postId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
+
+/** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
+export const issueResetCode = (accountId: string) =>
+  post<Recorded<{ code: string; expiresAt: string }>>('/admin/accounts/' + encodeURIComponent(accountId) + '/reset-code', {})
+
+/** Ends every other session of the signed-in account; this one stays signed in. */
+export const signOutOtherDevices = () => post<Done>('/auth/sign-out-others', {})
+
+/** Sets the signed-in person's profile photo (a data URL the browser already resized), or removes it with null. */
+export const setProfilePhoto = (photo: string | null) => performPageAction('P39', { action: 'setProfilePhoto', payload: { photo } })

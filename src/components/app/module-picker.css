@@ -44,3 +44,20 @@
 .module-picker .module-tile--soon .ds-card__title {
   color: var(--ds-text-secondary);
 }
+.module-picker .module-tile--soon {
+  min-height: 0;
+  padding: var(--ds-space-16) var(--ds-space-24);
+  opacity: 0.8;
+}
+
+/* Getting started: a numbered list in the order of the demo. Numbers come from the list, not the markup. */
+.getting-started {
+  display: grid;
+  gap: var(--ds-space-8);
+  margin: 0;
+  padding-inline-start: var(--ds-space-24);
+}
+.getting-started__step {
+  padding-inline-start: var(--ds-space-8);
+  color: var(--ds-text-secondary);
+}
