@@ -5,18 +5,18 @@ import { matchesPerson } from './communications'
 
 describe('messages', () => {
   it('finds a person by the start of any word of their name, with or without @', () => {
-    expect(matchesPerson('Prof. Robin Elm', 'rob')).toBe(true)
-    expect(matchesPerson('Prof. Robin Elm', '@rob')).toBe(true)
-    expect(matchesPerson('Prof. Robin Elm', '@elm')).toBe(true)
-    expect(matchesPerson('Prof. Robin Elm', 'robin e')).toBe(true)
-    expect(matchesPerson('Prof. Robin Elm', 'obin')).toBe(false)
-    expect(matchesPerson('Prof. Robin Elm', '@')).toBe(true)
+    expect(matchesPerson('Demo Professor Charlie', 'dem')).toBe(true)
+    expect(matchesPerson('Demo Professor Charlie', '@dem')).toBe(true)
+    expect(matchesPerson('Demo Professor Charlie', '@charlie')).toBe(true)
+    expect(matchesPerson('Demo Professor Charlie', 'demo p')).toBe(true)
+    expect(matchesPerson('Demo Professor Charlie', 'emo')).toBe(false)
+    expect(matchesPerson('Demo Professor Charlie', '@')).toBe(true)
   })
 
   it('reads the name typed after @ at the end of a message', () => {
     expect(mentionQuery('Hi @rob')).toBe('rob')
     expect(mentionQuery('@')).toBe('')
     expect(mentionQuery('email me at prof@school')).toBeUndefined()
-    expect(mentionQuery('Hi @robin elm')).toBeUndefined()
+    expect(mentionQuery('Hi @demo professor')).toBeUndefined()
   })
 })
