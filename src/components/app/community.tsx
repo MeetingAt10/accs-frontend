@@ -290,6 +290,41 @@ function priorityLabel(priority: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+/** Comment on a post straight from the feed, without opening it. To comment anonymously, open the post. */
+function RowComment({ post }: { post: CommunityPost }) {
+  const [open, setOpen] = useState(false)
+  const [body, setBody] = useState('')
+  const queryClient = useQueryClient()
+  const send = useMutation({
+    mutationFn: () => performPageAction('P06', { action: 'comment', recordId: post.id, payload: { body: body.trim() } }),
+    onSuccess: async (result) => {
+      setBody('')
+      setOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ['page'] })
+      toast(result.message, { tone: 'success' })
+    },
+  })
+  return (
+    <div className="fx-row-comment">
+      {!open ? (
+        <button type="button" className="fx-row-comment__toggle" onClick={() => { send.reset(); setOpen(true) }}>
+          <Icon name="chat" size={16} />
+          Comment
+        </button>
+      ) : (
+        <form className="fx-row-comment__form" onSubmit={(event) => { event.preventDefault(); if (body.trim() && !send.isPending) send.mutate() }}>
+          <TextArea label={`Comment on ${post.title}`} value={body} onChange={setBody} maxLength={4000} autoFocus />
+          <div className="fx-row-comment__actions">
+            <Button type="submit" size="sm" loading={send.isPending} isDisabled={!body.trim()}>Post comment</Button>
+            <Button size="sm" variant="tertiary" onPress={() => { setOpen(false); setBody('') }}>Cancel</Button>
+          </div>
+          {send.error && <Alert tone="danger" title="The comment was not posted">{send.error.message}</Alert>}
+        </form>
+      )}
+    </div>
+  )
+}
+
 function ThreadList({
   posts,
   spaces,
@@ -383,6 +418,7 @@ function ThreadList({
                       <span className="fx-sr">replies</span>
                     </span>
                   </p>
+                  {!post.removed && <RowComment post={post} />}
                 </div>
               </motion.li>
             )

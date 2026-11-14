@@ -744,3 +744,11 @@
   font-weight: 600;
 }
 .fx-rail { gap: 28px; }
+
+/* Comment from a feed row. It sits above the row's stretched title link so it can be clicked. */
+.fx-row-comment { position: relative; z-index: 1; margin-top: 6px; }
+.fx-row-comment__toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; margin-left: -8px; border: 0; border-radius: 8px; background: none; color: var(--accs-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.fx-row-comment__toggle:hover { background: var(--accs-sunken); color: var(--site-accent-ink); }
+.fx-row-comment__toggle:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; }
+.fx-row-comment__form { display: grid; gap: 8px; max-width: 40rem; }
+.fx-row-comment__actions { display: flex; gap: 8px; }
