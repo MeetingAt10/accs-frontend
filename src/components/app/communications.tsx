@@ -221,6 +221,14 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const readyFiles = pendingFiles.filter((file) => file.state === "ready");
   const filesBusy = pendingFiles.some((file) => file.state === "uploading");
+  // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
+  useEffect(() => {
+    setBody("");
+    setPendingFiles((current) => {
+      for (const file of current) if (file.preview) URL.revokeObjectURL(file.preview);
+      return [];
+    });
+  }, [conversationId]);
   function removePendingFile(key: string) {
     setPendingFiles((current) => {
       const gone = current.find((file) => file.key === key);
