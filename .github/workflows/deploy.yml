@@ -57,6 +57,7 @@ jobs:
           VITE_API_URL: ${{ steps.stack.outputs.api }}/api
           VITE_FARO_URL: ${{ vars.FARO_URL }}
           VITE_FARO_ENV: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+          VITE_GA_ID: ${{ github.ref_name == 'main' && 'G-MQVKYC9P1Z' || '' }} # only the prod build reports to GA
           VITE_APP_VERSION: ${{ github.sha }}
           VITE_DEV_TOOLBOX: ${{ github.ref_name == 'dev' && 'true' || '' }} # only the dev branch's build carries the dev toolbox
 
