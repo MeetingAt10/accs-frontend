@@ -1,3 +1,4 @@
+import { campusToday } from '@/lib/campus-date'
 import {
   Alert,
   Button,
@@ -562,7 +563,7 @@ function CalendarPage({
           )}
           {entry.contact && (
             <div>
-              <dt>Contact</dt>
+              <dt>Contact person</dt>
               <dd>{entry.contact}</dd>
             </div>
           )}
@@ -2191,6 +2192,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <DatePicker
                 label="Date"
                 isRequired
+                minValue={campusToday()}
                 onChange={(value) => setDate(value?.toString() ?? '')}
               />
               <div className="sc-timepair">

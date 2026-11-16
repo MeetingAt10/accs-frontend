@@ -1,3 +1,4 @@
+import { campusToday } from '@/lib/campus-date'
 import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
 import type { MessageFile } from '@/lib/api'
 import { AvatarFill, photoSrc } from '@/components/app/photo'
@@ -82,6 +83,8 @@ interface PostComment {
   at: string
   /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
   underReview?: boolean
+  /** Written by you (anonymous or not): no "Report comment" for it. */
+  owned?: boolean
 }
 
 export interface CommunityPost {
@@ -873,10 +876,11 @@ export function PostComposer({
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
     if (eventRequired) {
       if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
+      else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTime))
         nextErrors.eventTime = 'Enter a time as HH:MM.'
       if (!eventPlace.trim()) nextErrors.eventPlace = 'Enter the event place.'
-      if (!eventContact.trim()) nextErrors.eventContact = 'Enter a contact.'
+      if (!eventContact.trim()) nextErrors.eventContact = 'Enter who to contact.'
     }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
@@ -1060,6 +1064,7 @@ export function PostComposer({
                   <DatePicker
                     label="Event date"
                     isRequired
+                    minValue={campusToday()}
                     onChange={(value) => setEventDate(value?.toString() ?? '')}
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
@@ -1083,7 +1088,8 @@ export function PostComposer({
                     errorMessage={errors.eventPlace}
                   />
                   <TextField
-                    label="Contact"
+                    label="Contact person"
+                    description="Who to ask, with a number or email if you like: Prof. Robin Elm, 0917 123 4567."
                     value={eventContact}
                     onChange={setEventContact}
                     isRequired
@@ -1445,7 +1451,7 @@ function PostDetailPage({
               onAction={(key) => menuAction(String(key))}
             >
               <MenuItem id="copy">Copy link</MenuItem>
-              <MenuItem id="report">Report post</MenuItem>
+              {!post.owned && <MenuItem id="report">Report post</MenuItem>}
               {canConvert && <MenuItem id="convert">Start a report</MenuItem>}
               {post.owned && session.permissions.includes('post.create') && (
                 <MenuItem id="edit">Edit post</MenuItem>
@@ -1521,14 +1527,16 @@ function PostDetailPage({
                             Reply
                           </Button>
                         )}
-                        <MenuButton
-                          iconOnly
-                          icon="dots-three"
-                          label="Comment actions"
-                          onAction={() => openReport('comment', comment.id)}
-                        >
-                          <MenuItem id="report">Report comment</MenuItem>
-                        </MenuButton>
+                        {!comment.owned && (
+                          <MenuButton
+                            iconOnly
+                            icon="dots-three"
+                            label="Comment actions"
+                            onAction={() => openReport('comment', comment.id)}
+                          >
+                            <MenuItem id="report">Report comment</MenuItem>
+                          </MenuButton>
+                        )}
                       </>
                     }
                   >

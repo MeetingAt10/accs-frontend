@@ -505,7 +505,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                 }}
                               >
                                 <MenuItem id="copy">Copy</MenuItem>
-                                <MenuItem id="report">Report message</MenuItem>
+                                {sender.id !== session.data?.user.id && <MenuItem id="report">Report message</MenuItem>}
                               </MenuButton>
                             }
                           />

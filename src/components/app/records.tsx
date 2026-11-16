@@ -789,6 +789,23 @@ function Analytics({ page }: { page: PageEnvelope }) {
     );
   };
   const filtered = [...search.keys()].length > 0;
+  // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
+  const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
+  const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  const changeRange = (name: "from" | "to", value: string) => {
+    const next = { from: search.get("from") ?? "", to: search.get("to") ?? "", ...rangeDraft, [name]: value };
+    setRangeDraft(next);
+    if (next.from && next.to && next.from > next.to) { setRangeProblem(name); return; }
+    setRangeProblem("");
+    setRangeDraft({});
+    // Both dates in one change of address: two updateFilter calls would each start from the old address.
+    const params = new URLSearchParams(location.searchStr);
+    for (const key of ["from", "to"] as const) {
+      if (next[key]) params.set(key, next[key]);
+      else params.delete(key);
+    }
+    router.history.replace(location.pathname + (params.size ? "?" + params.toString() : ""));
+  };
   const program = search.get("program") ?? "All";
   return (
     <Screen
@@ -877,17 +894,22 @@ function Analytics({ page }: { page: PageEnvelope }) {
           <SelectOption id="current">Available period</SelectOption>
           <SelectOption id="none">No matching period</SelectOption>
         </Select>
+        {/* A range that ends before it starts is not applied: the field says why instead. */}
         <TextField
           type="date"
           label="From"
-          value={search.get("from") ?? ""}
-          onChange={(value) => updateFilter("from", value)}
+          value={rangeDraft.from ?? search.get("from") ?? ""}
+          onChange={(value) => changeRange("from", value)}
+          isInvalid={rangeProblem === "from"}
+          errorMessage={rangeProblem === "from" ? "Choose a date on or before the To date." : undefined}
         />
         <TextField
           type="date"
           label="To"
-          value={search.get("to") ?? ""}
-          onChange={(value) => updateFilter("to", value)}
+          value={rangeDraft.to ?? search.get("to") ?? ""}
+          onChange={(value) => changeRange("to", value)}
+          isInvalid={rangeProblem === "to"}
+          errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
         />
       </div>
       <Kpis label="Case counts">

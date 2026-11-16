@@ -1,3 +1,4 @@
+import { campusToday } from '@/lib/campus-date'
 import {
   Alert, Button, DatePicker, Drawer, Grid, Icon, Link, MenuButton, MenuItem, Modal,
   ModalActions, ModalBody, Pagination, PrivacyNotice, Radio, RadioGroup, Search, Select,
@@ -353,7 +354,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                 {step === 0 && <>
                   <TextArea label="What happened" isRequired showCount maxLength={4000} value={draft.narrative} onChange={(value) => update('narrative', value)} description="Say what happened, when, and where. Leave out names you don't need to share." isInvalid={Boolean(error && !draft.narrative.trim())} errorMessage={error && !draft.narrative.trim() ? error : undefined} />
                   <Grid columns={2}>
-                    <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + formatDate(draft.occurredOn) : 'Optional'} />
+                    <DatePicker label="When" maxValue={campusToday()} onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + formatDate(draft.occurredOn) : 'Optional'} />
                     <TextField label="Where" value={draft.location} onChange={(value) => update('location', value)} maxLength={200} description="Optional" />
                   </Grid>
                   {/* TBD(D-08): attachment access and retention policy is not approved. */}
@@ -917,10 +918,23 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
   const refused = (path: string) => (action.error as { fields?: Array<{ path: string; message: string }> } | null)?.fields?.find((field) => field.path === path)?.message
   const fieldError = (path: string, local?: string) => refused(path) ?? (tried ? local : undefined)
   const ready = Boolean(draft.studentId && draft.narrative.trim() && draft.severity) && Object.keys(missing).length === 0
+  // What is still missing, in the form's order, said next to the Send button: the fields' own messages can be off screen.
+  const missingNames = [
+    !draft.studentId && 'Student',
+    missing.category && 'Category',
+    missing.subcategory && 'Sub-category',
+    missing.categoryDetail && 'Description',
+    !draft.severity && 'How serious it is',
+    !draft.narrative.trim() && 'What happened',
+  ].filter(Boolean) as string[]
   const close = () => { setOpen(false); setTried(false); action.reset() }
-  const send = () => {
+  const send = (form?: HTMLFormElement | null) => {
     setTried(true)
-    if (!ready) return
+    if (!ready) {
+      // Take the reader to the first field that needs them.
+      requestAnimationFrame(() => (form?.querySelector('[aria-invalid="true"], [data-invalid] input, [data-invalid] button, [data-invalid] textarea') as HTMLElement | null)?.focus())
+      return
+    }
     action.mutate({
       action: 'reportStudent',
       payload: {
@@ -934,7 +948,7 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
     <>
       <Button icon="pencil" onPress={() => { action.reset(); setOpen(true) }}>Report a student</Button>
       <Drawer title="Report a student" isOpen={open} onOpenChange={(state) => !state && close()}>
-        <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); send() }}>
+        <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); send(event.currentTarget) }}>
           <p className="gv-hint">Report a student from your classes. It goes to the Program Chair, or to the Dean if you are the chair. You can follow its status from your case queue.</p>
           <Select label="Student" placeholder="Choose a student" isRequired selectedKey={draft.studentId || null} onSelectionChange={(key) => update('studentId', String(key ?? ''))}
             isInvalid={Boolean(fieldError('studentId', draft.studentId ? undefined : 'Choose a student.'))} errorMessage={fieldError('studentId', draft.studentId ? undefined : 'Choose a student.')}
@@ -962,9 +976,10 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
             isInvalid={Boolean(fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.'))} errorMessage={fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.')} />
           <Grid columns={2}>
             <TextField label="Where" maxLength={200} value={draft.location} onChange={(value) => update('location', value)} description="Optional" />
-            <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description="Optional" />
+            <DatePicker label="When" maxValue={campusToday()} onChange={(value) => update('occurredOn', value?.toString() ?? '')} description="Optional" />
           </Grid>
           {action.error && !(action.error as { fields?: unknown[] }).fields?.length && <Alert tone="danger" title="The report was not sent">{action.error.message}</Alert>}
+          {tried && missingNames.length > 0 && <Alert tone="danger" title="Fill in the required fields">{missingNames.join(', ')}.</Alert>}
           <div className="gv-foot">
             <Button variant="secondary" onPress={close} isDisabled={action.isPending}>Cancel</Button>
             <Button type="submit" loading={action.isPending}>Send report</Button>
