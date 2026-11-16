@@ -30,6 +30,7 @@ import {
   TabPanel,
   Tabs,
   TextArea,
+  TextField,
   ViewState,
   toast,
 } from "@meetingat10/design-system/react";
@@ -102,6 +103,29 @@ function useCommunicationAction(pageId: string, showToast = true) {
   });
 }
 
+/** Mute a conversation. The switch flips at once and pages refresh in the background, so it can be switched back right away. */
+function MuteSwitch({ conversationId, muted }: { conversationId: string; muted: boolean }) {
+  const queryClient = useQueryClient();
+  const [on, setOn] = useState(muted);
+  useEffect(() => setOn(muted), [muted]);
+  const save = useMutation({
+    mutationFn: (next: boolean) => performPageAction("P12", { action: "muteThread", recordId: conversationId, payload: { muted: next } }),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["page"] });
+      toast(result.message, { tone: "success" });
+    },
+    onError: (_error, next) => setOn(!next),
+  });
+  return (
+    <>
+      <Switch isSelected={on} onChange={(next) => { setOn(next); save.mutate(next); }}>
+        Mute this conversation
+      </Switch>
+      <ActionError error={save.error} />
+    </>
+  );
+}
+
 function ActionError({ error }: { error: unknown }) {
   return error ? (
     <Alert tone="danger" title="The change couldn't be saved">
@@ -160,6 +184,13 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   );
   const [recipientId, setRecipientId] = useState(requestedRecipient);
   const [newBody, setNewBody] = useState("");
+  // A new conversation is with one person or a named group (anyone may start a group, decided 16 November 2026).
+  const [groupMode, setGroupMode] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const canSendNew = groupMode
+    ? Boolean(groupName.trim() && groupIds.length >= 2 && newBody.trim())
+    : Boolean(recipientId && newBody.trim());
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("all");
   const [body, setBody] = useState("");
@@ -207,14 +238,17 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   }, [isThread, conversationId, messages.length, queryClient]);
 
   async function createConversation() {
-    if (!recipientId || !newBody.trim() || create.isPending) return;
+    if (!canSendNew || create.isPending) return;
     try {
-      const result = await create.mutateAsync({
-        action: "createThread",
-        payload: { recipientId, body: newBody.trim() },
-      });
+      const result = await create.mutateAsync(
+        groupMode
+          ? { action: "createGroupThread", payload: { title: groupName.trim(), memberIds: groupIds, body: newBody.trim() } }
+          : { action: "createThread", payload: { recipientId, body: newBody.trim() } },
+      );
       setNewOpen(false);
       setNewBody("");
+      setGroupName("");
+      setGroupIds([]);
       router.history.push(
         "/messages/" + encodeURIComponent(words(object(result.record).id)),
       );
@@ -399,9 +433,11 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     <h2 style={{ margin: 0 }}>{words(conversation.title)}</h2>
                     <span>
                       {members.length} members ·{" "}
-                      {conversation.kind === "group"
-                        ? "Class group"
-                        : "Direct conversation"}
+                      {conversation.groupKind === "people"
+                        ? "Group"
+                        : conversation.kind === "group"
+                          ? "Class group"
+                          : "Direct conversation"}
                     </span>
                   </Stack>
                 </Row>
@@ -482,7 +518,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                 }}
                               >
                                 <MenuItem id="copy">Copy</MenuItem>
-                                <MenuItem id="report">Report message</MenuItem>
+                                {sender.id !== session.data?.user.id && <MenuItem id="report">Report message</MenuItem>}
                               </MenuButton>
                             }
                           />
@@ -519,26 +555,54 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       <Modal title="New message" isOpen={newOpen} onOpenChange={setNewOpen}>
         <ModalBody>
           <Stack gap={16}>
+            <RadioGroup label="Send to" row value={groupMode ? "group" : "person"} onChange={(value) => setGroupMode(value === "group")}>
+              <Radio value="person">One person</Radio>
+              <Radio value="group">A group</Radio>
+            </RadioGroup>
+            {groupMode && (
+              <TextField label="Group name" value={groupName} onChange={setGroupName} maxLength={80} isRequired description="For example, Capstone team." />
+            )}
             <ComboBox
-              label="To"
+              // In a group, a fresh box after each person is added, so the next search starts empty.
+              key={groupMode ? `add-${groupIds.length}` : "to"}
+              label={groupMode ? "Add people" : "To"}
               placeholder="Search people"
-              description="Type a name, or @ and a name."
+              description={groupMode ? "Add at least two people. Type a name, or @ and a name." : "Type a name, or @ and a name."}
               defaultFilter={matchesPerson}
-              selectedKey={recipientId || null}
-              onSelectionChange={(key) => setRecipientId(String(key ?? ""))}
+              {...(groupMode ? {} : { selectedKey: recipientId || null })}
+              onSelectionChange={(key) => {
+                const id = String(key ?? "");
+                if (!groupMode) setRecipientId(id);
+                else if (id) setGroupIds((current) => (current.includes(id) ? current : [...current, id]));
+              }}
               emptyMessage="No matching recipients"
-              isRequired
+              isRequired={!groupMode}
             >
-              {recipients.map((recipient) => (
-                <SelectOption
-                  id={words(recipient.id)}
-                  key={words(recipient.id)}
-                  textValue={words(recipient.name)}
-                >
-                  {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
-                </SelectOption>
-              ))}
+              {recipients
+                .filter((recipient) => !groupMode || !groupIds.includes(words(recipient.id)))
+                .map((recipient) => (
+                  <SelectOption
+                    id={words(recipient.id)}
+                    key={words(recipient.id)}
+                    textValue={words(recipient.name)}
+                  >
+                    {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
+                  </SelectOption>
+                ))}
             </ComboBox>
+            {groupMode && groupIds.length > 0 && (
+              <ul className="cm-group-people" aria-label="People in the group">
+                {groupIds.map((id) => {
+                  const person = recipients.find((recipient) => words(recipient.id) === id);
+                  return (
+                    <li key={id}>
+                      <span>{words(person?.name, id)}</span>
+                      <IconButton icon="x" size="sm" label={`Remove ${words(person?.name, id)}`} onPress={() => setGroupIds((current) => current.filter((value) => value !== id))} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <TextArea
               label="Message"
               value={newBody}
@@ -557,9 +621,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           <Button
             onPress={() => void createConversation()}
             loading={create.isPending}
-            isDisabled={!recipientId || !newBody.trim()}
+            isDisabled={!canSendNew}
           >
-            Send
+            {groupMode ? "Start group" : "Send"}
           </Button>
         </ModalActions>
       </Modal>
@@ -579,20 +643,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               </Stack>
             </Row>
           ))}
-          <Switch
-            isSelected={conversation.muted === true}
-            onChange={(muted) =>
-              action.mutate({
-                action: "muteThread",
-                recordId: words(conversation.id),
-                payload: { muted },
-              })
-            }
-            isDisabled={action.isPending}
-          >
-            Mute this conversation
-          </Switch>
-          <ActionError error={action.error} />
+          <MuteSwitch conversationId={words(conversation.id)} muted={conversation.muted === true} />
         </Stack>
       </Drawer>
       <Modal

@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { CatchBoundary, createRootRouteWithContext, Outlet, useRouter } from '@tanstack/react-router'
 import { DesignSystemProvider, ToastRegion } from '@meetingat10/design-system/react'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 
 
 // Development stack only (docs/deltas/2026-11-05-consultation-50-percent.md, slice E). Both conditions are fixed when the app is
@@ -18,6 +18,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 // Design system context: Motion defaults, client-side routing for its links (through the router's history), locale.
 function Root() {
   const router = useRouter()
+  // Toasts pause while the toast area has focus. Closing one with the mouse left focus on the next toast, so its timer
+  // never ran out; let it go after a pointer close. A keyboard close keeps focus there for screen reader users.
+  useEffect(() => {
+    const release = (event: MouseEvent) => {
+      if (event.detail === 0 || !(event.target instanceof Element) || !event.target.closest('.ds-toast__close, .ds-toast__action')) return
+      requestAnimationFrame(() => {
+        const active = document.activeElement
+        if (active instanceof HTMLElement && active.closest('.ds-toast-region')) active.blur()
+      })
+    }
+    document.addEventListener('click', release, true)
+    return () => document.removeEventListener('click', release, true)
+  }, [])
   return (
     <DesignSystemProvider
       navigate={(href) => router.history.push(href)}

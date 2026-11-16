@@ -1,3 +1,5 @@
+import { campusToday } from '@/lib/campus-date'
+import { parseDate } from '@internationalized/date'
 import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
 import type { MessageFile } from '@/lib/api'
 import { AvatarFill, photoSrc } from '@/components/app/photo'
@@ -82,6 +84,8 @@ interface PostComment {
   at: string
   /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
   underReview?: boolean
+  /** Written by you (anonymous or not): no "Report comment" for it. */
+  owned?: boolean
 }
 
 export interface CommunityPost {
@@ -833,7 +837,9 @@ export function PostComposer({
   const uploads = useFileUploads(10)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
-  const [eventDate, setEventDate] = useState('')
+  // "Add event" on the calendar opens this form with its date (YYYY-MM-DD, today or later).
+  const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') && (params.get('date') ?? '') >= campusToday().toString() ? params.get('date')! : ''
+  const [eventDate, setEventDate] = useState(requestedDate)
   const [eventTime, setEventTime] = useState('')
   const [eventPlace, setEventPlace] = useState('')
   const [eventContact, setEventContact] = useState('')
@@ -851,6 +857,9 @@ export function PostComposer({
   const eventRequired =
     kind === 'announcement' &&
     (audience.startsWith('organization:') || audience.startsWith('space:'))
+  // Any announcement can carry an event, which puts it on the calendar; only class and organization ones must.
+  const eventShown = kind === 'announcement'
+  const eventGiven = Boolean(eventDate || eventTime.trim() || eventPlace.trim() || eventContact.trim())
   const invalidRequestedAudience = Boolean(
     requested &&
     ![...audiences, ...announcementAudiences].includes(requestedAudience),
@@ -871,12 +880,15 @@ export function PostComposer({
     if (!body.trim() && !uploads.ready.length) nextErrors.body = 'Write your post or attach a file.'
     if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
-    if (eventRequired) {
+    if (eventRequired || (eventShown && eventGiven)) {
       if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
+      else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTime))
         nextErrors.eventTime = 'Enter a time as HH:MM.'
+    }
+    if (eventRequired) {
       if (!eventPlace.trim()) nextErrors.eventPlace = 'Enter the event place.'
-      if (!eventContact.trim()) nextErrors.eventContact = 'Enter a contact.'
+      if (!eventContact.trim()) nextErrors.eventContact = 'Enter who to contact.'
     }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
@@ -894,9 +906,12 @@ export function PostComposer({
           priority,
           private: audience.startsWith('organization:'),
           ...(uploads.ready.length ? { attachments: uploads.ready } : {}),
+          // Notify members only for class and organization events: a college-wide one would notify every account.
           ...(eventRequired
             ? { eventDate, eventTime, eventPlace, eventContact, notifyMembers }
-            : {}),
+            : eventShown && eventGiven
+              ? { eventDate, eventTime, ...(eventPlace.trim() ? { eventPlace } : {}), ...(eventContact.trim() ? { eventContact } : {}) }
+              : {}),
         },
       })
       const created = record<CommunityPost>(result.record)
@@ -1038,7 +1053,7 @@ export function PostComposer({
             </div>
           </section>
           <AnimatePresence initial={false}>
-            {eventRequired && (
+            {eventShown && (
               <motion.section
                 key="event"
                 className="fx-group fx-group--event"
@@ -1053,13 +1068,17 @@ export function PostComposer({
                     Event details
                   </h2>
                   <p className="fx-group__hint">
-                    Members see this on the post and in the calendar.
+                    {eventRequired
+                      ? 'Members see this on the post and in the calendar.'
+                      : 'Optional. Add a date and time to put this announcement on the calendar.'}
                   </p>
                 </div>
                 <div className="fx-group__body fx-group__body--grid">
                   <DatePicker
                     label="Event date"
-                    isRequired
+                    isRequired={eventRequired}
+                    defaultValue={requestedDate ? parseDate(requestedDate) : undefined}
+                    minValue={campusToday()}
                     onChange={(value) => setEventDate(value?.toString() ?? '')}
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
@@ -1070,7 +1089,7 @@ export function PostComposer({
                     onChange={setEventTime}
                     placeholder="14:00"
                     description="Use 24-hour time, HH:MM."
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}
                   />
@@ -1078,23 +1097,26 @@ export function PostComposer({
                     label="Place"
                     value={eventPlace}
                     onChange={setEventPlace}
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventPlace)}
                     errorMessage={errors.eventPlace}
                   />
                   <TextField
-                    label="Contact"
+                    label="Contact person"
+                    description="Who to ask, with a number or email if you like: Prof. Robin Elm, 0917 123 4567."
                     value={eventContact}
                     onChange={setEventContact}
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventContact)}
                     errorMessage={errors.eventContact}
                   />
-                  <div className="fx-group__wide">
-                    <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
-                      Notify members
-                    </Checkbox>
-                  </div>
+                  {eventRequired && (
+                    <div className="fx-group__wide">
+                      <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
+                        Notify members
+                      </Checkbox>
+                    </div>
+                  )}
                 </div>
               </motion.section>
             )}
@@ -1445,7 +1467,7 @@ function PostDetailPage({
               onAction={(key) => menuAction(String(key))}
             >
               <MenuItem id="copy">Copy link</MenuItem>
-              <MenuItem id="report">Report post</MenuItem>
+              {!post.owned && <MenuItem id="report">Report post</MenuItem>}
               {canConvert && <MenuItem id="convert">Start a report</MenuItem>}
               {post.owned && session.permissions.includes('post.create') && (
                 <MenuItem id="edit">Edit post</MenuItem>
@@ -1521,14 +1543,16 @@ function PostDetailPage({
                             Reply
                           </Button>
                         )}
-                        <MenuButton
-                          iconOnly
-                          icon="dots-three"
-                          label="Comment actions"
-                          onAction={() => openReport('comment', comment.id)}
-                        >
-                          <MenuItem id="report">Report comment</MenuItem>
-                        </MenuButton>
+                        {!comment.owned && (
+                          <MenuButton
+                            iconOnly
+                            icon="dots-three"
+                            label="Comment actions"
+                            onAction={() => openReport('comment', comment.id)}
+                          >
+                            <MenuItem id="report">Report comment</MenuItem>
+                          </MenuButton>
+                        )}
                       </>
                     }
                   >

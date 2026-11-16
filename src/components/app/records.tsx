@@ -1,3 +1,4 @@
+import { featureLabels } from "@/lib/restrictions";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -63,7 +64,7 @@ const word = (value: unknown, fallback = "") =>
 const firstRole = (value: unknown, fallback = "Office not recorded") =>
   Array.isArray(value) ? word(value[0], fallback) : fallback;
 const features = (restriction: Item) =>
-  Array.isArray(restriction.features) ? restriction.features.map(String) : [];
+  Array.isArray(restriction.features) ? restriction.features.map((code) => featureLabels[String(code)] ?? String(code)) : [];
 const isPaused = (standing: unknown) =>
   /paused|restrict/i.test(word(standing));
 const hasRestrictions = (student: Item) =>
@@ -778,7 +779,8 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const categories = items(page.data.byCategory);
   const trend = items(page.data.trend);
   const waiting = items(page.data.waitingByStage);
-  const cases = items(page.data.cases);
+  // Newest first: the cases a reader is looking for are usually the recent ones (oldest came first before).
+  const cases = items(page.data.cases).sort((a, b) => word(b.createdAt ?? b.at).localeCompare(word(a.createdAt ?? a.at)));
   const updateFilter = (name: string, value: string) => {
     const next = new URLSearchParams(location.searchStr);
     if (value) next.set(name, value);
@@ -788,6 +790,23 @@ function Analytics({ page }: { page: PageEnvelope }) {
     );
   };
   const filtered = [...search.keys()].length > 0;
+  // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
+  const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
+  const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  const changeRange = (name: "from" | "to", value: string) => {
+    const next = { from: search.get("from") ?? "", to: search.get("to") ?? "", ...rangeDraft, [name]: value };
+    setRangeDraft(next);
+    if (next.from && next.to && next.from > next.to) { setRangeProblem(name); return; }
+    setRangeProblem("");
+    setRangeDraft({});
+    // Both dates in one change of address: two updateFilter calls would each start from the old address.
+    const params = new URLSearchParams(location.searchStr);
+    for (const key of ["from", "to"] as const) {
+      if (next[key]) params.set(key, next[key]);
+      else params.delete(key);
+    }
+    router.history.replace(location.pathname + (params.size ? "?" + params.toString() : ""));
+  };
   const program = search.get("program") ?? "All";
   return (
     <Screen
@@ -829,6 +848,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                 { id: "All", label: "All" },
                 { id: "BSIT", label: "BSIT" },
                 { id: "BSCS", label: "BSCS" },
+                { id: "BSIS", label: "BSIS" },
               ]}
             />
           </FilterField>
@@ -876,17 +896,22 @@ function Analytics({ page }: { page: PageEnvelope }) {
           <SelectOption id="current">Available period</SelectOption>
           <SelectOption id="none">No matching period</SelectOption>
         </Select>
+        {/* A range that ends before it starts is not applied: the field says why instead. */}
         <TextField
           type="date"
           label="From"
-          value={search.get("from") ?? ""}
-          onChange={(value) => updateFilter("from", value)}
+          value={rangeDraft.from ?? search.get("from") ?? ""}
+          onChange={(value) => changeRange("from", value)}
+          isInvalid={rangeProblem === "from"}
+          errorMessage={rangeProblem === "from" ? "Choose a date on or before the To date." : undefined}
         />
         <TextField
           type="date"
           label="To"
-          value={search.get("to") ?? ""}
-          onChange={(value) => updateFilter("to", value)}
+          value={rangeDraft.to ?? search.get("to") ?? ""}
+          onChange={(value) => changeRange("to", value)}
+          isInvalid={rangeProblem === "to"}
+          errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
         />
       </div>
       <Kpis label="Case counts">
@@ -1032,9 +1057,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         : role === "guidance"
           ? "Students in Guidance cases"
           : "Students under OSAS authority";
-  const programs = [
-    ...new Set(students.map((student) => word(student.program)).filter(Boolean)),
-  ].sort();
+  // Every CCS program for readers who see the whole college (BSIS was missing while no BSIS student was listed); a
+  // Program Chair sees only their program, so they get no program filter.
+  const programs = role === "chair"
+    ? []
+    : [...new Set(["BSIT", "BSCS", "BSIS", ...students.map((student) => word(student.program)).filter(Boolean)])];
+  const [sort, setSort] = useState("name");
   const needle = search.trim().toLowerCase();
   const matching = students.filter(
     (student) =>
@@ -1047,6 +1075,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
           ? isPaused(student.standing)
           : !isPaused(student.standing))) &&
       (!restricted || hasRestrictions(student)),
+  ).sort((a, b) =>
+    sort === "id" ? word(a.studentId).localeCompare(word(b.studentId))
+      : sort === "program" ? `${word(a.program)} ${word(a.section)}`.localeCompare(`${word(b.program)} ${word(b.section)}`) || word(a.name).localeCompare(word(b.name))
+        : sort === "restricted" ? Number(hasRestrictions(b)) - Number(hasRestrictions(a)) || word(a.name).localeCompare(word(b.name))
+          : word(a.name).localeCompare(word(b.name)),
   );
   const filtered = Boolean(needle) || program !== "All" || standing !== "All" || restricted;
   const reset = () => {
@@ -1112,6 +1145,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         >
           Has restriction
         </button>
+        <Select label="Sort by" selectedKey={sort} onSelectionChange={(key) => setSort(String(key))}>
+          <SelectOption id="name">Name, A to Z</SelectOption>
+          <SelectOption id="id">Student ID</SelectOption>
+          <SelectOption id="program">Program and section</SelectOption>
+          <SelectOption id="restricted">Restricted first</SelectOption>
+        </Select>
       </div>
       <p className="rc-count" aria-live="polite">
         {matching.length} of {students.length}{" "}
@@ -1556,7 +1595,10 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const action = useAction("P35");
   const students = items(page.data.students);
   const restrictions = items(page.data.restrictions);
-  const referrals = items(page.data.referrals);
+  // Waiting requests first; a request is done once the administrator acts on that student's restrictions.
+  const isDone = (request: Record<string, unknown>) => word(request.status).startsWith("Done");
+  const referrals = items(page.data.referrals).sort((a, b) => Number(isDone(a)) - Number(isDone(b)));
+  const waitingRequests = referrals.filter((request) => !isDone(request)).length;
   const [tab, setTab] = useState("active");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
@@ -1622,7 +1664,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
           onChange={setTab}
           tabs={[
             { id: "active", label: "Active", count: active.length },
-            { id: "requests", label: "Change requests", count: referrals.length },
+            { id: "requests", label: "Change requests", count: waitingRequests },
             { id: "ended", label: "Ended", count: ended.length },
           ]}
         />
@@ -1655,7 +1697,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                           </td>
                           <td className="rc-wrap">{word(request.reason, "—")}</td>
                           <td>
-                            <StatusChip tone={toneFor(word(request.status))}>
+                            <StatusChip tone={isDone(request) ? "ok" : toneFor(word(request.status))}>
                               {word(request.status, "—")}
                             </StatusChip>
                           </td>

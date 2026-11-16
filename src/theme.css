@@ -445,3 +445,16 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .cm-chat__col { max-width: none; }
 :root .ev-form { max-width: none; }
 :root :is(.rc-form, .rc-choices) { max-width: none; }
+
+/* Toasts follow the site's light or dark mode instead of always using the inverse (dark-on-light) colours. */
+:root .ds-toast { --toast-tone: var(--site-accent-ink); background: var(--accs-surface); color: var(--accs-ink); border: 1px solid var(--accs-line); box-shadow: 0 12px 32px rgb(0 0 0 / 0.14); }
+:root .ds-toast--success { --toast-tone: var(--accs-ok); }
+:root .ds-toast__body { color: var(--accs-muted); }
+:root .ds-toast__action { color: var(--accs-ink); }
+:root .ds-toast__close { color: var(--accs-muted); }
+:root .ds-toast__close:is(:hover, [data-hovered]) { color: var(--accs-ink); background: var(--accs-sunken); }
+:root .ds-toast:focus-visible { outline-color: var(--site-accent); }
+
+/* A popup whose body and buttons sit inside a <form> lost its scrolling body, so a tall form (Add times) hid its Save
+   button below the screen. The form drops out of the layout (it still submits), so only the body scrolls. */
+:root .ds-modal form:has(> .ds-modal__body) { display: contents; }

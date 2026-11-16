@@ -1,0 +1,9 @@
+/* Search results: one panel per kind of result. */
+.sr-groups { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); align-items: start; }
+.sr-group-title { display: inline-flex; align-items: center; gap: 8px; }
+.sr-hits { margin: 0; padding: 0; list-style: none; }
+.sr-hits > li + li { border-top: 1px solid var(--accs-line); }
+a.sr-hit { display: grid; gap: 2px; padding: 12px 4px; color: inherit; text-decoration: none; border-radius: 8px; }
+a.sr-hit:hover .sr-hit__title { color: var(--site-accent-ink); text-decoration: underline; }
+.sr-hit__title { color: var(--accs-ink); font-size: 0.9375rem; font-weight: 600; overflow-wrap: anywhere; }
+.sr-hit__sub { color: var(--accs-muted); font-size: 0.8125rem; }

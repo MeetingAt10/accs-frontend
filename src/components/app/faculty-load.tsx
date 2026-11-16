@@ -1,3 +1,4 @@
+import { keepFilteredPage } from '@/lib/queries'
 import { Alert, Button, DatePicker, Select, SelectOption, TextField, ViewState, toast } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useRouterState } from '@tanstack/react-router'
@@ -225,7 +226,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
 
 export function FacultyLoadPage() {
   const filters = useRouterState({ select: (state) => state.location.searchStr.replace(/^\?/, '') })
-  const page = useQuery(pageQuery('P54', undefined, filters))
+  const page = useQuery({ ...pageQuery('P54', undefined, filters), placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, 'P54') ? previous : undefined })
   if (page.isPending) return <ViewState kind="loading" title="Loading faculty load" />
   if (page.isError) return <ViewState kind="error" title="Faculty load didn't load" description={page.error.message} actions={<Button variant="secondary" onPress={() => void page.refetch()}>Try again</Button>} />
   return <FacultyLoadScreen page={page.data} />

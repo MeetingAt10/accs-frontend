@@ -180,6 +180,7 @@ export function pageIdForPath(path: string) {
 }
 
 export function titleForPath(path: string) {
+  if (path === '/search') return 'Search'
   const pageId = pageIdForPath(path)
   return pageId ? pageTitles[pageId] : 'ACCS'
 }

@@ -1,3 +1,4 @@
+import { featureWords } from "@/lib/restrictions";
 import {
   Alert,
   Badge,
@@ -755,13 +756,14 @@ function Topbar({
             role="search"
             onSubmit={(event) => {
               event.preventDefault();
+              // One search over posts, spaces, people, cases and records, limited to what this person may open.
               if (search.trim())
-                router.history.push("/feed?q=" + encodeURIComponent(search.trim()));
+                router.history.push("/search?q=" + encodeURIComponent(search.trim()));
             }}
           >
             <Search
-              label="Search posts and spaces"
-              placeholder="Search posts and spaces"
+              label="Search ACCS"
+              placeholder="Search posts, people, cases…"
               size="sm"
               value={search}
               onChange={setSearch}
@@ -954,9 +956,7 @@ export function AppChrome({
               ? pausedFeatures
                   .map((entry) => {
                     const restriction = entry as Record<string, unknown>;
-                    const features = Array.isArray(restriction.features)
-                      ? restriction.features.map(String).join(", ")
-                      : "Some features";
+                    const features = featureWords(restriction.features) || "Some features";
                     return `${features} paused until ${String(restriction.until ?? "review")}`;
                   })
                   .join("; ")

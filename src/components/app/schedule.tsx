@@ -1,3 +1,4 @@
+import { campusToday } from '@/lib/campus-date'
 import {
   Alert,
   Button,
@@ -261,7 +262,11 @@ function useCalendarLocation() {
   const params = new URLSearchParams(location.searchStr)
   function update(values: Record<string, string>) {
     const next = new URLSearchParams(location.searchStr)
-    for (const [key, value] of Object.entries(values)) next.set(key, value)
+    // An empty value removes the parameter (no `layers` means every layer).
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
     router.history.push(`${location.pathname}?${next.toString()}`)
   }
   return { params, update }
@@ -386,6 +391,7 @@ function CalendarPage({
   const selectedLayers = params.has('layers')
     ? (params.get('layers') ?? '').split(',')
     : layers.map((layer) => layer.id)
+  const allLayersShown = layers.every((layer) => selectedLayers.includes(layer.id))
   const todos = [...list<Todo>(page.data.todos)].sort(
     (a, b) => Number(a.done) - Number(b.done) || a.date.localeCompare(b.date),
   )
@@ -562,7 +568,7 @@ function CalendarPage({
           )}
           {entry.contact && (
             <div>
-              <dt>Contact</dt>
+              <dt>Contact person</dt>
               <dd>{entry.contact}</dd>
             </div>
           )}
@@ -649,6 +655,16 @@ function CalendarPage({
         description="All times are campus time."
         actions={
           <>
+            {/* Events are announcements with a date: this opens one with the chosen day filled in (a past day becomes today). */}
+            {session.permissions.includes('announcement.publish') && (
+              <Button
+                icon="calendar"
+                variant={canTodo ? 'secondary' : 'primary'}
+                href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate < today() ? today() : selectedDate)}`}
+              >
+                Add event
+              </Button>
+            )}
             {canTodo && (
               <Button icon="plus" onPress={() => setTodoOpen(true)}>
                 Add to-do
@@ -717,7 +733,20 @@ function CalendarPage({
             <ActionError error={action.error} />
           </div>
           <div className="accs-stack">
-            <Panel title="Show on calendar" className="sc-rail-layers">
+            <Panel
+              title="Show on calendar"
+              className="sc-rail-layers"
+              action={
+                // Every layer at once, or none: one press instead of one per layer.
+                <button
+                  type="button"
+                  className="accs-panel__link sc-layers-all"
+                  onClick={() => update({ layers: allLayersShown ? 'none' : '' })}
+                >
+                  {allLayersShown ? 'Hide all' : 'Show all'}
+                </button>
+              }
+            >
               {layerPills}
             </Panel>
             <Panel flush title="Upcoming">
@@ -1794,11 +1823,12 @@ function RequestPage({
                 <li key={role}>
                   <div className="accs-row accs-row--people">
                     <Avatar name={person.name} />
-                    <span>
+                    {/* Name above role; they ran together ("Demo Student GolfStudent · CCS student"). */}
+                    <span className="sc-person-text">
                       <span className="accs-row__title">{person.name}</span>
                       <span className="accs-row__sub">
                         {role}
-                        {person.title ? ` · ${person.title}` : ''}
+                        {person.title && !person.title.toLowerCase().includes(role.toLowerCase()) ? ` · ${person.title}` : ''}
                       </span>
                     </span>
                   </div>
@@ -2191,6 +2221,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <DatePicker
                 label="Date"
                 isRequired
+                minValue={campusToday()}
                 onChange={(value) => setDate(value?.toString() ?? '')}
               />
               <div className="sc-timepair">

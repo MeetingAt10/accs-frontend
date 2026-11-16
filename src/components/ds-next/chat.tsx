@@ -143,7 +143,7 @@ function ConversationRow({
           </span>
           <span className="ds-next-conversation__tags">
             <span className="accs-tag">
-              {conversation.kind === "group" ? "Class group" : "Direct"}
+              {conversation.groupKind === "people" ? "Group" : conversation.kind === "group" ? "Class group" : "Direct"}
             </span>
             {memberRoles.length > 0 && (
               <span className="ds-next-conversation__roles">
@@ -376,6 +376,8 @@ export function MessageComposer({
                   const chosen = Array.from(event.target.files ?? []);
                   event.target.value = "";
                   if (chosen.length) onAddFiles(chosen);
+                  // Back to the message box, so Enter sends instead of pressing the paperclip again.
+                  event.currentTarget.form?.querySelector("textarea")?.focus();
                 }}
               />
               <IconButton
