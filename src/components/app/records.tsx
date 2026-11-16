@@ -779,7 +779,8 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const categories = items(page.data.byCategory);
   const trend = items(page.data.trend);
   const waiting = items(page.data.waitingByStage);
-  const cases = items(page.data.cases);
+  // Newest first: the cases a reader is looking for are usually the recent ones (oldest came first before).
+  const cases = items(page.data.cases).sort((a, b) => word(b.createdAt ?? b.at).localeCompare(word(a.createdAt ?? a.at)));
   const updateFilter = (name: string, value: string) => {
     const next = new URLSearchParams(location.searchStr);
     if (value) next.set(name, value);
@@ -847,6 +848,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                 { id: "All", label: "All" },
                 { id: "BSIT", label: "BSIT" },
                 { id: "BSCS", label: "BSCS" },
+                { id: "BSIS", label: "BSIS" },
               ]}
             />
           </FilterField>
@@ -1055,9 +1057,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         : role === "guidance"
           ? "Students in Guidance cases"
           : "Students under OSAS authority";
-  const programs = [
-    ...new Set(students.map((student) => word(student.program)).filter(Boolean)),
-  ].sort();
+  // Every CCS program for readers who see the whole college (BSIS was missing while no BSIS student was listed); a
+  // Program Chair sees only their program, so they get no program filter.
+  const programs = role === "chair"
+    ? []
+    : [...new Set(["BSIT", "BSCS", "BSIS", ...students.map((student) => word(student.program)).filter(Boolean)])];
+  const [sort, setSort] = useState("name");
   const needle = search.trim().toLowerCase();
   const matching = students.filter(
     (student) =>
@@ -1070,6 +1075,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
           ? isPaused(student.standing)
           : !isPaused(student.standing))) &&
       (!restricted || hasRestrictions(student)),
+  ).sort((a, b) =>
+    sort === "id" ? word(a.studentId).localeCompare(word(b.studentId))
+      : sort === "program" ? `${word(a.program)} ${word(a.section)}`.localeCompare(`${word(b.program)} ${word(b.section)}`) || word(a.name).localeCompare(word(b.name))
+        : sort === "restricted" ? Number(hasRestrictions(b)) - Number(hasRestrictions(a)) || word(a.name).localeCompare(word(b.name))
+          : word(a.name).localeCompare(word(b.name)),
   );
   const filtered = Boolean(needle) || program !== "All" || standing !== "All" || restricted;
   const reset = () => {
@@ -1135,6 +1145,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         >
           Has restriction
         </button>
+        <Select label="Sort by" selectedKey={sort} onSelectionChange={(key) => setSort(String(key))}>
+          <SelectOption id="name">Name, A to Z</SelectOption>
+          <SelectOption id="id">Student ID</SelectOption>
+          <SelectOption id="program">Program and section</SelectOption>
+          <SelectOption id="restricted">Restricted first</SelectOption>
+        </Select>
       </div>
       <p className="rc-count" aria-live="polite">
         {matching.length} of {students.length}{" "}

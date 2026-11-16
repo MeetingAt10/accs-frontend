@@ -756,13 +756,14 @@ function Topbar({
             role="search"
             onSubmit={(event) => {
               event.preventDefault();
+              // One search over posts, spaces, people, cases and records, limited to what this person may open.
               if (search.trim())
-                router.history.push("/feed?q=" + encodeURIComponent(search.trim()));
+                router.history.push("/search?q=" + encodeURIComponent(search.trim()));
             }}
           >
             <Search
-              label="Search posts and spaces"
-              placeholder="Search posts and spaces"
+              label="Search ACCS"
+              placeholder="Search posts, people, cases…"
               size="sm"
               value={search}
               onChange={setSearch}

@@ -998,6 +998,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [query, setQuery] = useState(initial.get('q') ?? '')
   const [level, setLevel] = useState(initial.get('severity') ?? '')
   const [category, setCategory] = useState(initial.get('category') ?? '')
+  const [subcategory, setSubcategory] = useState(initial.get('subcategory') ?? '')
   const [status, setStatus] = useState(initial.get('status') ?? '')
   const [stage, setStage] = useState(initial.get('stage') ?? '')
   const [received, setReceived] = useState('term')
@@ -1005,6 +1006,9 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [sort, setSort] = useState<SortDescriptor>({ column: 'updatedAt', direction: 'descending' })
   const records = items(page.data.cases)
+  const categoryOptions = readCategoryOptions(page.data.categoryOptions)
+  const queueCategories = [...new Set([...categoryOptions.map((option) => option.label), ...records.map((report) => words(report.category))])].filter(Boolean)
+  const queueSubcategories = categoryOptions.find((option) => option.label === category)?.subcategories ?? []
   const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...(roles.includes('professor') ? [['teaching', 'Teaching assignments']] : []), ['history', 'Handled by me'], ['closed', 'Closed']]
     : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
@@ -1026,7 +1030,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
                   : selected === 'active' ? !isClosed(report) && items(report.history).length > 1
                     : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
   const inQueue = records.filter((report) => inTab(report, validTab))
-  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
+  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!subcategory || report.subcategory === subcategory) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
@@ -1042,7 +1046,9 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
           <div className="accs-toolbar gv-toolbar">
             <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
             <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
-            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            {/* Every category, not only those in the list now, and its sub-categories once one is chosen. */}
+            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => { setCategory(String(key ?? '')); setSubcategory('') })}><SelectOption id="">All categories</SelectOption>{queueCategories.map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            {queueSubcategories.length > 0 && <Select label="Sub-category" selectedKey={subcategory} onSelectionChange={(key) => reset(() => setSubcategory(String(key ?? '')))}><SelectOption id="">All sub-categories</SelectOption>{queueSubcategories.map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>}
             <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
             <Select label="Stage" selectedKey={stage} onSelectionChange={(key) => reset(() => setStage(String(key ?? '')))}><SelectOption id="">All stages</SelectOption>{stages.map(([key, name]) => <SelectOption id={key} key={key}>{name + ' (' + inQueue.filter((report) => stageOf(report) === key).length + ')'}</SelectOption>)}</Select>
             <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>

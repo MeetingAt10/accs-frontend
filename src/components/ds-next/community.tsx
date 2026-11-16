@@ -1,7 +1,7 @@
 import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 import { initials } from '@/lib/format'
 import './community.css'
@@ -69,10 +69,31 @@ export function Comment({
             {date}
           </time>
         </div>
-        <div className="ds-next-comment__body">{children}</div>
+        <CommentBody>{children}</CommentBody>
         {actions && <div className="ds-next-comment__actions">{actions}</div>}
       </div>
     </motion.li>
+  )
+}
+
+/** A comment's text, cut to about six lines when it is longer, with Show more and Show less. */
+function CommentBody({ children }: { children: ReactNode }) {
+  const body = useRef<HTMLDivElement>(null)
+  const [long, setLong] = useState(false)
+  const [open, setOpen] = useState(false)
+  useLayoutEffect(() => {
+    const element = body.current
+    if (element && !open) setLong(element.scrollHeight > element.clientHeight + 2)
+  }, [children, open])
+  return (
+    <>
+      <div ref={body} className="ds-next-comment__body" data-clamped={!open || undefined}>{children}</div>
+      {(long || open) && (
+        <button type="button" className="ds-next-comment__more" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          {open ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </>
   )
 }
 

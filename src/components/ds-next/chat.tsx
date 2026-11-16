@@ -143,7 +143,7 @@ function ConversationRow({
           </span>
           <span className="ds-next-conversation__tags">
             <span className="accs-tag">
-              {conversation.kind === "group" ? "Class group" : "Direct"}
+              {conversation.groupKind === "people" ? "Group" : conversation.kind === "group" ? "Class group" : "Direct"}
             </span>
             {memberRoles.length > 0 && (
               <span className="ds-next-conversation__roles">

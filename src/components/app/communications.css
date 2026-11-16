@@ -77,3 +77,7 @@
 /* A category that cannot be turned off is tagged Required next to its choices. */
 .cm-pref { position: relative; }
 .cm-required { position: absolute; top: 16px; right: 20px; }
+
+/* People added to a new group, each with a remove button. */
+.cm-group-people { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cm-group-people li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 2px 2px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); color: var(--accs-ink); font-size: 0.875rem; font-weight: 500; }
