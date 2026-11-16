@@ -1,3 +1,4 @@
+import { featureWords } from "@/lib/restrictions";
 import {
   Alert,
   Badge,
@@ -954,9 +955,7 @@ export function AppChrome({
               ? pausedFeatures
                   .map((entry) => {
                     const restriction = entry as Record<string, unknown>;
-                    const features = Array.isArray(restriction.features)
-                      ? restriction.features.map(String).join(", ")
-                      : "Some features";
+                    const features = featureWords(restriction.features) || "Some features";
                     return `${features} paused until ${String(restriction.until ?? "review")}`;
                   })
                   .join("; ")

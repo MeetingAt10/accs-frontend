@@ -6,7 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { ApiError, type PageEnvelope } from '@/lib/api'
 import { formatDate, initials, relativeTime } from '@/lib/format'
 import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
-import { pageQuery, sessionQuery } from '@/lib/queries'
+import { keepFilteredPage, pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { CommunityHeader, dashboardStats, isCommunityRole } from '@/components/app/community-home'
@@ -503,7 +503,14 @@ export function PageScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>
   const recordId = Object.values(params).at(-1)
   const filters = useRouterState({ select: (state) => state.location.searchStr.slice(1) })
-  const page = useQuery(pageQuery(pageId, pageId === 'P03' ? undefined : recordId, filters))
+  const record = pageId === 'P03' ? undefined : recordId
+  // Typing in a search box or changing a filter only changes `filters`: keep showing the page while the new results load.
+  // It used to swap the whole page for "Loading page" on every key, which also threw away the search box. Another page
+  // or record still starts from the loading state.
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  })
   return (
     <RequirePermission pageId={pageId}>
       <div className="app-page">

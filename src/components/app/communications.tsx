@@ -102,6 +102,29 @@ function useCommunicationAction(pageId: string, showToast = true) {
   });
 }
 
+/** Mute a conversation. The switch flips at once and pages refresh in the background, so it can be switched back right away. */
+function MuteSwitch({ conversationId, muted }: { conversationId: string; muted: boolean }) {
+  const queryClient = useQueryClient();
+  const [on, setOn] = useState(muted);
+  useEffect(() => setOn(muted), [muted]);
+  const save = useMutation({
+    mutationFn: (next: boolean) => performPageAction("P12", { action: "muteThread", recordId: conversationId, payload: { muted: next } }),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["page"] });
+      toast(result.message, { tone: "success" });
+    },
+    onError: (_error, next) => setOn(!next),
+  });
+  return (
+    <>
+      <Switch isSelected={on} onChange={(next) => { setOn(next); save.mutate(next); }}>
+        Mute this conversation
+      </Switch>
+      <ActionError error={save.error} />
+    </>
+  );
+}
+
 function ActionError({ error }: { error: unknown }) {
   return error ? (
     <Alert tone="danger" title="The change couldn't be saved">
@@ -579,20 +602,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               </Stack>
             </Row>
           ))}
-          <Switch
-            isSelected={conversation.muted === true}
-            onChange={(muted) =>
-              action.mutate({
-                action: "muteThread",
-                recordId: words(conversation.id),
-                payload: { muted },
-              })
-            }
-            isDisabled={action.isPending}
-          >
-            Mute this conversation
-          </Switch>
-          <ActionError error={action.error} />
+          <MuteSwitch conversationId={words(conversation.id)} muted={conversation.muted === true} />
         </Stack>
       </Drawer>
       <Modal

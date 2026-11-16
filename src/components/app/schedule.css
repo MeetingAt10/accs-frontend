@@ -294,7 +294,9 @@
 .bk-slot > span { position: relative; z-index: 1; }
 .bk-slot:hover:not(:disabled) { background: var(--site-accent-wash); }
 .bk-slot:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 3px; }
-.bk-slot[aria-pressed='true'] { color: var(--accs-on-accent); }
+/* The chosen time has its own fill, so its light text never sits on a light background (it looked empty when the
+   animated thumb was not drawn). */
+.bk-slot[aria-pressed='true'], .bk-slot[aria-pressed='true']:hover:not(:disabled) { background: var(--site-accent); border-color: var(--site-accent); color: var(--accs-on-accent); }
 .bk-slot__thumb {
   position: absolute;
   inset: -1.5px;

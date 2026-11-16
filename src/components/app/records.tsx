@@ -1,3 +1,4 @@
+import { featureLabels } from "@/lib/restrictions";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -63,7 +64,7 @@ const word = (value: unknown, fallback = "") =>
 const firstRole = (value: unknown, fallback = "Office not recorded") =>
   Array.isArray(value) ? word(value[0], fallback) : fallback;
 const features = (restriction: Item) =>
-  Array.isArray(restriction.features) ? restriction.features.map(String) : [];
+  Array.isArray(restriction.features) ? restriction.features.map((code) => featureLabels[String(code)] ?? String(code)) : [];
 const isPaused = (standing: unknown) =>
   /paused|restrict/i.test(word(standing));
 const hasRestrictions = (student: Item) =>
@@ -1556,7 +1557,10 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const action = useAction("P35");
   const students = items(page.data.students);
   const restrictions = items(page.data.restrictions);
-  const referrals = items(page.data.referrals);
+  // Waiting requests first; a request is done once the administrator acts on that student's restrictions.
+  const isDone = (request: Record<string, unknown>) => word(request.status).startsWith("Done");
+  const referrals = items(page.data.referrals).sort((a, b) => Number(isDone(a)) - Number(isDone(b)));
+  const waitingRequests = referrals.filter((request) => !isDone(request)).length;
   const [tab, setTab] = useState("active");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
@@ -1622,7 +1626,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
           onChange={setTab}
           tabs={[
             { id: "active", label: "Active", count: active.length },
-            { id: "requests", label: "Change requests", count: referrals.length },
+            { id: "requests", label: "Change requests", count: waitingRequests },
             { id: "ended", label: "Ended", count: ended.length },
           ]}
         />
@@ -1655,7 +1659,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                           </td>
                           <td className="rc-wrap">{word(request.reason, "—")}</td>
                           <td>
-                            <StatusChip tone={toneFor(word(request.status))}>
+                            <StatusChip tone={isDone(request) ? "ok" : toneFor(word(request.status))}>
                               {word(request.status, "—")}
                             </StatusChip>
                           </td>

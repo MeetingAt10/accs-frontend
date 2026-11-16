@@ -376,6 +376,8 @@ export function MessageComposer({
                   const chosen = Array.from(event.target.files ?? []);
                   event.target.value = "";
                   if (chosen.length) onAddFiles(chosen);
+                  // Back to the message box, so Enter sends instead of pressing the paperclip again.
+                  event.currentTarget.form?.querySelector("textarea")?.focus();
                 }}
               />
               <IconButton

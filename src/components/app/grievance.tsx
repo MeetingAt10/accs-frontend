@@ -668,6 +668,8 @@ export function CaseActionBar({ report }: { report: Report }) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
   const allowedAll = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
   const [selected, setSelected] = useState('')
+  // The opened action names the popup, also while it closes (it read "Record action" during the closing animation).
+  const [opened, setOpened] = useState('')
   const [reason, setReason] = useState('')
   const [update, setUpdate] = useState('')
   const [error, setError] = useState('')
@@ -678,18 +680,20 @@ export function CaseActionBar({ report }: { report: Report }) {
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
   if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions available. You can only read this report at its current stage.</p></Panel>
-  const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
+  const open = (type: string) => { setSelected(type); setOpened(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
     <Panel title="Next action">
       <div className="gv-actions">
         {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
         {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
       </div>
-      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
+      {/* Every action closes on a click outside, unless something has been typed: a stray click never loses a reason. */}
+      <Modal title={label(opened) + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(opened) ? 'alertdialog' : 'dialog'} isDismissable={!reason.trim() && !update.trim()} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
         <ModalBody>
           <div className="gv-stack">
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
-            <TextArea label="Reason" value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
+            {/* A milestone is named, not justified: "Counselling session held", not a reason. */}
+            <TextArea label={opened === 'milestone' ? 'Milestone' : 'Reason'} description={opened === 'milestone' ? 'What happened, for example "Counselling session held".' : undefined} value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
             <TextArea label="Update shown to the reporter" value={update} onChange={setUpdate} isRequired maxLength={4000} showCount />
             <Note>The reason stays in the handler history. The reporter sees the update you write above.</Note>
             {error && <Alert tone="danger" title="Missing information">{error}</Alert>}
@@ -699,9 +703,9 @@ export function CaseActionBar({ report }: { report: Report }) {
         <ModalActions>
           <Button variant="secondary" isDisabled={action.isPending} onPress={() => setSelected('')}>Cancel</Button>
           <Button loading={action.isPending} onPress={() => {
-            if (!reason.trim() || !update.trim()) { setError('Add a reason and an update for the reporter.'); return }
+            if (!reason.trim() || !update.trim()) { setError(`Add ${opened === 'milestone' ? 'the milestone' : 'a reason'} and an update for the reporter.`); return }
             action.mutate({ action: 'caseAction', recordId: report.id, reason, payload: { type: selected, update, ...(transition && next ? { nextStage: next.stage } : {}) } }, { onSuccess: () => setSelected('') })
-          }}>{label(selected) || 'Save action'}</Button>
+          }}>{label(opened) || 'Save action'}</Button>
         </ModalActions>
       </Modal>
     </Panel>

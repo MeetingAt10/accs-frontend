@@ -21,6 +21,10 @@ export const sessionQuery = () =>
  */
 export const sessionCheckSignedOut = (error: unknown) => error instanceof ApiError && error.status === 401
 
+/** True when the previous page data belongs to the same page and record, so only the filters differ. */
+export const keepFilteredPage = (previousKey: readonly unknown[] | undefined, pageId: string, recordId?: string) =>
+  !!previousKey && previousKey[0] === 'page' && previousKey[1] === pageId && previousKey[2] === recordId
+
 export const pageQuery = (pageId: string, recordId?: string, filters = '') =>
   queryOptions({
     queryKey: ['page', pageId, recordId, filters],
