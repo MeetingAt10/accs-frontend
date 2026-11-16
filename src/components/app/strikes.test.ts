@@ -11,11 +11,11 @@ describe('strikes', () => {
   })
 
   it('says who recommended the strike and who decided it', () => {
-    const dean = { name: 'Dr. Sage Linden' }
-    const osas = { name: 'Jamie Alder' }
-    expect(strikePeople({ status: 'recommended', recommendedBy: dean, recordedBy: dean })).toBe('Recommended by Dr. Sage Linden')
-    expect(strikePeople({ status: 'confirmed', recommendedBy: dean, recordedBy: osas })).toBe('Recommended by Dr. Sage Linden, confirmed by Jamie Alder')
-    expect(strikePeople({ status: 'rejected', recommendedBy: dean, recordedBy: osas })).toBe('Recommended by Dr. Sage Linden, rejected by Jamie Alder')
-    expect(strikePeople({ recordedBy: osas })).toBe('Recorded by Jamie Alder')
+    const dean = { name: 'Dr. Paula Joy L. Dela Cruz' }
+    const osas = { name: 'Demo OSAS Officer' }
+    expect(strikePeople({ status: 'recommended', recommendedBy: dean, recordedBy: dean })).toBe('Recommended by Dr. Paula Joy L. Dela Cruz')
+    expect(strikePeople({ status: 'confirmed', recommendedBy: dean, recordedBy: osas })).toBe('Recommended by Dr. Paula Joy L. Dela Cruz, confirmed by Demo OSAS Officer')
+    expect(strikePeople({ status: 'rejected', recommendedBy: dean, recordedBy: osas })).toBe('Recommended by Dr. Paula Joy L. Dela Cruz, rejected by Demo OSAS Officer')
+    expect(strikePeople({ recordedBy: osas })).toBe('Recorded by Demo OSAS Officer')
   })
 })

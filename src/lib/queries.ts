@@ -29,6 +29,23 @@ export const pageQuery = (pageId: string, recordId?: string, filters = '') =>
   })
 
 /**
+ * The unread notifications not seen before, given the ones seen so far. The first list only marks everything as seen,
+ * so opening the portal does not pop up old notifications.
+ */
+export function newNotifications(seen: { current: Set<string> | null }, items: unknown) {
+  if (!Array.isArray(items)) return []
+  const list = items as Record<string, unknown>[]
+  if (seen.current === null) {
+    seen.current = new Set(list.map((notice) => String(notice.id)))
+    return []
+  }
+  const known = seen.current
+  const fresh = list.filter((notice) => notice.read !== true && !known.has(String(notice.id)))
+  for (const notice of list) known.add(String(notice.id))
+  return fresh
+}
+
+/**
  * The notification bell popover's items (the latest 5) and the unread count of every notification, from the P40 page query. Reads them
  * only from a successful fetch - a failed or still-loading query must not read as "zero
  * notifications" (it isn't; the request just hasn't told us yet).

@@ -8,10 +8,11 @@ import {
   Popover,
   Search,
   Stack,
+  toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AssistantPanel,
@@ -35,7 +36,7 @@ import {
   type Role,
   type Session,
 } from "@/lib/api";
-import { notificationsFromQuery, pageQuery } from "@/lib/queries";
+import { newNotifications, notificationsFromQuery, pageQuery } from "@/lib/queries";
 import {
   allowsPath,
   canOpenSite,
@@ -512,6 +513,16 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
+  staff: [
+    {
+      label: "Workspace",
+      entries: [
+        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
+        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+        { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
+      ],
+    },
+  ],
   secretary: [
     {
       label: "Workspace",
@@ -603,8 +614,24 @@ function ThemeToggle() {
   const density = typeof settings?.density === "string" ? settings.density : "comfortable";
   const [current, setCurrent] = useState(() => resolvedTheme(saved));
   useEffect(() => setCurrent(resolvedTheme(saved)), [saved]);
+  // Following the device: track its light/dark changes so the switch offers the other theme.
+  useEffect(() => {
+    if (saved !== "system" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const follow = () => setCurrent(media.matches ? "dark" : "light");
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, [saved]);
   const save = useMutation({
     mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
+    // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
+    onError: (error) => {
+      const restored = resolvedTheme(saved);
+      if (saved === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", restored);
+      setCurrent(restored);
+      toast(apiErrorText(error));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
   });
   const next = current === "dark" ? "light" : "dark";
@@ -612,6 +639,8 @@ function ThemeToggle() {
     <IconButton
       icon={current === "dark" ? "sun" : "moon"}
       label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
+      // Off until the saved settings are known, so saving the theme never replaces the saved density with a default.
+      isDisabled={!appearance.isSuccess || save.isPending}
       onPress={() => {
         document.documentElement.setAttribute("data-theme", next);
         setCurrent(next);
@@ -640,7 +669,8 @@ function Topbar({
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const notifications = useQuery(pageQuery("P40"));
+  // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
+  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
     mutationFn: (action: {
       action: "markNotification";
@@ -677,6 +707,27 @@ function Topbar({
 
   const { recent: recentNotifications, unreadCount } =
     notificationsFromQuery(notifications);
+
+  // A pop-up for each notification that arrives while the portal is open; the ones already there on load stay quiet.
+  const seenNotifications = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const fresh = newNotifications(seenNotifications, notifications.isSuccess ? notifications.data?.data.notifications : undefined);
+    if (!fresh.length) return;
+    // An open conversation or message list shows the new message right away.
+    if (fresh.some((notice) => notice.kind === "message")) {
+      void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
+    }
+    for (const notice of fresh.slice(0, 3)) {
+      const body = String(notice.body ?? "");
+      toast(String(notice.title ?? "New update"), {
+        ...(body && !body.startsWith("Open this update") ? { description: body } : {}),
+        action: { label: "Open", onAction: () => void openNotification(notice) },
+      });
+    }
+    if (fresh.length > 3) toast(`${fresh.length - 3} more new notifications`, { action: { label: "View all", onAction: () => router.history.push("/notifications") } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifications.data]);
   const siteLabel = siteById[site].label;
 
   return (

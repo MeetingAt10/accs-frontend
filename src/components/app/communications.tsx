@@ -1,4 +1,4 @@
-import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
+import { MessageFiles, PendingFiles, messageFileAccept, messageFileProblem, messageFileType, messageFilesPerMessage, type PendingFile } from '@/components/app/message-files'
 import { roleLabelOf } from '@/lib/role-labels'
 import { Pager, usePaged } from '@/components/app/paging'
 import {
@@ -189,6 +189,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     roles(member.roles).some((role) => ["guidance", "osas"].includes(role)),
   );
 
+  // New messages show without notifications too: muting a conversation must not stop it from updating while open.
+  useEffect(() => {
+    const timer = window.setInterval(() => void queryClient.invalidateQueries({ queryKey: ["page", page.pageId] }), 15_000);
+    return () => window.clearInterval(timer);
+  }, [queryClient, page.pageId]);
+
   useEffect(() => {
     if (!isThread || !conversationId) return;
     void performPageAction("P12", {
@@ -221,6 +227,18 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const readyFiles = pendingFiles.filter((file) => file.state === "ready");
   const filesBusy = pendingFiles.some((file) => file.state === "uploading");
+  // Previews still open when Messages is left are released.
+  const latestFiles = useRef(pendingFiles);
+  latestFiles.current = pendingFiles;
+  useEffect(() => () => { for (const file of latestFiles.current) if (file.preview) URL.revokeObjectURL(file.preview); }, []);
+  // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
+  useEffect(() => {
+    setBody("");
+    setPendingFiles((current) => {
+      for (const file of current) if (file.preview) URL.revokeObjectURL(file.preview);
+      return [];
+    });
+  }, [conversationId]);
   function removePendingFile(key: string) {
     setPendingFiles((current) => {
       const gone = current.find((file) => file.key === key);
@@ -241,7 +259,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       const preview = !problem && file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
       setPendingFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? "failed" : "uploading", problem }]);
       if (problem) continue;
-      uploadMessageFile(file)
+      uploadMessageFile(file, messageFileType(file))
         .then((uploaded) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "ready", file: uploaded } : item))))
         .catch((error) => setPendingFiles((current) => current.map((item) => (item.key === key ? { ...item, state: "failed", problem: apiErrorText(error) } : item))));
     }

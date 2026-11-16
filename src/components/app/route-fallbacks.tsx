@@ -1,8 +1,9 @@
 import { Button, Icon, Row, type IconName } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { type ErrorComponentProps, useRouter } from '@tanstack/react-router'
+import { type ReactNode, useEffect } from 'react'
 
+import { reportError } from '@/lib/observability'
 import { sessionQuery } from '@/lib/queries'
 import { landingFor } from '@/lib/sites'
 
@@ -60,8 +61,9 @@ export function RouteNotFound() {
  * route may define its own `errorComponent` (for example the session check); this is the fallback
  * for everything else, so it never shows the error's technical detail to the person using the app.
  */
-export function RouteError() {
+export function RouteError({ error }: ErrorComponentProps) {
   const router = useRouter()
+  useEffect(() => reportError(error), [error])
   const session = useQuery(sessionQuery()).data
   return (
     <FallbackScreen

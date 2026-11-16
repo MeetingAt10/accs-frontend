@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fileSize, messageFileAccept, messageFileProblem } from './message-files'
+import { fileSize, messageFileAccept, messageFileProblem, messageFileType } from './message-files'
 
 describe('files in messages', () => {
   it('accepts pictures and documents the API accepts', () => {
@@ -12,6 +12,10 @@ describe('files in messages', () => {
 
   it('names what is wrong with a file', () => {
     expect(messageFileProblem({ name: 'run.exe', type: 'application/x-msdownload', size: 10 })).toBe('Not a picture, PDF, Office or text file.')
+    // Browsers often give Office files no type: the extension decides.
+    expect(messageFileProblem({ name: 'Report.docx', type: '', size: 10 })).toBe('')
+    expect(messageFileType({ name: 'Report.docx', type: '' })).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    expect(messageFileType({ name: 'run.exe', type: '' })).toBeUndefined()
     // The extension must match the type, as the API checks.
     expect(messageFileProblem({ name: 'photo.pdf', type: 'image/png', size: 10 })).toBe('Not a picture, PDF, Office or text file.')
     expect(messageFileProblem({ name: 'big.pdf', type: 'application/pdf', size: 10 * 1024 * 1024 + 1 })).toBe('Larger than 10 MB.')

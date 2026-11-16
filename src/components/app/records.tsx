@@ -723,7 +723,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
             Read each report in context.
           </p>
           {status === "To review" ? (
-            <div className="rc-hold-reasons">
+            <div className="rc-reasons">
               <TextArea
                 label="Review note"
                 value={reason}
@@ -2203,7 +2203,8 @@ function ClearanceList({ page }: { page: PageEnvelope }) {
   const clearanceSummary = object(page.data.clearanceSummary);
   const filters = object(page.data.filters);
   const programs = Array.isArray(filters.programs) ? filters.programs.map(String) : [];
-  const sections = [...new Set(rows.map((row) => word(row.section)).filter(Boolean))].sort();
+  // Every section in scope, plus the chosen one, so the filter stays visible and switchable when no student matches.
+  const sections = [...new Set([...(Array.isArray(filters.sections) ? filters.sections.map(String) : []), ...rows.map((row) => word(row.section)), params.get("section") ?? ""].filter(Boolean))].sort();
   const [search, setSearch] = useState("");
   const setParam = (changes: Record<string, string>) => {
     const next = new URLSearchParams(location.searchStr);

@@ -100,6 +100,8 @@ function UploadLoad({ onSaved }: { onSaved: (term: string) => void }) {
   const fieldError = (path: string) => action.error instanceof ApiError ? action.error.fields?.find((field) => field.path === path)?.message : undefined
   const readFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    // Cleared so choosing the same file again, after fixing it, reads it again.
+    event.target.value = ''
     action.reset()
     setRows([])
     setFileName(file?.name ?? '')

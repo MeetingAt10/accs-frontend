@@ -2,6 +2,7 @@ export type Role =
   | 'student'
   | 'organization'
   | 'professor'
+  | 'staff'
   | 'chair'
   | 'dean'
   | 'administrator'
@@ -271,11 +272,14 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
 export type MessageFile = { id: string; fileName: string; contentType: string; size: number }
 
 /** Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`. */
-export async function uploadMessageFile(file: File): Promise<MessageFile> {
-  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType: file.type, size: file.size })
+export async function uploadMessageFile(file: File, contentType = file.type): Promise<MessageFile> {
+  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType, size: file.size })
   await sendMaterialFile(started.record.upload, file)
   return started.record.attachment
 }
+
+/** Downloads a class material file (the API checks access, then redirects to a short-lived link). On the API's own origin. */
+export const materialFilePath = (materialId: string) => `${baseUrl}/materials/${encodeURIComponent(materialId)}/file`
 
 /** Downloads a file from a conversation (the API checks membership, then redirects to a short-lived link). */
 export const messageFilePath = (threadId: string, messageId: string, fileId: string) =>
@@ -284,6 +288,14 @@ export const messageFilePath = (threadId: string, messageId: string, fileId: str
 /** A short-lived link that shows a picture in the browser. */
 export const messageFileLink = async (threadId: string, messageId: string, fileId: string) =>
   (await request<Recorded<{ url: string }>>(messageFilePath(threadId, messageId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
+
+/** Downloads a file from a post (the API checks the post can be read, then redirects to a short-lived link). */
+export const postFilePath = (postId: string, fileId: string) =>
+  `${baseUrl}/posts/${encodeURIComponent(postId)}/files/${encodeURIComponent(fileId)}`
+
+/** A short-lived link that shows a post's picture in the browser. */
+export const postFileLink = async (postId: string, fileId: string) =>
+  (await request<Recorded<{ url: string }>>(postFilePath(postId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
 
 /** Issues a password reset code for an account (System Administrator, `role.manage`). The code is in the answer only. */
 export const issueResetCode = (accountId: string) =>

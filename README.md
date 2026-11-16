@@ -44,3 +44,7 @@ The signed-in app has seven module sites (Home, Forums, Schedule, Cases, Evaluat
 ## Errors
 
 `src/main.tsx` sets router-wide not-found and error screens (`src/components/app/route-fallbacks.tsx`); a route with its own `errorComponent` still handles its own errors. The session check redirects to sign-in only on a 401. A network error or a 5xx shows a "Couldn't load this page" screen with Try again, so a server fault does not look like a sign-out. A failed sign-out shows an alert with Try again and keeps the person signed in; the cache is cleared only after the server confirms.
+
+## Observability
+
+With `VITE_FARO_URL` set, `src/lib/observability.ts` starts Grafana Faro, which sends page loads, web vitals, JavaScript errors, and traces to the Frontend Observability app `accs-frontend` in Grafana Cloud. Router errors shown by `RouteError` are reported too. The deploy workflow sets it from the repository variable `FARO_URL`, plus `VITE_FARO_ENV` (`prod` on `main`, else `dev`) and `VITE_APP_VERSION` (the commit SHA). The collector URL is public by design: it only accepts telemetry. Unset, nothing loads or sends. No user identity is set. Trace headers go only to the API origin when `VITE_API_URL` is an absolute URL, never to S3 upload URLs, whose bucket CORS rules would reject them.

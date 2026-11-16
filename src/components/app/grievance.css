@@ -296,6 +296,7 @@
 @media (prefers-reduced-motion: reduce) {
   .gv-timeline > li[data-current]::before { animation: none; }
 }
+.gv-routing { margin: 4px 0 8px; padding-inline-start: 18px; }
 /* New reports have long IDs: the reference stays on one line and is cut with an ellipsis (the full ID is in the tooltip). */
 .gv-row__ref, .gv-ref-link { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gv-c-ref { max-width: 14ch; }
