@@ -407,8 +407,9 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
             {step < 3 ? <Button onPress={() => { if (validate(step)) go(step + 1) }}>Next</Button> : <Button loading={send.isPending} onPress={review}>Review consent and submit</Button>}
           </div>
         </div>
-        <ConsentDialog key={consentOpen ? 'open' : 'closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
-        <DraftHelp key={helpOpen ? 'open' : 'closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
+        {/* Each dialog's key names it: both used "open"/"closed", so two closed dialogs shared the key "closed". */}
+        <ConsentDialog key={consentOpen ? 'consent-open' : 'consent-closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
+        <DraftHelp key={helpOpen ? 'help-open' : 'help-closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
         <Modal role="alertdialog" title="Discard this draft?" isOpen={discardOpen} onOpenChange={setDiscardOpen}>
           <ModalBody><p>The description and choices in this draft will be cleared.</p></ModalBody>
           <ModalActions><Button variant="secondary" onPress={() => setDiscardOpen(false)}>Keep draft</Button><Button variant="destructive" onPress={() => { setDraft({ ...blankDraft }); setStep(0); setError(''); setDiscardOpen(false); action.mutate({ action: 'saveDraft', payload: { narrative: '' } }); try { localStorage.removeItem(storageKey) } catch { /* No stored draft to remove. */ } }}>Discard draft</Button></ModalActions>
@@ -948,7 +949,8 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
     <>
       <Button icon="pencil" onPress={() => { action.reset(); setOpen(true) }}>Report a student</Button>
       <Drawer title="Report a student" isOpen={open} onOpenChange={(state) => !state && close()}>
-        <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); send(event.currentTarget) }}>
+        {/* noValidate: the browser's own required-field check stopped the submit silently (custom lists show no bubble), so our message never appeared. */}
+        <form className="gv-stack" noValidate onSubmit={(event) => { event.preventDefault(); send(event.currentTarget) }}>
           <p className="gv-hint">Report a student from your classes. It goes to the Program Chair, or to the Dean if you are the chair. You can follow its status from your case queue.</p>
           <Select label="Student" placeholder="Choose a student" isRequired selectedKey={draft.studentId || null} onSelectionChange={(key) => update('studentId', String(key ?? ''))}
             isInvalid={Boolean(fieldError('studentId', draft.studentId ? undefined : 'Choose a student.'))} errorMessage={fieldError('studentId', draft.studentId ? undefined : 'Choose a student.')}

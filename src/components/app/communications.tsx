@@ -563,11 +563,13 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               <TextField label="Group name" value={groupName} onChange={setGroupName} maxLength={80} isRequired description="For example, Capstone team." />
             )}
             <ComboBox
+              // In a group, a fresh box after each person is added, so the next search starts empty.
+              key={groupMode ? `add-${groupIds.length}` : "to"}
               label={groupMode ? "Add people" : "To"}
               placeholder="Search people"
               description={groupMode ? "Add at least two people. Type a name, or @ and a name." : "Type a name, or @ and a name."}
               defaultFilter={matchesPerson}
-              selectedKey={groupMode ? null : recipientId || null}
+              {...(groupMode ? {} : { selectedKey: recipientId || null })}
               onSelectionChange={(key) => {
                 const id = String(key ?? "");
                 if (!groupMode) setRecipientId(id);

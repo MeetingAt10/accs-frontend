@@ -122,8 +122,11 @@ export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   admin: ['administrator', 'dean', 'secretary'],
 }
 
-/** Whether the session may open the page that owns `href`. */
-export const allowsPath = (session: Access, href: string) => pageAllowed(session, pageIdForPath(href))
+/**
+ * Whether the session may open the page that owns `href`. Search has no page of its own: everyone signed in may open it,
+ * and the API returns only what each person may open.
+ */
+export const allowsPath = (session: Access, href: string) => href.split(/[?#]/)[0] === '/search' || pageAllowed(session, pageIdForPath(href))
 
 /** A site is open when the role is listed for it and at least one of its landing pages is allowed. */
 export function canOpenSite(session: Access, site: SiteId) {

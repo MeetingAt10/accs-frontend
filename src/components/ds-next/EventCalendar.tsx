@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react'
-import { useState, type CSSProperties } from 'react'
+import { Fragment, useId, useState, type CSSProperties } from 'react'
 
 import { DateTile, Empty } from '@/components/app/page-shell'
 import { dateParts, formatDate } from '@/lib/format'
@@ -292,7 +292,13 @@ interface Placed {
   to: number
   col: number
   cols: number
+  /** Overlapping events past the second column are not drawn; the second column's event counts them. */
+  hidden?: boolean
+  more?: number
 }
+
+/** At most two events side by side in a week column: more made every block too narrow to read. */
+const weekColumns = 2
 
 /** Side-by-side columns for overlapping events within one day. */
 function place(events: CalendarEvent[], startHour: number, endHour: number) {
@@ -313,7 +319,14 @@ function place(events: CalendarEvent[], startHour: number, endHour: number) {
   let ends: number[] = []
   let clusterEnd = -1
   const flush = () => {
-    for (const item of cluster) item.cols = ends.length
+    const extra = cluster.filter((item) => item.col >= weekColumns)
+    for (const item of cluster) {
+      item.cols = Math.min(ends.length, weekColumns)
+      if (item.col >= weekColumns) item.hidden = true
+    }
+    // The last drawn column carries "+N more" for what did not fit.
+    const carrier = cluster.filter((item) => item.col === weekColumns - 1).at(-1)
+    if (carrier && extra.length) carrier.more = extra.length
     cluster = []
     ends = []
   }
@@ -355,6 +368,7 @@ function Week({
   const weekEvents = days.flatMap((day) => byDate.get(iso(day)) ?? [])
   const hasAllDay = weekEvents.some((event) => event.allDay)
   const marks = Array.from({ length: span }, (_, index) => startHour + index)
+  const weekListId = `${useId()}-week-list`
 
   return (
     <>
@@ -426,10 +440,10 @@ function Week({
                       style={{ top: `${((nowHour - startHour) / span) * 100}%` }}
                     />
                   )}
-                  {place(timed, startHour, endHour).map((item, index) => (
+                  {place(timed, startHour, endHour).filter((item) => !item.hidden).map((item, index) => (
+                    <Fragment key={item.event.id}>
                     <button
                       type="button"
-                      key={item.event.id}
                       className="ec-block"
                       data-etone={item.event.tone}
                       onClick={() => onEventPress?.(item.event)}
@@ -448,6 +462,17 @@ function Week({
                         {item.event.time ?? formatClock(item.event.start)}
                       </span>
                     </button>
+                    {item.more ? (
+                      <button
+                        type="button"
+                        className="ec-block-more"
+                        style={{ top: `calc(${((item.to - startHour) / span) * 100}% - 20px)`, right: '2px' } as CSSProperties}
+                        onClick={() => document.getElementById(weekListId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      >
+                        +{item.more} more
+                      </button>
+                    ) : null}
+                    </Fragment>
                   ))}
                 </div>
               )
@@ -455,7 +480,7 @@ function Week({
           </div>
         </div>
       </div>
-      <div className="ec-weeklist">
+      <div className="ec-weeklist" id={weekListId}>
         {weekEvents.length ? (
           <AgendaRows
             events={weekEvents}

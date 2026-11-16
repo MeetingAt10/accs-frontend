@@ -280,6 +280,23 @@
 }
 .ec-block__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ec-block__time { opacity: 0.72; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A block too short for two lines shows only its title, so the week view does not pile text up. */
+.ec-block { container-type: size; }
+@container (max-height: 34px) { .ec-block__time { display: none; } }
+/* Overlapping events that did not fit beside the others: a link to the week's list below. */
+.ec-block-more {
+  position: absolute;
+  z-index: 2;
+  padding: 1px 6px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-pill);
+  background: var(--accs-surface);
+  color: var(--accs-ink);
+  font: 600 0.625rem / 1.5 var(--accs-font-body);
+  cursor: pointer;
+}
+.ec-block-more:hover { background: var(--accs-sunken); }
+.ec-block-more:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; }
 
 .ec-now { position: absolute; left: 0; right: 0; z-index: 3; height: 2px; background: var(--accs-danger); pointer-events: none; }
 .ec-now::before {
