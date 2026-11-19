@@ -134,6 +134,7 @@ a { text-underline-offset: 3px; }
   text-wrap: balance;
 }
 .accs-page-desc { margin: 0; color: var(--accs-muted); font-size: 0.9375rem; line-height: 1.55; text-wrap: pretty; }
+.accs-page-role { margin: 2px 0 6px; color: var(--accs-ink-2, var(--accs-ink)); font-size: 0.8125rem; font-weight: 600; }
 .accs-page-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Layout helpers */
@@ -568,3 +569,4 @@ select {
     flex-wrap: wrap;
   }
 }
+.accs-pager--count { margin: 8px 0 0; color: var(--accs-muted); font-size: 0.8125rem; }

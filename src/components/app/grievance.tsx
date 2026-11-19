@@ -535,7 +535,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
         <div className="gv-page accs-stagger">
           <div className="gv-listbar">
             <PillGroup id="view" label="Report view" value={view} onChange={setView} options={[{ id: 'active', label: 'Active ' + (all.length - closedCount) }, { id: 'closed', label: 'Closed ' + closedCount }]} />
-            <Note>Only you and the office handling each report can open it.</Note>
+            <Note>Only you and the office handling each report can open it. Reporting under your name or anonymously is your choice on each report.</Note>
           </div>
           {records.length ? (
             <Panel flush>
@@ -1068,7 +1068,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
                   : selected === 'active' ? !isClosed(report) && items(report.history).length > 1
                     : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId)) && (!adviserTab.length || report.stage !== 'adviser')
   const inQueue = records.filter((report) => inTab(report, validTab))
-  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!subcategory || report.subcategory === subcategory) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
+  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || [reportReference(report), words(report.id), studentName(report), words(report.category), words(report.subcategory), words(report.severity)].join(' ').toLowerCase().includes(query.trim().toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!subcategory || report.subcategory === subcategory) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
@@ -1078,11 +1078,13 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
-        <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : <Note>{role === 'chair' || role === 'dean' ? 'You can read every concern in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>} />
+        <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : undefined} />
+        {/* Always shown, also when Report a student takes the header's action slot (testing sheet: the Chair had none). */}
+        <Note>{role === 'chair' || role === 'dean' ? 'You see the concerns in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>
         <div className="gv-page accs-stagger">
           <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabsShown} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">
-            <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
+            <div className="accs-grow"><Search label="Search reports" placeholder="Reference, student, category, or severity" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
             <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
             {/* Every category, not only those in the list now, and its sub-categories once one is chosen. */}
             <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => { setCategory(String(key ?? '')); setSubcategory('') })}><SelectOption id="">All categories</SelectOption>{queueCategories.map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>

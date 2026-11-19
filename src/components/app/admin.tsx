@@ -882,7 +882,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Users" })}
         title="Users and roles"
-        description="Role changes take effect at the next sign-in and go in the audit trail."
+        description="Role changes take effect at the next sign-in and go in the audit trail. Only the System Administrator sees this list; students and staff never see each other's roles here."
         actions={
           <Button
             variant="secondary"
@@ -1355,7 +1355,7 @@ function ModerationQueue({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Moderation" })}
         title="Moderation"
-        description="A flag is not proof of a violation. Read the context before you decide."
+        description="A flag is not proof of a violation. Read the context before you decide. Only reviewers see flagged items; the author is not told who flagged them, and the person who flagged is not told the outcome."
       />
       <div className="accs-toolbar adm-toolbar">
         <Pills
