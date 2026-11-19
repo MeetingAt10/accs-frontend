@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  CheckboxGroup,
   FileUpload,
   IconButton,
   Modal,
@@ -780,8 +779,8 @@ function AdvisorsTab() {
   return (
     <div className="accs-stack">
       <p className="acct-lead">
-        A student's advisor follows from their program and year level. Choose who advises each year; one person can advise several
-        years. You can change this every year.
+        Each year level has one advisor, and every student in that year has them as advisor. One person can advise several
+        years, for example one advisor for 1st and 2nd year and another for 3rd and 4th. You can change this every year.
       </p>
       <SegmentedControl aria-label="Year level" selectedKey={String(year)} onSelectionChange={(key) => setYear(Number(key))}>
         {yearLevels.map((level) => (
@@ -791,18 +790,20 @@ function AdvisorsTab() {
         ))}
       </SegmentedControl>
       <Gate queries={[faculty, advisors]} what="advisors">
-        <Panel title={`Year ${year} advisors`} action={<span className="acct-muted">{chosen.length} chosen</span>}>
+        <Panel title={`Year ${year} advisor`} action={<span className="acct-muted">{chosen.length ? members.find((member) => member.id === chosen[0])?.name ?? '1 chosen' : 'None yet'}</span>}>
           {members.length ? (
             <>
               <Search label="Search faculty" placeholder="Search faculty" size="sm" value={filter} onChange={setFilter} />
               <div className="acct-pick">
-                <CheckboxGroup
-                  label={`Faculty who advise year ${year}`}
-                  value={chosen}
-                  onChange={(ids) => setDraft((previous) => ({ ...previous, [year]: ids }))}
+                {/* One advisor per year level (decided 19 November 2026): a single choice, not checkboxes. */}
+                <RadioGroup
+                  label={`Who advises year ${year}`}
+                  value={chosen[0] ?? ''}
+                  onChange={(id) => setDraft((previous) => ({ ...previous, [year]: id ? [id] : [] }))}
                 >
+                  <Radio value="">No advisor yet</Radio>
                   {visible.map((member) => (
-                    <Checkbox
+                    <Radio
                       key={member.id}
                       value={member.id}
                       description={[member.program, member.active ? '' : 'Not active', member.advisorYears.length ? `Advises year ${member.advisorYears.join(', ')}` : '']
@@ -810,9 +811,9 @@ function AdvisorsTab() {
                         .join(' · ')}
                     >
                       {member.name}
-                    </Checkbox>
+                    </Radio>
                   ))}
-                </CheckboxGroup>
+                </RadioGroup>
                 {!visible.length && <p className="acct-muted">No faculty match.</p>}
               </div>
               {save.error && (
@@ -826,7 +827,7 @@ function AdvisorsTab() {
                   loading={save.isPending}
                   onPress={() => save.mutate({ yearLevel: year, facultyIds: chosen })}
                 >
-                  Save year {year} advisors
+                  Save year {year} advisor
                 </Button>
               </div>
             </>

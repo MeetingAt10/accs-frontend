@@ -493,6 +493,8 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       label: "Cases",
       entries: [
         { label: "OSAS cases", href: "/cases", pageId: "P21", icon: "tray" },
+        // Flagged posts and messages the CCS Secretary sends to OSAS for a decision.
+        { label: "Flagged content", href: "/admin/moderation", pageId: "P49", icon: "flag" },
       ],
     },
     {
@@ -547,6 +549,7 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P49",
           icon: "flag",
         },
+        { label: "Calendar", href: "/calendar", pageId: "P13", icon: "calendar" },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
         {
           label: "Organizations",

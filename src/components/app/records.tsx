@@ -1,4 +1,5 @@
 import { featureLabels } from "@/lib/restrictions";
+import { campusToday } from "@/lib/campus-date";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -6,6 +7,7 @@ import {
   Button,
   Checkbox,
   CheckboxGroup,
+  DatePicker,
   Icon,
   Link,
   Modal,
@@ -1786,12 +1788,14 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             onChange={setBasis}
             maxLength={500}
           />
-          <TextField
-            type="date"
+          {/* Tomorrow or later (decided 19 November 2026). The design-system picker shows its own message; the browser's
+              date bubble appeared behind this dialog (QA 17 November). */}
+          <DatePicker
             label="End date"
             isRequired
-            value={until}
-            onChange={setUntil}
+            minValue={campusToday().add({ days: 1 })}
+            description="Tomorrow or later."
+            onChange={(value) => setUntil(value?.toString() ?? "")}
           />
           <p className="rc-policy">
             Only the selected features are paused. The restriction starts today.

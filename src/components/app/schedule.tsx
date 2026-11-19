@@ -884,6 +884,7 @@ function CalendarPage({
               <DatePicker
                 label="Due"
                 isRequired
+                minValue={campusToday()}
                 onChange={(value) => setTodoDate(value?.toString() ?? '')}
               />
               <PrivacyNotice title="Personal to-do">
