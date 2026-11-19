@@ -576,3 +576,12 @@ select {
   }
 }
 .accs-pager--count { margin: 8px 0 0; color: var(--accs-muted); font-size: 0.8125rem; }
+
+/* Case statuses that name an office use that office's color, as in the Directory (QA 19 November). Closed is gray. */
+.accs-status[data-office] { --office: var(--accs-info); background: color-mix(in srgb, var(--office) 12%, transparent); color: color-mix(in srgb, var(--office) 80%, var(--accs-ink)); }
+.accs-status[data-office="adviser"] { --office: #2563eb; }
+.accs-status[data-office="chair"] { --office: #7c3aed; }
+.accs-status[data-office="dean"] { --office: #b45309; }
+.accs-status[data-office="guidance"] { --office: #0d9488; }
+.accs-status[data-office="osas"] { --office: #dc2626; }
+.accs-status[data-closed] { background: var(--accs-sunken); color: var(--accs-muted); }

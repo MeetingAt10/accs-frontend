@@ -230,12 +230,15 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
               <Panel flush title="Announcements" action={<PanelLink href="/feed">View feed</PanelLink>}>
                 <Rows>
                   {announcements.map((item, index) => {
-                    const urgent = text(item.priority) === 'high'
+                    // Urgent and Important show their own colored tag beside a blue Announcement tag (QA 19 November).
+                    const priority = text(item.priority)
                     return (
                       <Entry key={text(item.id, 'announcement-' + index)} href={text(item.id) ? '/feed/' + encodeURIComponent(text(item.id)) : '/feed'}>
                         <p className="pt-row__title">{text(item.title, 'Announcement')}</p>
                         <Sub>
-                          <StatusChip tone={urgent ? 'warn' : 'neutral'}>{urgent ? 'Priority' : text(item.label, 'Announcement')}</StatusChip>
+                          <StatusChip tone="info">{text(item.label, 'Announcement')}</StatusChip>
+                          {(priority === 'urgent' || priority === 'high') && <StatusChip tone="danger">Urgent</StatusChip>}
+                          {priority === 'important' && <StatusChip tone="warn">Important</StatusChip>}
                           {nameOf(item.author, text(item.source)) && <span>{nameOf(item.author, text(item.source))}</span>}
                           {text(item.at, text(item.date)) && <span>{relativeTime(item.at ?? item.date)}</span>}
                         </Sub>

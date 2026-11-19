@@ -1059,10 +1059,16 @@ function ConsultationsPage({
         : consultation.studentId === session.user.id,
   )
   // Soonest open time first; professors with none posted come last (QA 17 November: the list was alphabetical).
-  const nextKey = (person: Person) => (person.nextSlot ? `${person.nextSlot.date}${person.nextSlot.start}` : '~')
+  // No open time goes last explicitly: localeCompare sorted a "~" stand-in before digits, so those professors came first.
+  const nextKey = (person: Person) => (person.nextSlot ? `${person.nextSlot.date}${person.nextSlot.start}` : '')
+  const byNext = (a: Person, b: Person) => {
+    const x = nextKey(a), y = nextKey(b)
+    if (!x || !y) return Number(!x) - Number(!y)
+    return x < y ? -1 : x > y ? 1 : 0
+  }
   const faculty = list<Person>(page.data.faculty)
     .filter((person) => person.name.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => nextKey(a).localeCompare(nextKey(b)) || a.name.localeCompare(b.name))
+    .sort((a, b) => byNext(a, b) || a.name.localeCompare(b.name))
   const visible =
     status === 'All'
       ? consultations
