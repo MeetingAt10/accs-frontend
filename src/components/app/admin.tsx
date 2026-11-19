@@ -1,4 +1,4 @@
-import { canAddRole, sectionProblem } from "@/lib/role-rules";
+import { canAddRole, fullSectionProblem, sectionLetter, sectionPrefix } from "@/lib/role-rules";
 import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
 import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
@@ -1126,7 +1126,12 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [roleToAdd, setRoleToAdd] = useState("");
   const [program, setProgram] = useState(word(record.program));
-  const [section, setSection] = useState(word(record.section));
+  // The Section field shows and takes the full name, like SBIT4A (QA 19 November); the letter is what gets saved.
+  const prefixFor = (programCode: string) => sectionPrefix({ campus: word(record.campus), program: programCode, year: word(record.year) });
+  const [sectionText, setSectionText] = useState(record.section ? word(record.sectionName, prefixFor(word(record.program)) + word(record.section)) : "");
+  const prefix = prefixFor(program);
+  const section = sectionLetter(sectionText, prefix) ?? "";
+  const sectionError = fullSectionProblem(sectionText, prefix);
   const [reason, setReason] = useState("");
   if (!record.id)
     return (
@@ -1219,7 +1224,12 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               <Select
                 label="Program"
                 selectedKey={program || "none"}
-                onSelectionChange={(key) => setProgram(key === "none" ? "" : String(key))}
+                onSelectionChange={(key) => {
+                  const next = key === "none" ? "" : String(key);
+                  // The section name follows the program: SBIT4A becomes SBCS4A.
+                  if (section) setSectionText(prefixFor(next) + section);
+                  setProgram(next);
+                }}
               >
                 <SelectOption id="none">No program</SelectOption>
                 <SelectOption id="BSIT">BSIT</SelectOption>
@@ -1229,12 +1239,12 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               {selectedRoles.includes("student") && (
                 <TextField
                   label="Section"
-                  description="The section letter, like A."
-                  value={section}
-                  onChange={(value) => setSection(value.toUpperCase())}
-                  maxLength={3}
-                  isInvalid={Boolean(sectionProblem(section))}
-                  errorMessage={sectionProblem(section)}
+                  placeholder={`${prefix}A`}
+                  value={sectionText}
+                  onChange={(value) => setSectionText(value.toUpperCase())}
+                  maxLength={12}
+                  isInvalid={Boolean(sectionError)}
+                  errorMessage={sectionError}
                 />
               )}
             </div>
@@ -1253,7 +1263,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
             <div className="adm-form__actions">
               <Button
                 loading={action.isPending}
-                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionProblem(section))}
+                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionError)}
                 onPress={() =>
                   action.mutate({
                     action: "updateRoles",
