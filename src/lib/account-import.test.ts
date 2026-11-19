@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { chunk, credentialsCsv, parseStudentRows, toStudent } from './account-import'
+import { chunk, credentialsCsv, parseStudentRows, studentProblems, toStudent } from './account-import'
 
 // A title and a blank row above the headings, loose heading names, and one row of each kind.
 const sheet: unknown[][] = [
@@ -54,5 +54,15 @@ describe('credentials file', () => {
   it('quotes list text that could run as a formula, but never alters the password', () => {
     expect(csv).toContain(`"'=cmd, ""x"""`)
     expect(csv).toContain('"-Ab3x,y"')
+  })
+})
+
+describe('sections (QA 17 November: section 200 was accepted)', () => {
+  it('takes letters only', () => {
+    const base = { name: 'Ana Reyes', email: 'ana@example.com', studentId: '26-7001', program: 'BSIT', year: '1', section: 'A' }
+    expect(studentProblems(base).section).toBeUndefined()
+    expect(studentProblems({ ...base, section: 'ab' }).section).toBeUndefined()
+    expect(studentProblems({ ...base, section: '200' }).section).toBe('Use the section letter, like A.')
+    expect(studentProblems({ ...base, section: 'A1' }).section).toBe('Use the section letter, like A.')
   })
 })

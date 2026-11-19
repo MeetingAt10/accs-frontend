@@ -16,6 +16,7 @@ import { RestrictedView } from '@/components/app/guards'
 import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, alsoReadableBy, modeLabel, readAccess, readTalk, readWording } from '@/components/app/concern-talk'
 import { categoryDetailMax, categoryText, choicePayload, choiceProblems, cleanChoice, readCategoryOptions } from '@/lib/concern-categories'
 import { tidyDraft } from '@/lib/draft-tidy'
+import { progressOf } from '@/lib/report-progress'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import { CaseStrikes } from '@/components/app/strikes'
@@ -52,8 +53,25 @@ const stageOf = (report: Item): string => isClosed(report) ? 'resolved'
   : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
     : words(report.stage, 'adviser')
 const stageIndex = (report: Item) => Math.max(0, stages.findIndex(([key]) => key === stageOf(report)))
-const stageStep = (report: Item) => Math.max(1, stageIndex(report))
 const stageLabel = (report: Item) => stages[stageIndex(report)][1]
+
+/**
+ * The student's progress (decided 19 November 2026): Submitted, Read, Escalated, Resolved, Closed, five equal steps,
+ * from the API's `progress`. It replaced "Stage 2 of 6 · Adviser", which said which office had it, in uneven steps.
+ */
+function ProgressSteps({ report, showLabels = false }: { report: Item; showLabels?: boolean }) {
+  const { steps, step, label } = progressOf(report)
+  return (
+    <span className="gv-steps-wrap">
+      <span className="gv-steps" role="img" aria-label={`Step ${step + 1} of ${steps.length}: ${label}`}>
+        {steps.map((name, index) => <span key={name} className="gv-steps__seg" data-done={index <= step || undefined} />)}
+      </span>
+      {showLabels
+        ? <span className="gv-steps__names" aria-hidden>{steps.map((name, index) => <span key={name} data-current={index === step || undefined}>{name}</span>)}</span>
+        : <span className="gv-row__stage">Step {step + 1} of {steps.length} · {label}</span>}
+    </span>
+  )
+}
 
 function useAction(pageId: string) {
   const queryClient = useQueryClient()
@@ -525,7 +543,6 @@ function ReportList({ page }: { page: PageEnvelope }) {
                 {(records) => (
                 <ul className="accs-rows gv-rows">
                   {records.map((report) => {
-                    const step = stageStep(report)
                     return (
                       <li key={words(report.id)}>
                         <a className="accs-row gv-row" href={reportPath(report)}>
@@ -534,10 +551,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
                             <span className="accs-row__title">{categoryText(report)}</span>
                             <span className="accs-row__sub">{words(report.office, '—')}</span>
                           </span>
-                          <span className="gv-row__progress">
-                            <span className="accs-progress" role="progressbar" aria-label={'Stage ' + step + ' of 6'} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step}><span style={{ width: (step / 6) * 100 + '%' }} /></span>
-                            <span className="gv-row__stage">Stage {step} of 6 · {stageLabel(report)}</span>
-                          </span>
+                          <span className="gv-row__progress"><ProgressSteps report={report} /></span>
                           <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
                           <span className="gv-row__time">{relativeTime(report.updatedAt) || '—'}</span>
                           <span className="gv-row__go" aria-hidden><Icon name="caret-right" size={16} /></span>
@@ -603,12 +617,15 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
             {words(report.narrative) && <Narrative report={report} title="What you reported" />}
             <TalkChoice report={report} wording={readWording(page.data.consentWording)} action={talkAction} />
             <Panel title="Messages"><Conversation report={report} pageId="P20" /></Panel>
-            <Panel title="Progress"><Timeline report={report} /></Panel>
+            <Panel title="Progress">
+              <ProgressSteps report={report} showLabels />
+              <Timeline report={report} />
+            </Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Report details">
             <Panel title="Details">
               <Facts values={[
-                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report)], ['Program', words(report.program, '—')],
+                ['Progress', progressOf(report).label], ['With', words(report.office, '—')], ['Category', categoryText(report)], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
                 ['Identity', report.identity === 'anonymous' ? disclosed ? 'Name shared with this office' : 'Alias to this office' : 'Named'],
               ]} />

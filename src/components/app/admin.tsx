@@ -1,3 +1,4 @@
+import { canAddRole, sectionProblem } from "@/lib/role-rules";
 import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
 import {
@@ -310,6 +311,18 @@ const DECISIONS: Record<string, string> = {
   remove: "Content removed",
   warn: "Removed, author warned",
   refer: "Referred to the CCS Secretary",
+  dismiss: "Flag dismissed, content shown again",
+  osas: "Sent to OSAS",
+};
+
+/** How each decision reads as a choice; the API says which ones the reader may make (decided 19 November 2026). */
+const DECISION_CHOICES: Record<string, { label: string; description?: string }> = {
+  keep: { label: "Keep, no action" },
+  remove: { label: "Remove content" },
+  warn: { label: "Remove and warn the author" },
+  refer: { label: "Refer to the CCS Secretary", description: "The CCS Secretary dismisses the flag or sends it to OSAS." },
+  dismiss: { label: "Dismiss the flag", description: "The content is shown again. Nothing else happens." },
+  osas: { label: "Send to OSAS", description: "OSAS reviews it and decides. The content stays hidden until then." },
 };
 
 /* ---------- P48 Permission matrix ---------- */
@@ -1142,28 +1155,41 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Role changes apply at the next sign-in. The current session keeps
               its roles. The audit trail records this change.
             </Note>
+            {/* A student or organization account has that one role; anyone else at most two (decided 19 November 2026). */}
             <CheckboxGroup
               label="Assigned roles"
+              description="A student or organization account has that one role. Faculty and staff have at most two, like Dean and professor."
               value={selectedRoles}
               onChange={(next) => setSelectedRoles(next as Role[])}
             >
               {roles.map((role) => (
-                <Checkbox key={role} value={role}>
+                <Checkbox key={role} value={role} isDisabled={!canAddRole(selectedRoles, role)}>
                   {roleFull(role)}
                 </Checkbox>
               ))}
             </CheckboxGroup>
             <div className="adm-form__grid">
-              <TextField
+              <Select
                 label="Program"
-                value={program}
-                onChange={setProgram}
-              />
-              <TextField
-                label="Section"
-                value={section}
-                onChange={setSection}
-              />
+                selectedKey={program || "none"}
+                onSelectionChange={(key) => setProgram(key === "none" ? "" : String(key))}
+              >
+                <SelectOption id="none">No program</SelectOption>
+                <SelectOption id="BSIT">BSIT</SelectOption>
+                <SelectOption id="BSCS">BSCS</SelectOption>
+                <SelectOption id="BSIS">BSIS</SelectOption>
+              </Select>
+              {selectedRoles.includes("student") && (
+                <TextField
+                  label="Section"
+                  description="The section letter, like A."
+                  value={section}
+                  onChange={(value) => setSection(value.toUpperCase())}
+                  maxLength={3}
+                  isInvalid={Boolean(sectionProblem(section))}
+                  errorMessage={sectionProblem(section)}
+                />
+              )}
             </div>
             <TextArea
               label="Reason"
@@ -1180,7 +1206,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
             <div className="adm-form__actions">
               <Button
                 loading={action.isPending}
-                isDisabled={!selectedRoles.length || !reason.trim()}
+                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionProblem(section))}
                 onPress={() =>
                   action.mutate({
                     action: "updateRoles",
@@ -1188,7 +1214,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                     payload: {
                       roles: selectedRoles,
                       ...(program ? { program } : {}),
-                      ...(section ? { section } : {}),
+                      ...(section && selectedRoles.includes("student") ? { section } : {}),
                     },
                     reason,
                   })
@@ -1399,12 +1425,13 @@ function ModerationReview({
   page: PageEnvelope;
   itemId: string;
 }) {
-  const secretaryRole = useQuery(sessionQuery()).data?.user.roles ?? [];
-  // The CCS Secretary decides referred items; only moderators refer.
-  const secretary = secretaryRole.includes("secretary") && !secretaryRole.includes("administrator");
   const record = object(page.data.record);
   const action = useAction("P50");
-  const [decision, setDecision] = useState("keep");
+  // The decisions this reader may make now: a moderator on a pending item, the CCS Secretary on a referred one (dismiss
+  // or send to OSAS), OSAS on one sent to it. Before, the panel showed only on pending items, so the Secretary could only read.
+  const decisions = (Array.isArray(page.data.decisions) ? page.data.decisions : []).map(String).filter((key) => key in DECISION_CHOICES);
+  const [decision, setDecision] = useState("");
+  const chosenDecision = decisions.includes(decision) ? decision : decisions[0] ?? "";
   const [reason, setReason] = useState("");
   const [notifyAuthor, setNotifyAuthor] = useState(true);
   if (!record.id)
@@ -1415,7 +1442,6 @@ function ModerationReview({
         description="It may not exist or may no longer be visible."
       />
     );
-  const userReport = record.source === "User";
   const messages = items(page.data.messages);
   const post = object(page.data.post);
   const history = items(record.history);
@@ -1467,30 +1493,19 @@ function ModerationReview({
               </Note>
             </div>
           </Panel>
-          {status === "Pending" && (
+          {decisions.length > 0 && (
             <Panel title="Decision">
               <div className="adm-form">
                 <RadioGroup
                   label="Decision"
-                  value={decision}
+                  value={chosenDecision}
                   onChange={setDecision}
                 >
-                  <Radio value="keep" card>
-                    Keep, no action
-                  </Radio>
-                  <Radio value="remove" card>
-                    Remove content
-                  </Radio>
-                  <Radio value="warn" card>
-                    Remove and warn the author
-                  </Radio>
-                  {!secretary && (
-                    <Radio value="refer" card isDisabled={!userReport} description="The CCS Secretary reviews it and decides.">
-                      {userReport
-                        ? "Refer to the CCS Secretary"
-                        : "Refer to the CCS Secretary (user reports only)"}
+                  {decisions.map((key) => (
+                    <Radio key={key} value={key} card description={DECISION_CHOICES[key]!.description}>
+                      {DECISION_CHOICES[key]!.label}
                     </Radio>
-                  )}
+                  ))}
                 </RadioGroup>
                 <TextArea
                   label="Reason"
@@ -1515,7 +1530,7 @@ function ModerationReview({
                       action.mutate({
                         action: "moderate",
                         recordId: itemId,
-                        payload: { decision, notifyAuthor },
+                        payload: { decision: chosenDecision, notifyAuthor },
                         reason,
                       })
                     }
@@ -1558,7 +1573,7 @@ function ModerationReview({
               <li>
                 <div className="adm-timeline-body">
                   <strong>
-                    Flagged{userReport ? " by a community member" : " by filter"}
+                    Flagged{record.source === "User" ? " by a community member" : " by filter"}
                   </strong>
                   <span>{word(record.reason, "No reason given")}</span>
                   <span className="accs-timeline__time accs-mono">
@@ -1954,7 +1969,7 @@ export function AdminScreen({ pageId }: { pageId: string }) {
   // Moderation pages are also the Secretary's, for referred items; the rest of administration is the administrator's.
   const roleAllowed =
     session.data?.user.roles.includes("administrator") === true ||
-    (["P49", "P50"].includes(pageId) && session.data?.permissions.includes("moderation.referral") === true);
+    (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some((key) => session.data?.permissions.includes(key) === true));
   if (session.isPending || page.isPending)
     return (
       <div

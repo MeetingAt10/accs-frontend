@@ -46,7 +46,7 @@ export function studentProblems(draft: StudentDraft): StudentProblems {
   if (!/^[A-Za-z0-9][A-Za-z0-9-]{2,39}$/.test(draft.studentId.trim())) problems.studentId = 'Use letters, numbers, and dashes, like 24-1234.'
   if (!programs.includes(draft.program as Program)) problems.program = 'Choose BSIT, BSCS, or BSIS.'
   if (!/^[1-4]$/.test(draft.year.trim())) problems.year = 'Choose a year level from 1 to 4.'
-  if (!/^[A-Za-z0-9]{1,10}$/.test(draft.section.trim())) problems.section = 'Use the section letter, like A.'
+  if (!/^[A-Za-z]{1,3}$/.test(draft.section.trim())) problems.section = 'Use the section letter, like A.'
   return problems
 }
 

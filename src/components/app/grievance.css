@@ -301,3 +301,11 @@
 .gv-row__ref, .gv-ref-link { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gv-c-ref { max-width: 14ch; }
 .gv-missing { margin: 4px 0 0; padding-inline-start: 18px; }
+/* Five equal steps of a student's report (Submitted, Read, Escalated, Resolved, Closed). */
+.gv-steps-wrap { display: grid; gap: 6px; min-width: 0; }
+.gv-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.gv-steps__seg { height: 6px; border-radius: 999px; background: var(--accs-border, color-mix(in srgb, currentColor 15%, transparent)); }
+.gv-steps__seg[data-done] { background: var(--accs-navy); }
+.gv-steps__names { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; font-size: 0.75rem; color: var(--accs-muted); }
+.gv-steps__names > span { overflow-wrap: anywhere; }
+.gv-steps__names > [data-current] { color: var(--accs-ink); font-weight: 600; }

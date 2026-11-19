@@ -200,6 +200,10 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const [memberOpen, setMemberOpen] = useState(false);
   const [reportedMessage, setReportedMessage] = useState<Item>();
   const [reportReason, setReportReason] = useState("");
+  // Editing or deleting one's own message (decided 19 November 2026).
+  const [editedMessage, setEditedMessage] = useState<Item>();
+  const [editText, setEditText] = useState("");
+  const [deletedMessage, setDeletedMessage] = useState<Item>();
   const [earlier, setEarlier] = useState(20);
   const create = useCommunicationAction("P11");
   const action = useCommunicationAction("P12");
@@ -339,6 +343,22 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       setReportReason("");
     } catch {
       // The modal keeps the reason after an error.
+    }
+  }
+
+  async function changeMessage(kind: "editMessage" | "deleteMessage") {
+    const target = kind === "editMessage" ? editedMessage : deletedMessage;
+    if (!target || action.isPending) return;
+    try {
+      await action.mutateAsync({
+        action: kind,
+        recordId: words(conversation.id),
+        payload: kind === "editMessage" ? { messageId: words(target.id), body: editText.trim() } : { messageId: words(target.id) },
+      });
+      setEditedMessage(undefined);
+      setDeletedMessage(undefined);
+    } catch {
+      // The dialog stays open with the error and the text.
     }
   }
 
@@ -496,7 +516,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                             photo={words(sender.photo)}
                             sender={words(sender.name, "ACCS member")}
                             role={roles(sender.roles).map(roleLabelOf).join(" · ")}
-                            body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
+                            body={message.deleted === true ? "Message deleted" : message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body) + (message.editedAt ? " (edited)" : "")}
                             at={words(message.at)}
                             own={sender.id === session.data?.user.id}
                             children={
@@ -525,9 +545,17 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                       );
                                   if (key === "report")
                                     setReportedMessage(message);
+                                  if (key === "edit") {
+                                    setEditText(words(message.body));
+                                    setEditedMessage(message);
+                                  }
+                                  if (key === "delete")
+                                    setDeletedMessage(message);
                                 }}
                               >
                                 <MenuItem id="copy">Copy</MenuItem>
+                                {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && words(message.body) && <MenuItem id="edit">Edit message</MenuItem>}
+                                {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && <MenuItem id="delete">Delete message</MenuItem>}
                                 {sender.id !== session.data?.user.id && <MenuItem id="report">Report message</MenuItem>}
                               </MenuButton>
                             }
@@ -658,6 +686,31 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           <MuteSwitch conversationId={words(conversation.id)} muted={conversation.muted === true} />
         </Stack>
       </Drawer>
+      <Modal title="Edit message" isOpen={Boolean(editedMessage)} onOpenChange={(open) => { if (!open) setEditedMessage(undefined); }}>
+        <ModalBody>
+          <Stack gap={16}>
+            <TextArea label="Message" value={editText} onChange={setEditText} maxLength={4000} isRequired />
+            <p className="cm-hint">Everyone in the conversation sees that it was edited.</p>
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setEditedMessage(undefined)}>Cancel</Button>
+          <Button onPress={() => void changeMessage("editMessage")} loading={action.isPending} isDisabled={!editText.trim() || editText.trim() === words(editedMessage?.body)}>Save</Button>
+        </ModalActions>
+      </Modal>
+      <Modal title="Delete this message?" isOpen={Boolean(deletedMessage)} onOpenChange={(open) => { if (!open) setDeletedMessage(undefined); }}>
+        <ModalBody>
+          <Stack gap={16}>
+            <p>It is removed for everyone in the conversation, with its files. The conversation shows "Message deleted" in its place. This can't be undone.</p>
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setDeletedMessage(undefined)}>Cancel</Button>
+          <Button variant="destructive" onPress={() => void changeMessage("deleteMessage")} loading={action.isPending}>Delete</Button>
+        </ModalActions>
+      </Modal>
       <Modal
         title="Report this message"
         isOpen={Boolean(reportedMessage)}
