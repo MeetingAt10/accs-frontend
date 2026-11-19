@@ -197,11 +197,14 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
                   return (
                     <li key={text(person.id)} className="accs-row fl-row">
                       <div className="fl-row__body">
-                        <p className="fl-row__name">
-                          {text(person.name)}
-                          {overlaps.length > 0 && <StatusChip tone="warn">{overlaps.length} {overlaps.length === 1 ? 'overlap' : 'overlaps'}</StatusChip>}
-                        </p>
-                        <p className="fl-hint">{text(person.email)} · {classes.length} {classes.length === 1 ? 'class' : 'classes'}</p>
+                        {/* One line per person: name, then email and class count (QA 19 November: too much white space). */}
+                        <div className="fl-row__head">
+                          <p className="fl-row__name">
+                            {text(person.name)}
+                            {overlaps.length > 0 && <StatusChip tone="warn">{overlaps.length} {overlaps.length === 1 ? 'overlap' : 'overlaps'}</StatusChip>}
+                          </p>
+                          <p className="fl-hint">{text(person.email)} · {classes.length} {classes.length === 1 ? 'class' : 'classes'}</p>
+                        </div>
                         {classes.length > 0 && (
                           <p className="fl-classes">
                             {classes.map((entry) => `${text(entry.day)} ${text(entry.start)}–${text(entry.end)} ${text(entry.subject)}${text(entry.section) ? ' (' + text(entry.section) + ')' : ''}`).join(' · ')}

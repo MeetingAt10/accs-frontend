@@ -992,6 +992,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
   return (
     <Panel title="Add one student">
       <form className="acct-form" onSubmit={submit} noValidate>
+        {/* Hints are placeholders, so every box lines up (a hint above a box pushed it down). */}
         <div className="acct-form__grid">
           <TextField
             label="Full name"
@@ -1015,7 +1016,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
             value={draft.studentId}
             onChange={set('studentId')}
             autoComplete="off"
-            description="Like 24-1234."
+            placeholder="24-1234"
             isInvalid={Boolean(errors.studentId)}
             errorMessage={errors.studentId}
           />
@@ -1052,7 +1053,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
             value={draft.section}
             onChange={set('section')}
             autoComplete="off"
-            description="The section letter, like A."
+            placeholder="A"
             isInvalid={Boolean(errors.section)}
             errorMessage={errors.section}
           />
@@ -1123,6 +1124,9 @@ function StudentList() {
         )}
         {list.length ? (
           <>
+            {/* Ten students a page (QA 19 November: the list was one long scroll). */}
+            <PagedList items={list} size={10} noun="students" resetKey={q}>
+              {(shown) => (
             <div className="acct-scroll" aria-busy={students.isPlaceholderData}>
               <table className="accs-table acct-table acct-stack" aria-label="Student accounts">
                 <thead>
@@ -1139,7 +1143,7 @@ function StudentList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((student) => (
+                  {shown.map((student) => (
                     <tr key={student.id}>
                       <td className="acct-main">
                         <span className="acct-person">
@@ -1164,6 +1168,8 @@ function StudentList() {
                 </tbody>
               </table>
             </div>
+              )}
+            </PagedList>
             {total > list.length && (
               <p className="acct-foot">
                 Showing the first {list.length} of {total} students, in name order. Search to find the others.

@@ -89,14 +89,20 @@ const entries: Entry[] = [
   { id: 'osas-directory', label: 'Directory', about: 'Find faculty and offices.', icon: 'users', roles: ['osas'], to: ['/directory'] },
 ]
 
-/** Tiles for this session, in catalog order. */
+/** The role whose modules Home shows, for people with two roles: the Dean before their professor duties, and so on. */
+const mainRoleOrder = ['dean', 'chair', 'guidance', 'osas', 'secretary', 'administrator', 'professor', 'organization', 'student']
+/** Home shows six main modules (QA 19 November: the Dean, who also teaches, had twelve); the menu still has the rest. */
+export const moduleLimit = 6
+
+/** Tiles for this session: its main role's modules, in catalog order, at most six. */
 export function moduleTiles(session: Parameters<typeof canOpenPath>[0]) {
+  const main = mainRoleOrder.find((role) => session.user.roles.includes(role))
   return entries.flatMap(({ roles, to, query = '', ...tile }): ModuleTile[] => {
-    if (!roles.some((role) => session.user.roles.includes(role))) return []
+    if (!roles.some((role) => (main ? role === main : session.user.roles.includes(role)))) return []
     if (!to) return [tile]
     const path = to.find((candidate) => canOpenPath(session, candidate))
     return path ? [{ ...tile, href: path + query }] : []
-  })
+  }).slice(0, moduleLimit)
 }
 
 export function ModulePicker({ session }: { session: Session }) {

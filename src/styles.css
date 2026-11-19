@@ -145,6 +145,12 @@ a { text-underline-offset: 3px; }
   .accs-split { grid-template-columns: minmax(0, 1fr) 340px; }
   .accs-split--wide-rail { grid-template-columns: minmax(0, 1fr) 400px; }
 }
+/* A side column with nothing in it takes no room, so the main column uses the width (QA 19 November: Home left half
+   the page empty). */
+.accs-split > aside:empty { display: none; }
+@media (min-width: 1100px) {
+  .accs-split:has(> aside:empty) { grid-template-columns: minmax(0, 1fr); }
+}
 .accs-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
 
 /* KPI strip: one bordered strip divided by hairlines, not a row of floating cards. */

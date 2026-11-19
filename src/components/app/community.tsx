@@ -180,6 +180,8 @@ interface ScopeOption {
 const postLabels = ['Discussion', 'Rant', 'Assistance', 'Support']
 /** The label as a key for its colour (Announcement, Discussion, Rant, Assistance, Support). */
 export const labelKey = (label: string) => label.toLowerCase().replace(/s$/, '').replace(/[^a-z]/g, '') || 'discussion'
+// Roles that post on the Feed. The CCS Secretary posts and publishes announcements (decided 16 November 2026); she was
+// missing here, so the Feed never offered her a way to post although the API allows it.
 const participatingRoles = [
   'student',
   'organization',
@@ -188,6 +190,7 @@ const participatingRoles = [
   'dean',
   'guidance',
   'osas',
+  'secretary',
 ]
 const roleNames: Record<string, string> = {
   student: 'Student',
@@ -1126,13 +1129,13 @@ export function PostComposer({
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
-                  {/* The browser's time picker (QA 17 November: typing the time by hand was hard); it gives HH:MM. */}
+                  {/* The browser's time picker (QA 17 November: typing the time by hand was hard); it gives HH:MM. No hint line, so the
+                      row lines up with Event date (QA 19 November). */}
                   <TextField
                     type="time"
                     label="Time"
                     value={eventTime}
                     onChange={setEventTime}
-                    description="Pick the start time."
                     isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}
@@ -1147,7 +1150,7 @@ export function PostComposer({
                   />
                   <TextField
                     label="Contact person"
-                    description="Who to ask, with a number or email if you like: Prof. Robin Elm, 0917 123 4567."
+                    placeholder="Prof. Robin Elm, 0917 123 4567"
                     value={eventContact}
                     onChange={setEventContact}
                     isRequired={eventRequired}
