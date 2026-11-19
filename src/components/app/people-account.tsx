@@ -68,9 +68,10 @@ function useAction(pageId: string) {
   });
 }
 
+// Each role has its own color, the same on the Directory filters and on every role tag (QA 19 November).
 const roleTags = (roles: string[]) =>
   roles.map((role) => (
-    <span className="accs-tag pa-role" key={role}>
+    <span className="accs-tag pa-role" data-role={role} key={role}>
       {roleLabelOf(role)}
     </span>
   ));
@@ -169,7 +170,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             { id: "All", label: "Everyone" },
             ...roleOptions.map((value) => ({
               id: value,
-              label: <span className="pa-role">{roleLabelOf(value)}</span>,
+              label: <span className="pa-role pa-role--pill" data-role={value}>{roleLabelOf(value)}</span>,
             })),
           ]}
         />
@@ -786,7 +787,7 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
                   "Roles",
                   <span className="pa-tags" key="roles">
                     {roleLabels.map((role) => (
-                      <span className="accs-tag pa-role" key={role}>
+                      <span className="accs-tag pa-role" data-role={role} key={role}>
                         {role}
                         {record.program && ["chair", "student"].includes(role)
                           ? ` · ${word(record.program)}`
