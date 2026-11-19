@@ -1,10 +1,17 @@
 import { canAddRole, sectionProblem } from "@/lib/role-rules";
+import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
 import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
   Checkbox,
+  ComboBox,
+  Drawer,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   CheckboxGroup,
   Icon,
   Link,
@@ -398,7 +405,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               </th>
               {roles.map((role) => (
                 <th scope="col" key={role} title={roleFull(role)}>
-                  <span className="adm-matrix__role">{roleShort(role)}</span>
+                  <span className="adm-matrix__role">{roleFull(role)}</span>
                 </th>
               ))}
             </tr>
@@ -414,17 +421,17 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                   {(index === 0 || group !== previous) && (
                     <tr className="adm-matrix__group">
                       <th scope="rowgroup" colSpan={roles.length + 1}>
-                        {group}
+                        {permissionGroup(permission)}
                       </th>
                     </tr>
                   )}
                   <tr>
                     <th scope="row" className="adm-matrix__perm">
+                      <span className="adm-matrix__human">
+                        {permissionLabel(permission)}
+                      </span>
                       <span className="adm-matrix__key accs-mono">
                         {permission}
-                      </span>
-                      <span className="adm-matrix__human">
-                        {cap(permission.replace(/[._]/g, " "))}
                       </span>
                     </th>
                     {roles.map((role) => {
@@ -438,7 +445,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                           <MatrixCell
                             on={effective}
                             proposed={hasProposal}
-                            label={`${roleFull(role)}: ${permission}, ${
+                            label={`${roleFull(role)}: ${permissionLabel(permission)}, ${
                               effective ? "allowed" : "no access"
                             }${hasProposal ? " (proposed)" : ""}. Propose a change`}
                             onPress={() =>
@@ -488,15 +495,19 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                     <motion.li
                       key={key}
                       layout={!reduce}
-                      className="adm-proposed__chip"
                       initial={reduce ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={{ duration: 0.25, ease: EASE }}
                     >
-                      {roleShort(role)} ·{" "}
-                      <span className="accs-mono">{rest.join(":")}</span>
-                      <b>{value ? "allow" : "remove"}</b>
+                      {/* Opens that change, so it can be reviewed or reversed from here. */}
+                      <button
+                        type="button"
+                        className="adm-proposed__chip"
+                        onClick={() => setPendingCell({ role: role as Role, permission: rest.join(":"), allowed: !value })}
+                      >
+                        {proposalWords(roleFull(role), rest.join(":"), Boolean(value))}
+                      </button>
                     </motion.li>
                   );
                 })}
@@ -523,9 +534,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       >
         <ModalBody>
           <p>
-            {pendingCell?.allowed ? "Allow" : "Remove"}{" "}
-            <strong>{pendingCell?.role}</strong> access to{" "}
-            <strong>{pendingCell?.permission}</strong>.
+            <strong>{pendingCell ? proposalWords(roleFull(pendingCell.role), pendingCell.permission, pendingCell.allowed) : ""}</strong>.
+            CCS reviews the proposal before it applies.
           </p>
           <TextArea
             label="Reason"
@@ -598,7 +608,8 @@ function MatrixCell({
 
 /* ---------- Service status ---------- */
 
-export function SystemStatus({ status }: { status: Item }) {
+/** Service status. On the overview it links to Monitoring (testing sheet, P45: the numbers led nowhere). */
+export function SystemStatus({ status, linked = false }: { status: Item; linked?: boolean }) {
   const api = word(status.api, "Unknown");
   const storage = word(status.storage, "Unknown");
   const rows: Array<{
@@ -635,7 +646,7 @@ export function SystemStatus({ status }: { status: Item }) {
     },
   ];
   return (
-    <Panel flush title="Service status">
+    <Panel flush title="Service status" action={linked ? <Link variant="standalone" href="/admin/monitoring">Open monitoring</Link> : undefined}>
       <ul className="adm-rows">
         {rows.map((row) => (
           <li key={row.name}>
@@ -824,7 +835,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
         </Panel>
       </div>
       <div className="adm-cols">
-        <SystemStatus status={status} />
+        <SystemStatus status={status} linked />
         <Panel flush title="Accounts by role">
           {adoption.length ? (
             <Meters
@@ -1011,17 +1022,20 @@ function UsersPage({ page }: { page: PageEnvelope }) {
         onOpenChange={setAssignOpen}
       >
         <ModalBody>
-          <Select
+          {/* Type a name or ID (QA 17 November: a long dropdown that said "Select an item", with two scroll bars). */}
+          <ComboBox
             label="Choose a user"
+            placeholder="Select a user"
             selectedKey={selectedUser || null}
-            onSelectionChange={(key) => setSelectedUser(String(key))}
+            onSelectionChange={(key) => setSelectedUser(key ? String(key) : "")}
+            emptyMessage="No user with that name or ID"
           >
             {users.map((user) => (
-              <SelectOption key={word(user.id)} id={word(user.id)}>
+              <SelectOption key={word(user.id)} id={word(user.id)} textValue={`${word(user.name)} ${word(user.id)}`}>
                 {word(user.name)} · {word(user.id)}
               </SelectOption>
             ))}
-          </Select>
+          </ComboBox>
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setAssignOpen(false)}>
@@ -1109,6 +1123,8 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(
     Array.isArray(record.roles) ? (record.roles as Role[]) : [],
   );
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [roleToAdd, setRoleToAdd] = useState("");
   const [program, setProgram] = useState(word(record.program));
   const [section, setSection] = useState(word(record.section));
   const [reason, setReason] = useState("");
@@ -1168,6 +1184,38 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 </Checkbox>
               ))}
             </CheckboxGroup>
+            <div>
+              <Button variant="secondary" size="sm" icon="plus" isDisabled={!roles.some((role) => !selectedRoles.includes(role) && canAddRole(selectedRoles, role))} onPress={() => { setRoleToAdd(""); setAddRoleOpen(true); }}>
+                Add role
+              </Button>
+            </div>
+            <Modal title="Add role" isOpen={addRoleOpen} onOpenChange={setAddRoleOpen}>
+              <ModalBody>
+                <Select label="Role" placeholder="Select a role" selectedKey={roleToAdd || null} onSelectionChange={(key) => setRoleToAdd(key ? String(key) : "")}>
+                  {roles.filter((role) => !selectedRoles.includes(role) && canAddRole(selectedRoles, role)).map((role) => (
+                    <SelectOption key={role} id={role}>{roleFull(role)}</SelectOption>
+                  ))}
+                </Select>
+                {["chair", "student"].includes(roleToAdd) && (
+                  <Select label="Program" placeholder="Select a program" selectedKey={program || null} onSelectionChange={(key) => setProgram(key ? String(key) : "")}>
+                    <SelectOption id="BSIT">BSIT</SelectOption>
+                    <SelectOption id="BSCS">BSCS</SelectOption>
+                    <SelectOption id="BSIS">BSIS</SelectOption>
+                  </Select>
+                )}
+                {["guidance", "osas"].includes(roleToAdd) && <Note>{roleToAdd === "osas" ? "Office: OSAS." : "Office: Guidance."}</Note>}
+                <Note>The role is added to the list above. Give a reason and save to apply it.</Note>
+              </ModalBody>
+              <ModalActions>
+                <Button variant="secondary" onPress={() => setAddRoleOpen(false)}>Cancel</Button>
+                <Button
+                  isDisabled={!roleToAdd || (["chair", "student"].includes(roleToAdd) && !program)}
+                  onPress={() => { setSelectedRoles([...selectedRoles, roleToAdd as Role]); setAddRoleOpen(false); }}
+                >
+                  Add
+                </Button>
+              </ModalActions>
+            </Modal>
             <div className="adm-form__grid">
               <Select
                 label="Program"
@@ -1463,17 +1511,35 @@ function ModerationReview({
           <Panel title="Flagged content">
             <div className="adm-context">
               {messages.length ? (
-                messages.map((message) => (
-                  <div key={word(message.id)}>
-                    <blockquote className="adm-quote">
-                      {word(message.body)}
-                    </blockquote>
-                    <p className="adm-quote__by">
-                      {word(object(message.author).name, "Community member")} ·{" "}
-                      {formatDateTime(message.at)}
-                    </p>
-                  </div>
-                ))
+                // The flagged message with the messages around it; the flagged one is marked (QA 17 November).
+                <ol className="adm-thread" aria-label="Conversation around the flagged message">
+                  {messages.map((message) => (
+                    <li key={word(message.id)} className="adm-bubble" data-flagged={message.flagged === true || undefined}>
+                      {message.flagged === true && <span className="adm-bubble__tag">Flagged</span>}
+                      <p className="adm-bubble__body">{word(message.body, message.deleted ? "Message deleted" : "")}</p>
+                      <p className="adm-quote__by">
+                        {word(object(message.author).name, "Community member")} · {formatDateTime(message.at)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : record.itemType === "comment" && items(post.comments).length ? (
+                <div className="accs-stack">
+                  {word(post.title) && <p className="accs-row__title">{word(post.title)}</p>}
+                  <p className="adm-quote__by">{word(post.body)}</p>
+                  <ol className="adm-thread" aria-label="Comments on the post">
+                    {items(post.comments).map((comment) => {
+                      const flagged = word(comment.id) === word(record.itemId);
+                      return (
+                        <li key={word(comment.id)} className="adm-bubble" data-flagged={flagged || undefined}>
+                          {flagged && <span className="adm-bubble__tag">Flagged</span>}
+                          <p className="adm-bubble__body">{word(comment.body)}</p>
+                          <p className="adm-quote__by">{word(object(comment.author).name, "Community member")} · {formatDateTime(comment.at)}</p>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
               ) : (
                 <div>
                   {word(post.title) && (
@@ -1619,6 +1685,8 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
   const telemetry = items(page.data.telemetry);
   const recent = telemetry.slice(-10).reverse();
   const peak = Math.max(1, ...trend.map((row) => Number(row.value ?? 0)));
+  const [tab, setTab] = useState("status");
+  const [openTiming, setOpenTiming] = useState<Item>();
   return (
     <div className="accs-stack accs-stagger adm">
       <PageHeader
@@ -1636,6 +1704,14 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
           />
         ))}
       </Kpis>
+      {/* Tabs (testing sheet, P52): status and activity, response times, incidents. */}
+      <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
+        <TabList aria-label="Monitoring views">
+          <Tab id="status">Status and activity</Tab>
+          <Tab id="timings">Response times</Tab>
+          <Tab id="incidents">Incidents</Tab>
+        </TabList>
+        <TabPanel id="status">
       <div className="adm-cols">
         <SystemStatus status={object(page.data.systemStatus)} />
         <Panel flush title="Assistant sessions per day">
@@ -1674,23 +1750,32 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
           )}
         </Panel>
       </div>
-      <div className="adm-cols">
+        </TabPanel>
+        <TabPanel id="timings">
         <Panel flush title="Recent response times">
           {recent.length ? (
-            <Meters
-              rows={recent.map((entry) => ({
-                label: formatDateTime(entry.at),
-                value: Number(entry.durationMs ?? 0),
-                display: `${word(entry.durationMs, "0")} ms`,
-                tone: entry.success ? undefined : "danger",
-              }))}
-            />
+            <ul className="adm-rows">
+              {recent.map((entry, index) => (
+                <li key={index}>
+                  {/* Each answer opens its details: no conversation text is kept, only timing and result. */}
+                  <button type="button" className="adm-row adm-row--button" onClick={() => setOpenTiming(entry)}>
+                    <div>
+                      <p className="adm-row__title">{word(entry.durationMs, "0")} ms</p>
+                      <p className="adm-row__sub">{entry.success ? "Answered" : "Failed"} · {word(entry.category, "assistant")}</p>
+                    </div>
+                    <Time value={entry.at} />
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : (
             <Empty title="No timings recorded">
               The last 10 assistant answers show up here.
             </Empty>
           )}
         </Panel>
+        </TabPanel>
+        <TabPanel id="incidents">
         <Panel flush title="Incidents">
           {incidents.length ? (
             <ul className="adm-rows">
@@ -1714,7 +1799,22 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
             </Empty>
           )}
         </Panel>
-      </div>
+        </TabPanel>
+      </Tabs>
+      <Drawer title="Assistant answer" isOpen={Boolean(openTiming)} onOpenChange={(open) => { if (!open) setOpenTiming(undefined); }}>
+        {openTiming && (
+          <dl className="adm-entry">
+            {([
+              ["Time", formatDateTime(openTiming.at)],
+              ["Response time", `${word(openTiming.durationMs, "0")} ms`],
+              ["Result", openTiming.success ? "Answered" : "Failed"],
+              ["Kind", word(openTiming.category, "assistant")],
+            ] as Array<[string, string]>).map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        )}
+      </Drawer>
     </div>
   );
 }
@@ -1731,6 +1831,9 @@ const AUDIT_MODULES = [
 ];
 const AUDIT_ACTIONS = [
   "Role assignment changed",
+  "Restriction extended",
+  "Restriction shortened",
+  "Restriction change declined",
   "Permission change proposed",
   "Restriction applied",
   "Restriction lifted",
@@ -1748,6 +1851,9 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
+  const [openEntry, setOpenEntry] = useState<Item>();
+  // From after To is not a range (QA 17 November): say so and leave the dates out of the filter.
+  const backwards = Boolean(from && to && from > to);
   const reset =
     <T,>(set: (value: T) => void) =>
     (value: T) => {
@@ -1761,8 +1867,8 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
       (!query || text.includes(query.toLowerCase())) &&
       (module === "All" || word(row.module) === module) &&
       (actionFilter === "All" || word(row.action) === actionFilter) &&
-      (!from || word(row.at).slice(0, 10) >= from) &&
-      (!to || word(row.at).slice(0, 10) <= to)
+      (backwards || !from || word(row.at).slice(0, 10) >= from) &&
+      (backwards || !to || word(row.at).slice(0, 10) <= to)
     );
   });
   const pages = Math.max(1, Math.ceil(filtered.length / AUDIT_PAGE));
@@ -1824,12 +1930,16 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
             label="From"
             value={from}
             onChange={reset(setFrom)}
+            isInvalid={backwards}
+            errorMessage={backwards ? "Choose a date on or before the To date." : undefined}
           />
           <TextField
             type="date"
             label="To"
             value={to}
             onChange={reset(setTo)}
+            isInvalid={backwards}
+            errorMessage={backwards ? "Choose a date on or after the From date." : undefined}
           />
         </div>
       </div>
@@ -1850,7 +1960,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
               </thead>
               <tbody>
                 {shown.map((entry, index) => (
-                  <tr key={word(entry.id, String(start + index))}>
+                  <tr key={word(entry.id, String(start + index))} className="adm-row" onClick={() => setOpenEntry(entry)}>
                     <td data-label="Time">
                       <Time value={entry.at} />
                     </td>
@@ -1935,6 +2045,24 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
           </Empty>
         </div>
       )}
+      <Drawer title="Audit entry" isOpen={Boolean(openEntry)} onOpenChange={(open) => { if (!open) setOpenEntry(undefined); }}>
+        {openEntry && (
+          <dl className="adm-entry">
+            {([
+              ["Time", formatDateTime(openEntry.at)],
+              ["Actor", word(object(openEntry.actor).name, "System")],
+              ["Action", word(openEntry.action, "—")],
+              ["Module", word(openEntry.module, "—")],
+              ["Reference", word(openEntry.reference, "—")],
+              ["Purpose", word(openEntry.purpose, "—")],
+              ["Reason", word(openEntry.reason, "—")],
+              ["Result", word(openEntry.result, "—")],
+            ] as Array<[string, string]>).map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        )}
+      </Drawer>
     </div>
   );
 }

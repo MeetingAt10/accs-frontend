@@ -215,10 +215,12 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 }
 .adm-matrix__role {
   display: inline-block;
-  padding: 4px 0;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  white-space: nowrap;
+  /* Horizontal and wrapping (QA 17 November: vertical role names were hard to read). */
+  min-width: 72px;
+  max-width: 96px;
+  padding: 4px 2px;
+  white-space: normal;
+  line-height: 1.25;
   color: var(--accs-ink-2);
   font-size: 0.75rem;
   font-weight: 700;
@@ -235,8 +237,8 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   font-weight: 400;
 }
 .adm-matrix thead .adm-matrix__perm { z-index: 4; background: var(--accs-sunken); color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; vertical-align: bottom; }
-.adm-matrix__key { display: block; color: var(--accs-ink); }
-.adm-matrix__human { display: block; color: var(--accs-muted); font-size: 0.75rem; }
+.adm-matrix__key { display: block; color: var(--accs-muted); font-size: 0.75rem; }
+.adm-matrix__human { display: block; color: var(--accs-ink); }
 .adm-matrix__group th {
   position: sticky;
   left: 0;
@@ -291,18 +293,20 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
   align-items: center;
   gap: 10px 16px;
   padding: 12px 16px;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--accs-line);
   border-radius: 14px;
-  background: var(--accs-ink);
-  color: var(--accs-on-accent);
+  /* The page surface in both themes (QA 17 November: it stayed dark in light mode). */
+  background: var(--accs-surface);
+  color: var(--accs-ink);
   box-shadow: var(--accs-shadow-pop);
 }
 .adm-proposed__head { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
 .adm-proposed__count { min-width: 24px; padding: 0 8px; border-radius: var(--accs-radius-pill); background: var(--accs-gold); color: var(--accs-ink); font-size: 0.75rem; line-height: 24px; text-align: center; font-variant-numeric: tabular-nums; }
 .adm-proposed__list { display: flex; flex: 1 1 18rem; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
-.adm-proposed__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--accs-radius-pill); background: rgb(255 255 255 / 12%); font-size: 0.75rem; font-weight: 600; }
-.adm-proposed__chip b { font-weight: 700; color: #ffd98a; }
-.adm-proposed__note { flex-basis: 100%; margin: 0; color: rgb(255 255 255 / 66%); font-size: 0.75rem; }
+.adm-proposed__chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 3px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-sunken); color: var(--accs-ink); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.adm-proposed__chip:hover { border-color: var(--accs-navy); }
+.adm-proposed__chip:focus-visible { outline: 2px solid var(--accs-navy); outline-offset: 2px; }
+.adm-proposed__note { flex-basis: 100%; margin: 0; color: var(--accs-muted); font-size: 0.75rem; }
 
 @media (max-width: 640px) {
   .adm-matrix .adm-matrix__perm { min-width: 168px; padding-inline: 12px; }
@@ -361,3 +365,18 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 /* A one-time reset code, large enough to read out to the account holder. */
 .adm-code { margin: 0 0 12px; font-size: 1.75rem; font-weight: 600; letter-spacing: 0.12em; color: var(--accs-ink); }
 .adm-hint { margin: 0 0 10px; color: var(--accs-muted); font-size: 0.875rem; line-height: 1.5; }
+/* Audit rows open their entry; the entry reads as a list of facts. */
+.adm-table .adm-row { cursor: pointer; }
+.adm-table .adm-row:hover > td { background: color-mix(in srgb, var(--accs-navy) 4%, transparent); }
+.adm-entry { display: grid; gap: 12px; margin: 0; }
+.adm-entry dt { color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; }
+.adm-entry dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.adm-row--button { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.adm-row--button:hover { background: color-mix(in srgb, var(--accs-navy) 4%, transparent); }
+.adm-row--button:focus-visible { outline: 2px solid var(--accs-navy); outline-offset: -2px; }
+/* Moderation context: messages or comments in order, the flagged one marked. */
+.adm-thread { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.adm-bubble { padding: 10px 12px; border: 1px solid var(--accs-line); border-radius: 12px; background: var(--accs-sunken); }
+.adm-bubble[data-flagged] { border-color: var(--accs-gold); background: color-mix(in srgb, var(--accs-gold) 14%, var(--accs-surface)); }
+.adm-bubble__tag { display: inline-block; margin-bottom: 4px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.adm-bubble__body { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
