@@ -75,6 +75,8 @@ interface Person {
   program?: string
   studentId?: string
   organizationRole?: string
+  /** A student's section name, like SBIT3A. */
+  section?: string
   role?: string
   title?: string
 }
@@ -1910,6 +1912,10 @@ function MemberList({
                           {' · '}
                           {member.program ?? '—'}
                         </p>
+                      )}
+                      {/* An organization member's section under their name (QA 19 November). */}
+                      {organization && (member.section || member.program) && (
+                        <p className="accs-row__sub">{member.section ?? member.program}</p>
                       )}
                     </div>
                     <span className="accs-tag">
