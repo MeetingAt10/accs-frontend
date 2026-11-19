@@ -1081,6 +1081,13 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
         <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : undefined} />
         {/* Always shown, also when Report a student takes the header's action slot (testing sheet: the Chair had none). */}
         <Note>{role === 'chair' || role === 'dean' ? 'You see the concerns in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>
+        {/* What the two Guidance statuses mean (QA 17 November asked for the difference). */}
+        {['dean', 'guidance', 'osas', 'chair'].includes(role) && (
+          <p className="gv-hint">
+            <strong>Escalated to Guidance Office</strong>: sent to Guidance, which has not opened a case file yet.{' '}
+            <strong>Case File at Guidance</strong>: Guidance opened a case file and is handling it.
+          </p>
+        )}
         <div className="gv-page accs-stagger">
           <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabsShown} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">

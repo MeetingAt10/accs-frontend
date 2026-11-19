@@ -662,7 +662,9 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     const next = labels.includes(label)
       ? labels.filter((item) => item !== label)
       : [...labels, label]
-    update({ label: next.join(',') || undefined })
+    // Every label picked is the same as All, so it goes back to All (QA 17 November: two states that showed the same posts).
+    const everyLabel = ['Announcements', ...postLabels].every((item) => next.includes(item))
+    update({ label: everyLabel ? undefined : next.join(',') || undefined })
   }
 
   function clearFilters() {
@@ -764,6 +766,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                     key={label}
                     className="accs-pill fx-cat"
                     data-label={labelKey(label)}
+                    data-included={!labels.length || undefined}
                     aria-pressed={labels.includes(label)}
                     onClick={() => toggleLabel(label)}
                   >

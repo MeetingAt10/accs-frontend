@@ -958,6 +958,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const reduce = useReducedMotion();
   const scroller = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState("");
+  const askBox = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const proposed = suggestions ?? [
     "What can you help me with?",
@@ -1071,12 +1072,17 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                 type="button"
                 className="accs-pill"
                 key={prompt}
-                onClick={() => setQuestion(prompt)}
+                onClick={() => {
+                  setQuestion(prompt);
+                  // The cursor goes to the question, so Enter sends it (QA 17 November: Enter pressed the prompt again).
+                  requestAnimationFrame(() => askBox.current?.querySelector<HTMLElement>("textarea, [contenteditable=true]")?.focus());
+                }}
               >
                 {prompt}
               </button>
             ))}
           </div>
+          <div ref={askBox}>
           <MessageComposer
             label="Question for the assistant"
             value={question}
@@ -1085,6 +1091,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
             isPending={action.isPending}
             maxLength={2000}
           />
+          </div>
           {/* TBD(D-08): assistant provider data handling and log retention require approval. */}
           <div className="cm-chat__note">
             <small>
