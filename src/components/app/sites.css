@@ -205,6 +205,8 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+/* View all and Mark all as read on one row under the list. */
+.shell-bell__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .shell-top__tools { display: flex; align-items: center; gap: 4px; flex: none; }
 .shell-top__search { display: none; width: min(22rem, 30vw); margin-right: 8px; }
 .shell-top__search .ds-field { margin: 0; }

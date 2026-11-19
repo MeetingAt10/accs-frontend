@@ -15,6 +15,8 @@ export const validateAuthSearch = (search: Record<string, unknown>) => ({
   redirect: typeof search.redirect === 'string' && search.redirect.startsWith('/') && !search.redirect.startsWith('//')
     ? search.redirect
     : undefined,
+  // Set when a session ended on another page (main.tsx), so Sign in can say why the person is here.
+  ended: search.ended === 1 || search.ended === '1' || search.ended === true ? true : undefined,
 })
 
 /** Where a session goes next: the page it asked for, else its landing page. Temporary sign-in details come first. */

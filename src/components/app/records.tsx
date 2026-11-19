@@ -22,7 +22,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
   Empty,
@@ -44,6 +44,8 @@ import {
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { replaceFilters } from "@/lib/url-filters";
+import { TypedSearch, typingPause } from "@/components/app/typed-search";
 
 import "./records.css";
 
@@ -785,27 +787,32 @@ function Analytics({ page }: { page: PageEnvelope }) {
     const next = new URLSearchParams(location.searchStr);
     if (value) next.set(name, value);
     else next.delete(name);
-    router.history.replace(
-      location.pathname + (next.size ? "?" + next.toString() : ""),
-    );
+    replaceFilters(router, location.pathname, next);
   };
   const filtered = [...search.keys()].length > 0;
   // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
   const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
   const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  // Arrow keys in a date field change it once per press: apply the range after a short pause, not on every press
+  // (QA 17 November: each press loaded the page again).
+  const rangeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(rangeTimer.current), []);
   const changeRange = (name: "from" | "to", value: string) => {
     const next = { from: search.get("from") ?? "", to: search.get("to") ?? "", ...rangeDraft, [name]: value };
     setRangeDraft(next);
+    clearTimeout(rangeTimer.current);
     if (next.from && next.to && next.from > next.to) { setRangeProblem(name); return; }
     setRangeProblem("");
-    setRangeDraft({});
-    // Both dates in one change of address: two updateFilter calls would each start from the old address.
-    const params = new URLSearchParams(location.searchStr);
-    for (const key of ["from", "to"] as const) {
-      if (next[key]) params.set(key, next[key]);
-      else params.delete(key);
-    }
-    router.history.replace(location.pathname + (params.size ? "?" + params.toString() : ""));
+    rangeTimer.current = setTimeout(() => {
+      setRangeDraft({});
+      // Both dates in one change of address: two updateFilter calls would each start from the old address.
+      const params = new URLSearchParams(router.state.location.searchStr);
+      for (const key of ["from", "to"] as const) {
+        if (next[key]) params.set(key, next[key]);
+        else params.delete(key);
+      }
+      replaceFilters(router, router.state.location.pathname, params);
+    }, typingPause);
   };
   const program = search.get("program") ?? "All";
   return (
@@ -819,7 +826,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
             filtered ? (
               <Button
                 variant="secondary"
-                onPress={() => router.history.replace(location.pathname)}
+                onPress={() => replaceFilters(router, location.pathname, new URLSearchParams())}
               >
                 Clear filters
               </Button>
@@ -830,7 +837,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
     >
       <div className="accs-toolbar rc-toolbar rc-toolbar--fields" role="search">
         <div className="accs-grow">
-          <Search
+          <TypedSearch
             label="Search by case reference"
             placeholder="Case reference"
             size="sm"
@@ -2254,7 +2261,7 @@ function ClearanceList({ page }: { page: PageEnvelope }) {
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    router.history.replace(location.pathname + (next.size ? "?" + next.toString() : ""));
+    replaceFilters(router, location.pathname, next);
   };
   const quick = params.get("clearance") === "on_hold" ? "hold" : params.get("status") === "pending,missing" ? "unfinished" : "all";
   const needle = search.trim().toLowerCase();

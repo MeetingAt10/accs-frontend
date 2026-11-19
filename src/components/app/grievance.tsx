@@ -15,6 +15,7 @@ import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format
 import { RestrictedView } from '@/components/app/guards'
 import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, alsoReadableBy, modeLabel, readAccess, readTalk, readWording } from '@/components/app/concern-talk'
 import { categoryDetailMax, categoryText, choicePayload, choiceProblems, cleanChoice, readCategoryOptions } from '@/lib/concern-categories'
+import { tidyDraft } from '@/lib/draft-tidy'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import { CaseStrikes } from '@/components/app/strikes'
@@ -192,18 +193,33 @@ export function DiscloseIdentityDialog({ report, isOpen, onOpenChange }: { repor
   )
 }
 
-function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: string; isOpen: boolean; onOpenChange: (open: boolean) => void; onUse: (text: string) => void }) {
-  const [candidate, setCandidate] = useState(narrative)
+function DraftHelp({ draft, isOpen, onOpenChange, onUse }: { draft: Draft; isOpen: boolean; onOpenChange: (open: boolean) => void; onUse: (text: string) => void }) {
+  const [candidate, setCandidate] = useState(draft.narrative)
+  const [missing, setMissing] = useState<string[] | null>(null)
   const action = useAction('P19')
   const reply = words(object(action.data?.record).reply)
+  // Rewrites the student's own words in the browser: nothing is sent, nothing is invented (lib/draft-tidy.ts).
+  const tidy = () => {
+    const result = tidyDraft({ narrative: candidate, occurredOn: draft.occurredOn, location: draft.location, category: draft.category })
+    if (result.text) setCandidate(result.text)
+    setMissing(result.missing)
+  }
   return (
     <Drawer title="Help with your draft" isOpen={isOpen} onOpenChange={onOpenChange}>
       <div className="gv-stack">
-        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. It gives approved writing tips only.</Alert>
-        <Button variant="secondary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Show writing guidance</Button>
+        <Alert tone="neutral" title="The assistant helps you write">It tidies your own words and lays them out for the office. It doesn't decide what happened or add anything you didn't write.</Alert>
+        <TextArea label="Your draft" value={candidate} onChange={(value) => { setCandidate(value); setMissing(null) }} maxLength={4000} showCount description="Edit it here, then use it in your report." />
+        <div className="gv-actions">
+          <Button variant="secondary" icon="pencil" isDisabled={!candidate.trim()} onPress={tidy}>Tidy up my draft</Button>
+          <Button variant="tertiary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Writing tips</Button>
+        </div>
+        {missing && (missing.length
+          ? <Alert tone="info" title="You could also add">
+              <ul className="gv-missing">{missing.map((item) => <li key={item}>{item}</li>)}</ul>
+            </Alert>
+          : <Alert tone="success" title="Your draft covers what the office needs" />)}
         <ActionError error={action.error} />
         {reply && <p className="ds-prose">{reply}</p>}
-        <TextArea label="Text to review" value={candidate} onChange={setCandidate} maxLength={4000} showCount description="Review and edit your wording before using it." />
         <Button onPress={() => { onUse(candidate); onOpenChange(false) }}>Use this text</Button>
       </div>
     </Drawer>
@@ -409,7 +425,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
         </div>
         {/* Each dialog's key names it: both used "open"/"closed", so two closed dialogs shared the key "closed". */}
         <ConsentDialog key={consentOpen ? 'consent-open' : 'consent-closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
-        <DraftHelp key={helpOpen ? 'help-open' : 'help-closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
+        <DraftHelp key={helpOpen ? 'help-open' : 'help-closed'} draft={draft} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
         <Modal role="alertdialog" title="Discard this draft?" isOpen={discardOpen} onOpenChange={setDiscardOpen}>
           <ModalBody><p>The description and choices in this draft will be cleared.</p></ModalBody>
           <ModalActions><Button variant="secondary" onPress={() => setDiscardOpen(false)}>Keep draft</Button><Button variant="destructive" onPress={() => { setDraft({ ...blankDraft }); setStep(0); setError(''); setDiscardOpen(false); action.mutate({ action: 'saveDraft', payload: { narrative: '' } }); try { localStorage.removeItem(storageKey) } catch { /* No stored draft to remove. */ } }}>Discard draft</Button></ModalActions>
@@ -1011,8 +1027,11 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const categoryOptions = readCategoryOptions(page.data.categoryOptions)
   const queueCategories = [...new Set([...categoryOptions.map((option) => option.label), ...records.map((report) => words(report.category))])].filter(Boolean)
   const queueSubcategories = categoryOptions.find((option) => option.label === category)?.subcategories ?? []
-  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...(roles.includes('professor') ? [['teaching', 'Teaching assignments']] : []), ['history', 'Handled by me'], ['closed', 'Closed']]
-    : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
+  // Someone who is also a professor (a Chair or the Dean who teaches) handles their advisees' reports too: their own tab,
+  // named for what it is (QA 17 November: a Chair could not find them under "Teaching assignments", and the Dean had none).
+  const adviserTab = role !== 'professor' && roles.includes('professor') ? [['teaching', 'As adviser']] : []
+  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...adviserTab, ['history', 'Handled by me'], ['closed', 'Closed']]
+    : role === 'dean' ? [['open', 'At Dean stage'], ...adviserTab, ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
           : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
@@ -1030,7 +1049,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
               : selected === 'waiting' ? words(report.status).toLowerCase().includes('waiting')
                 : selected === 'intake' ? report.stage === 'guidance' && !report.caseFileId && !isClosed(report)
                   : selected === 'active' ? !isClosed(report) && items(report.history).length > 1
-                    : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
+                    : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId)) && (!adviserTab.length || report.stage !== 'adviser')
   const inQueue = records.filter((report) => inTab(report, validTab))
   const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!subcategory || report.subcategory === subcategory) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))

@@ -7,6 +7,7 @@ import { useState, type ChangeEvent } from 'react'
 import { ApiError, performPageAction, type PageAction, type PageEnvelope } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { pageQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import './faculty-load.css'
@@ -165,7 +166,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
   const faculty = items(page.data.faculty)
   const withClasses = faculty.filter((person) => items(person.classes).length)
   const conflicts = faculty.reduce((total, person) => total + items(person.conflicts).length, 0)
-  const showTerm = (value: string) => router.history.replace(location.pathname + (value ? '?period=' + encodeURIComponent(value) : ''))
+  const showTerm = (value: string) => replaceFilters(router, location.pathname, new URLSearchParams(value ? { period: value } : {}))
   return (
     <div className="accs-stack">
       <PageHeader
