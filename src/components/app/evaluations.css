@@ -80,7 +80,7 @@
 
 /* ---------- Assignment cards (P26) ---------- */
 
-.ev-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.ev-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
 .accs-panel.ev-card { gap: 14px; align-content: space-between; }
 .ev-card .accs-avatar { width: 44px; height: 44px; font-size: 0.9375rem; background: var(--site-accent-wash); }
 .ev-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -101,7 +101,7 @@
 
 /* ---------- Focused form column (P27, P32) ---------- */
 
-.ev-form { display: grid; gap: 20px; align-content: start; width: 100%; max-width: 760px; margin-inline: auto; min-width: 0; }
+.ev-form { display: grid; gap: 20px; align-content: start; width: 100%; min-width: 0; }
 
 .ev-sticky {
   position: sticky;

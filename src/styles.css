@@ -151,7 +151,7 @@ a { text-underline-offset: 3px; }
 @media (min-width: 1100px) {
   .accs-split:has(> aside:empty) { grid-template-columns: minmax(0, 1fr); }
 }
-.accs-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.accs-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
 
 /* KPI strip: one bordered strip divided by hairlines, not a row of floating cards. */
 .accs-kpis {
@@ -576,3 +576,9 @@ select {
   }
 }
 .accs-pager--count { margin: 8px 0 0; color: var(--accs-muted); font-size: 0.8125rem; }
+
+/* Dropdown lists (Select, ComboBox) are as wide as their field, and a long entry ends with "…" instead of stretching the
+   list across the page (QA 19 November: one account with ten roles made the recipient list page-wide). */
+.ds-popover[data-trigger="ComboBox"], .ds-popover[data-trigger="Select"] { width: var(--trigger-width); max-width: min(var(--trigger-width), calc(100vw - 32px)); }
+.ds-popover[data-trigger="ComboBox"] .ds-option__text, .ds-popover[data-trigger="Select"] .ds-option__text { min-width: 0; flex: 1 1 auto; }
+.ds-popover[data-trigger="ComboBox"] .ds-option__text > [slot="label"], .ds-popover[data-trigger="Select"] .ds-option__text > [slot="label"] { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

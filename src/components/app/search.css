@@ -1,5 +1,5 @@
 /* Search results: one panel per kind of result. */
-.sr-groups { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); align-items: start; }
+.sr-groups { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); align-items: start; }
 .sr-group-title { display: inline-flex; align-items: center; gap: 8px; }
 .sr-hits { margin: 0; padding: 0; list-style: none; }
 .sr-hits > li + li { border-top: 1px solid var(--accs-line); }

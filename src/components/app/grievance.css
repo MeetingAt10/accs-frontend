@@ -2,7 +2,8 @@
 
 .gv-page { display: grid; gap: 24px; align-content: start; min-width: 0; }
 .gv-stack { display: grid; gap: 18px; align-content: start; min-width: 0; }
-.gv-wizard { max-width: 680px; }
+/* Full page width, like every other page (QA 19 November: no white space on the right). */
+.gv-wizard { max-width: none; }
 .gv-cap { text-transform: capitalize; }
 .gv-hint { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.5; }
 .gv-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

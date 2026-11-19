@@ -625,7 +625,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     key={words(recipient.id)}
                     textValue={words(recipient.name)}
                   >
-                    {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
+                    {/* Two roles at most; the rest as "+N" (one account had ten). */}
+                    {words(recipient.name)} · {roles(recipient.roles).slice(0, 2).map(roleLabelOf).join(", ")}{roles(recipient.roles).length > 2 ? ` +${roles(recipient.roles).length - 2}` : ""}
                   </SelectOption>
                 ))}
             </ComboBox>
