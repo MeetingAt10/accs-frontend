@@ -1,13 +1,18 @@
 import { featureWords } from "@/lib/restrictions";
+import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
 import {
   Alert,
   Badge,
   Button,
+  ComboBox,
   Drawer,
   IconButton,
   Link,
+  Modal,
+  ModalBody,
   Popover,
   Search,
+  SelectOption,
   Stack,
   toast,
 } from "@meetingat10/design-system/react";
@@ -681,6 +686,11 @@ function Topbar({
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["page", "P40"] }),
   });
+  // Also in the popover, not only on the Notifications page (QA 17 November).
+  const markAllRead = useMutation({
+    mutationFn: () => performPageAction("P40", { action: "markAllNotifications", payload: {} }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["page", "P40"] }),
+  });
 
   async function openNotification(notification: Record<string, unknown>) {
     try {
@@ -826,7 +836,14 @@ function Topbar({
                     />
                   ))}
                 </NotificationList>
-                <Link href="/notifications">View all notifications</Link>
+                <div className="shell-bell__foot">
+                  <Link href="/notifications">View all notifications</Link>
+                  {unreadCount > 0 && (
+                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
+                      Mark all as read
+                    </Button>
+                  )}
+                </div>
               </Stack>
             ) : (
               <Stack gap={12}>
@@ -850,6 +867,39 @@ function Topbar({
         </Stack>
       </Drawer>
     </>
+  );
+}
+
+/** Search the pages and actions the role may open, and go there. Opened with Ctrl+K or Cmd+K. */
+function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen: boolean; onOpenChange: (open: boolean) => void }) {
+  const router = useRouter();
+  const items = jumpItems(visibleEntries(session).map((entry) => ({ label: entry.label, href: entry.href })), session.allowedPages);
+  return (
+    <Modal title="Go to" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <ModalBody>
+        <ComboBox
+          label="Page or action"
+          placeholder="Type a page, like Calendar or New report"
+          description="Press Enter to go. Esc closes this."
+          autoFocus
+          menuTrigger="focus"
+          defaultFilter={(text, typed) => matchesJump({ id: "", label: text, href: "", kind: "Page" }, typed)}
+          onSelectionChange={(key) => {
+            const item = items.find((candidate) => candidate.id === key);
+            if (!item) return;
+            onOpenChange(false);
+            router.history.push(item.href);
+          }}
+          emptyMessage="No page or action with that name"
+        >
+          {items.map((item) => (
+            <SelectOption id={item.id} key={item.id} textValue={item.label} description={item.kind === "Action" ? "Action" : undefined}>
+              {item.label}
+            </SelectOption>
+          ))}
+        </ComboBox>
+      </ModalBody>
+    </Modal>
   );
 }
 
@@ -933,6 +983,18 @@ export function AppChrome({
   // The drawer is a mobile-only surface; any route change closes it.
   useEffect(() => setMenuOpen(false), [path]);
 
+  // Ctrl+K (Cmd+K on a Mac) opens the quick jump from anywhere in the portal.
+  const [jumpOpen, setJumpOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isQuickJumpKey(event)) return;
+      event.preventDefault();
+      setJumpOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div
       className="app-chrome shell"
@@ -946,6 +1008,7 @@ export function AppChrome({
       <a className="shell-skip" href="#main-content">
         Skip to main content
       </a>
+      <QuickJump session={session} isOpen={jumpOpen} onOpenChange={setJumpOpen} />
       {restricted && (
         <div className="shell-banner" role="status">
           <Badge tone="warning" form="pending">

@@ -110,15 +110,18 @@ function MuteSwitch({ conversationId, muted }: { conversationId: string; muted: 
   useEffect(() => setOn(muted), [muted]);
   const save = useMutation({
     mutationFn: (next: boolean) => performPageAction("P12", { action: "muteThread", recordId: conversationId, payload: { muted: next } }),
+    // Only the message pages change. Reloading every page on each toggle sent a burst of requests that failed after a
+    // few quick toggles (QA 17 November).
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["page"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
       toast(result.message, { tone: "success" });
     },
     onError: (_error, next) => setOn(!next),
   });
   return (
     <>
-      <Switch isSelected={on} onChange={(next) => { setOn(next); save.mutate(next); }}>
+      <Switch isSelected={on} isDisabled={save.isPending} onChange={(next) => { setOn(next); save.mutate(next); }}>
         Mute this conversation
       </Switch>
       <ActionError error={save.error} />
@@ -280,7 +283,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       return current.filter((file) => file.key !== key);
     });
   }
+  // After the file picker closes, focus is still on the attach button, so the first Enter went there and the message
+  // needed a second Enter (QA 17 November). Put the cursor back in the message box.
+  const composerBox = useRef<HTMLDivElement>(null);
+  const focusMessageBox = () => requestAnimationFrame(() => composerBox.current?.querySelector<HTMLElement>("textarea, [contenteditable=true]")?.focus());
   function addFiles(chosen: File[]) {
+    focusMessageBox();
     const room = messageFilesPerMessage - pendingFiles.length;
     if (room <= 0) {
       toast(`Send at most ${messageFilesPerMessage} files at a time.`);
@@ -504,9 +512,11 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                 icon="dots-three"
                                 iconOnly
                                 onAction={(key) => {
+                                  // A message with only files has no text: copy the file names, so Copy is never empty.
+                                  const fileNames = (Array.isArray(message.attachments) ? message.attachments : []).map((file) => words(object(file).fileName)).filter(Boolean);
                                   if (key === "copy")
                                     void navigator.clipboard
-                                      ?.writeText(words(message.body))
+                                      ?.writeText([words(message.body), ...fileNames.map((name) => `Attachment: ${name}`)].filter(Boolean).join("\n"))
                                       .then(() => toast("Message copied."))
                                       .catch(() =>
                                         toast(
@@ -533,6 +543,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                 />
               )}
               <ActionError error={action.error} />
+              <div ref={composerBox}>
               <MessageComposer
                 value={body}
                 onChange={setBody}
@@ -548,6 +559,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   .filter((member) => member.id !== session.data?.user.id)
                   .map((member) => ({ id: words(member.id), name: words(member.name) }))}
               />
+              </div>
             </Stack>
           )}
         </section>

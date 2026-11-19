@@ -67,6 +67,7 @@ import {
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { replaceFilters } from "@/lib/url-filters";
 
 import "./evaluations.css";
 
@@ -160,9 +161,7 @@ function useFilters() {
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    router.history.replace(
-      location.pathname + (next.size ? "?" + next.toString() : ""),
-    );
+    replaceFilters(router, location.pathname, next);
   }
 
   return { params, update };

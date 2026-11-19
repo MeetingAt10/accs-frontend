@@ -64,6 +64,8 @@ import {
 } from '@/lib/api'
 import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
+import { TypedSearch } from '@/components/app/typed-search'
 import './community.css'
 
 interface Person {
@@ -245,8 +247,7 @@ function useFilters() {
       if (value) next.set(key, value)
       else next.delete(key)
     }
-    const search = next.toString()
-    router.history.push(location.pathname + (search ? `?${search}` : ''))
+    replaceFilters(router, location.pathname, next)
   }
 
   return { params, update }
@@ -700,7 +701,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
           <div className="fx-toolbar">
             <div className="fx-toolbar__row">
               <div className="fx-toolbar__search">
-                <Search
+                <TypedSearch
                   label="Search posts"
                   size="sm"
                   value={query}
@@ -1986,7 +1987,7 @@ function SpacesPage({
         <div className="fx-toolbar">
           <div className="fx-toolbar__row">
             <div className="fx-toolbar__search">
-              <Search
+              <TypedSearch
                 label="Find a section"
                 size="sm"
                 value={query}
@@ -2303,7 +2304,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
       />
       <div className="fx-toolbar fx-toolbar--slim">
         <div className="fx-toolbar__search">
-          <Search
+          <TypedSearch
             label="Find an organization"
             size="sm"
             value={query}

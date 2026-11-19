@@ -65,6 +65,7 @@ import {
   relativeTime,
 } from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
 import './schedule.css'
 
 interface Person {
@@ -267,7 +268,7 @@ function useCalendarLocation() {
       if (value) next.set(key, value)
       else next.delete(key)
     }
-    router.history.push(`${location.pathname}?${next.toString()}`)
+    replaceFilters(router, location.pathname, next)
   }
   return { params, update }
 }
@@ -357,6 +358,14 @@ function CalendarPage({
   const small = useSmallScreen()
   const action = useScheduleAction('P13')
   const [selectedEntry, setSelectedEntry] = useState<CalendarEntry>()
+  // Esc closes the event panel even when focus stayed on the calendar after the click (the drawer only hears Esc
+  // from inside itself; QA 17 November).
+  useEffect(() => {
+    if (!selectedEntry) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedEntry(undefined) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedEntry])
   const [todoOpen, setTodoOpen] = useState(false)
   const [todoTitle, setTodoTitle] = useState('')
   const [todoDate, setTodoDate] = useState('')
