@@ -53,6 +53,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// Remember the theme on this device, so the next load starts in it (public/theme-boot.js applies it before drawing).
+function rememberTheme() {
+  try {
+    const theme = document.documentElement.getAttribute('data-theme')
+    if (theme) localStorage.setItem('accs.theme', theme)
+    else localStorage.removeItem('accs.theme')
+  } catch {
+    // Storage can be blocked (private windows); the theme still applies for this visit.
+  }
+}
+new MutationObserver(rememberTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
 void initObservability()
 initAnalytics(router)
 

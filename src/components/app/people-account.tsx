@@ -535,11 +535,8 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
   const faqs = items(page.data.faq);
   const [search, setSearch] = useState("");
-  const visible = faqs.filter((faq) =>
-    `${word(faq.question)} ${word(faq.answer)}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  // Matches the question only (QA 17 November: "report" or "can" also listed questions whose answers mention them).
+  const visible = faqs.filter((faq) => word(faq.question).toLowerCase().includes(search.trim().toLowerCase()));
   const topics = [...new Set(visible.map(topicFor))];
   // Never offer a link to a page this role cannot open.
   const canOpen = (href: string) => {

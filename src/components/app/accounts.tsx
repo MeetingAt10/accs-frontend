@@ -901,6 +901,8 @@ function ChairsTab() {
           )}
           {members.length ? (
             <>
+              {/* A scrolling list, so Set as chair stays in view (QA 17 November: it was at the very bottom). */}
+              <div className="acct-pick">
               <RadioGroup
                 label={`${program} faculty`}
                 value={chosen}
@@ -912,6 +914,7 @@ function ChairsTab() {
                   </Radio>
                 ))}
               </RadioGroup>
+              </div>
               {save.error && (
                 <Alert tone="danger" title="The program chair couldn't be saved">
                   {errorText(save.error)}

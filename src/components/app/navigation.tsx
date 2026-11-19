@@ -578,7 +578,7 @@ export const accountNavigation: RoleGroup[] = [
     label: "Account",
     entries: [
       { label: "Notifications", href: "/notifications", pageId: "P40", icon: "bell" },
-      { label: "Assistant", href: "/assistant", pageId: "P41", icon: "chat" },
+      { label: "Assistant", href: "/assistant", pageId: "P41", icon: "question" },
       { label: "My profile", href: "/profile", pageId: "P39", icon: "user" },
       { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
       { label: "Help", href: "/help", pageId: "P42", icon: "question" },
@@ -783,8 +783,9 @@ function Topbar({
             />
           </form>
           <ThemeToggle />
+          {/* Not a chat bubble: that read as Messages (QA 17 November). */}
           <IconButton
-            icon="chat"
+            icon="question"
             label="Assistant"
             onPress={() => setAssistantOpen(true)}
           />
