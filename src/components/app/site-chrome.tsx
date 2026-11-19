@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { pageQuery } from '@/lib/queries'
 import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
+import { assistantIcon, assistantIconName } from '@/components/app/assistant-icon'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
@@ -195,7 +196,9 @@ export function SiteNav({
                 onNavigate={onNavigate}
               >
                 {isCurrent && <motion.span layoutId="side-pill" className="shell-nav-item__pill" transition={slide} aria-hidden />}
-                {entry.icon && <Icon name={entry.icon as never} size={20} weight={isCurrent ? 'fill' : 'regular'} />}
+                {entry.icon && (entry.icon === assistantIconName
+                  ? <Icon icon={assistantIcon} size={20} weight={isCurrent ? 'fill' : 'regular'} />
+                  : <Icon name={entry.icon as never} size={20} weight={isCurrent ? 'fill' : 'regular'} />)}
                 {entry.label}
               </NavLink>
             )

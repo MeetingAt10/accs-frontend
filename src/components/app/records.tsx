@@ -775,6 +775,9 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 const stages = ["adviser", "chair", "dean", "guidance", "osas"];
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
+/** Severity colors in analytics: High red, Medium yellow, Low green (QA 19 November). */
+const analyticsSeverityTone: Record<string, "danger" | "warn" | "ok" | undefined> = { high: "danger", medium: "warn", low: "ok" };
+
 function Analytics({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const location = useRouterState({ select: (state) => state.location });
@@ -783,6 +786,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const stats = items(page.data.stats);
   const stageRows = items(page.data.byStage);
   const categories = items(page.data.byCategory);
+  const severities = items(page.data.bySeverity);
   const trend = items(page.data.trend);
   const waiting = items(page.data.waitingByStage);
   // Newest first: the cases a reader is looking for are usually the recent ones (oldest came first before).
@@ -946,6 +950,19 @@ function Analytics({ page }: { page: PageEnvelope }) {
             }))}
           />
         </Panel>
+        {severities.length > 0 && (
+          <Panel title="Cases by severity">
+            <BarChart
+              title="Cases by severity"
+              hideTitle
+              data={severities.map((row) => ({
+                label: word(row.label),
+                value: Number(row.value ?? 0),
+                tone: analyticsSeverityTone[word(row.severity)],
+              }))}
+            />
+          </Panel>
+        )}
         <Panel title="Category counts">
           <BarChart
             title="Category counts"
@@ -1005,6 +1022,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                   <tr>
                     <th scope="col">Reference</th>
                     <th scope="col">Stage</th>
+                    <th scope="col">Severity</th>
                     <th scope="col">Status</th>
                     <th scope="col">Opened</th>
                   </tr>
@@ -1023,6 +1041,11 @@ function Analytics({ page }: { page: PageEnvelope }) {
                       </td>
                       <td>
                         {cap(word(entry.stage, "—"))}
+                      </td>
+                      <td>
+                        {analyticsSeverityTone[word(entry.severity)] ? (
+                          <StatusChip tone={analyticsSeverityTone[word(entry.severity)]}>{cap(word(entry.severity))}</StatusChip>
+                        ) : "—"}
                       </td>
                       <td>
                         <StatusChip tone={toneFor(word(entry.status))}>
@@ -1218,7 +1241,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
                         <td>
                           <span className="rc-tags">
                             <span className="accs-tag">{word(student.program, "—")}</span>
-                            <span className="rc-muted">Section {word(student.section, "—")}</span>
+                            <span className="rc-muted">{word(student.sectionName, "Section " + word(student.section, "—"))}</span>
                           </span>
                         </td>
                         <td>
@@ -1517,7 +1540,7 @@ function StudentRecord({
             <span className="accs-meta">
               <span className="accs-mono">{word(record.studentId, "—")}</span>
               <span className="accs-tag">{word(record.program, "—")}</span>
-              <span>Section {word(record.section, "—")}</span>
+              <span>{word(record.sectionName, "Section " + word(record.section, "—"))}</span>
               <span>Year {word(record.year, "—")}</span>
             </span>
           }
@@ -1557,7 +1580,7 @@ function StudentRecord({
                 <Facts
                   rows={[
                     ["Program", word(record.program, "—")],
-                    ["Section", word(record.section, "—")],
+                    ["Section", word(record.sectionName, word(record.section, "—"))],
                     ["Year", word(record.year, "—")],
                     ["Standing", <StandingBadge standing={record.standing} />],
                   ]}

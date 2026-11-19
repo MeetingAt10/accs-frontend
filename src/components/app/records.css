@@ -346,3 +346,8 @@
 @media (max-width: 720px) { .rc-filters { grid-template-columns: minmax(0, 1fr); } }
 .rc-table .rc-row { cursor: pointer; }
 .rc-table .rc-row:hover > td { background: color-mix(in srgb, var(--accs-navy) 4%, transparent); }
+
+/* Severity colors on a bar: High red, Medium yellow, Low green (QA 19 November). */
+.ch-bar[data-tone="danger"] .ch-bar__fill { background: var(--accs-danger); }
+.ch-bar[data-tone="warn"] .ch-bar__fill { background: var(--accs-warn); }
+.ch-bar[data-tone="ok"] .ch-bar__fill { background: var(--accs-ok); }

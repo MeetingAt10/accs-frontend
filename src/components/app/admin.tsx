@@ -1128,7 +1128,6 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const [program, setProgram] = useState(word(record.program));
   const [section, setSection] = useState(word(record.section));
   const [reason, setReason] = useState("");
-  const audit = items(page.data.audit);
   if (!record.id)
     return (
       <ViewState
@@ -1281,7 +1280,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 ["Email", word(record.email, "—")],
                 ["Roles", <Tags values={strings(record.roles)} />],
                 ["Program", word(record.program, "—")],
-                ["Section", word(record.section, "—")],
+                ["Section", word(record.sectionName, word(record.section, "—"))],
                 ["Office", word(record.office, "—")],
                 ["Title", word(record.title, "—")],
               ]}
@@ -1305,32 +1304,10 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Manage restrictions
             </Button>
           </Panel>
-          <Panel title="Recent activity">
-            {audit.length ? (
-              <ol className="accs-timeline">
-                {audit.map((entry, index) => (
-                  <li key={word(entry.id, String(index))}>
-                    <div className="adm-timeline-body">
-                      <strong>{word(entry.action)}</strong>
-                      <span>
-                        {word(object(entry.actor).name, "System")} ·{" "}
-                        {word(entry.module)}
-                      </span>
-                      {entry.reason ? <span>{word(entry.reason)}</span> : null}
-                      <span className="accs-timeline__time accs-mono">
-                        {formatDateTime(entry.at)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <Empty title="No recorded activity">
-                Role changes and account events for this person show up here.
-                Sign-in history isn't recorded.
-              </Empty>
-            )}
-          </Panel>
+          {/* Recent activity listed every entry for the person and grew too long (QA 19 November); it lives in the audit trail. */}
+          <Button variant="tertiary" size="sm" href="/admin/audit">
+            See activity in the audit trail
+          </Button>
         </div>
       </div>
     </div>
