@@ -601,7 +601,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
   ) {
     scopes.push({ id: `program:${session.user.program}`, label: 'My program' })
   }
-  if (roles.includes('dean')) {
+  // The CCS Secretary sees the Feed like the Dean (QA 19 November).
+  if (roles.some((role) => ['dean', 'secretary'].includes(role))) {
     scopes.push(
       ...['BSIT', 'BSCS', 'BSIS'].map((program) => ({
         id: `program:${program}`,
@@ -620,7 +621,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
         .map((space) => ({ id: `space:${space.id}`, label: spaceName(space) })),
     )
   }
-  if (roles.some((role) => ['professor', 'chair', 'dean'].includes(role))) {
+  if (roles.some((role) => ['professor', 'chair', 'dean', 'secretary'].includes(role))) {
     scopes.push({ id: 'faculty', label: 'Faculty' })
   }
   scopes.push(

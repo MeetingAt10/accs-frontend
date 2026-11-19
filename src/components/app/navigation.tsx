@@ -679,7 +679,9 @@ function Topbar({
   const [search, setSearch] = useState("");
   const [assistantOpen, setAssistantOpen] = useState(false);
   // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
-  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
+  // Checked every 10 seconds while the tab is open, and again as soon as the tab is back in view, so an urgent announcement
+  // shows within seconds (QA 19 November: urgent posts should reach everyone in real time).
+  const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 10_000, refetchOnWindowFocus: true, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
     mutationFn: (action: {
       action: "markNotification";
@@ -732,11 +734,15 @@ function Topbar({
       void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
       void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
     }
-    for (const notice of fresh.slice(0, 3)) {
+    // Urgent ones first, and they stay on screen until dismissed or opened.
+    const ordered = [...fresh].sort((x, y) => Number(y.priority === "high" && y.kind === "announcement") - Number(x.priority === "high" && x.kind === "announcement"));
+    for (const notice of ordered.slice(0, 3)) {
       const body = String(notice.body ?? "");
+      const urgent = notice.kind === "announcement" && notice.priority === "high";
       toast(String(notice.title ?? "New update"), {
         ...(body && !body.startsWith("Open this update") ? { description: body } : {}),
         action: { label: "Open", onAction: () => void openNotification(notice) },
+        ...(urgent ? { timeout: 0 } : {}),
       });
     }
     if (fresh.length > 3) toast(`${fresh.length - 3} more new notifications`, { action: { label: "View all", onAction: () => router.history.push("/notifications") } });
