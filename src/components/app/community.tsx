@@ -1122,12 +1122,13 @@ export function PostComposer({
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
+                  {/* The browser's time picker (QA 17 November: typing the time by hand was hard); it gives HH:MM. */}
                   <TextField
+                    type="time"
                     label="Time"
                     value={eventTime}
                     onChange={setEventTime}
-                    placeholder="14:00"
-                    description="Use 24-hour time, HH:MM."
+                    description="Pick the start time."
                     isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}

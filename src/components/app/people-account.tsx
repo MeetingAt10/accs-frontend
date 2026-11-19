@@ -4,6 +4,7 @@ import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
+  Checkbox,
   Icon,
   Link,
   PrivacyNotice,
@@ -391,6 +392,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const [about, setAbout] = useState(word(record.bio));
   const [education, setEducation] = useState(word(record.education));
   const [officeHours, setOfficeHours] = useState(word(record.officeHours));
+  // Save once something changed, and never an all-blank profile (QA 17 November).
+  const changed = title !== word(record.title) || about !== word(record.bio) || education !== word(record.education) || officeHours !== word(record.officeHours);
+  const blank = ![title, about, education, officeHours].some((value) => value.trim());
   const roles = strings(record.roles);
   return (
     <div className="accs-stack">
@@ -465,8 +469,10 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
         </Alert>
       )}
       <div className="pa-savebar">
+        {blank && <span className="pa-muted">Fill in at least one field.</span>}
         <Button
           loading={action.isPending}
+          isDisabled={!changed || blank}
           onPress={() =>
             action.mutate({
               action: "saveProfile",
@@ -621,6 +627,8 @@ const passwordMessages: Record<string, string> = {
 
 function ChangePasswordPanel() {
   const [current, setCurrent] = useState("");
+  // Show or hide all three passwords (testing sheet: there was no way to see what was typed).
+  const [shown, setShown] = useState(false);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string }>();
@@ -666,14 +674,14 @@ function ChangePasswordPanel() {
       <form className="pa-pw" onSubmit={submit} noValidate>
         <TextField
           label="Current password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="current-password"
           value={current}
           onChange={setCurrent}
         />
         <TextField
           label="New password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={next}
           onChange={setNext}
@@ -686,13 +694,14 @@ function ChangePasswordPanel() {
         </div>
         <TextField
           label="Confirm new password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={confirm}
           onChange={setConfirm}
           isInvalid={mismatch}
           errorMessage="The new passwords don't match."
         />
+        <Checkbox isSelected={shown} onChange={setShown}>Show passwords</Checkbox>
         <AnimatePresence initial={false}>
           {message && (
             <motion.p
