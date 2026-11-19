@@ -550,7 +550,7 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
         title="Help"
         description="Answers on reports, appointments, evaluations, and your account."
         actions={
-          <Button href="/assistant" variant="secondary" icon="chats">
+          <Button href="/assistant" variant="secondary">
             Ask the assistant
           </Button>
         }

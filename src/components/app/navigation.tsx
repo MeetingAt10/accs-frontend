@@ -1,4 +1,5 @@
 import { featureWords } from "@/lib/restrictions";
+import { AssistantIconButton, assistantIconName } from "@/components/app/assistant-icon";
 import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
 import {
   Alert,
@@ -580,7 +581,7 @@ export const accountNavigation: RoleGroup[] = [
     label: "Account",
     entries: [
       { label: "Notifications", href: "/notifications", pageId: "P40", icon: "bell" },
-      { label: "Assistant", href: "/assistant", pageId: "P41", icon: "question" },
+      { label: "Assistant", href: "/assistant", pageId: "P41", icon: assistantIconName },
       { label: "My profile", href: "/profile", pageId: "P39", icon: "user" },
       { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
       { label: "Help", href: "/help", pageId: "P42", icon: "question" },
@@ -788,12 +789,8 @@ function Topbar({
             />
           </form>
           <ThemeToggle />
-          {/* Not a chat bubble: that read as Messages (QA 17 November). */}
-          <IconButton
-            icon="question"
-            label="Assistant"
-            onPress={() => setAssistantOpen(true)}
-          />
+          {/* A sparkle: a chat bubble read as Messages (17 November), a question mark as Help (19 November). */}
+          <AssistantIconButton onPress={() => setAssistantOpen(true)} />
           <Popover
             trigger={
               <IconButton

@@ -13,6 +13,8 @@ export interface ChartDatum {
   label: string;
   value?: number | null;
   suppressed?: boolean;
+  /** Colors the bar: red, yellow or green by severity (QA 19 November). */
+  tone?: "danger" | "warn" | "ok";
   [key: string]: unknown;
 }
 
@@ -162,7 +164,7 @@ export function BarChart({
                   ? Math.min(100, (entry.reference / upper) * 100)
                   : null;
               return (
-                <li className="ch-bar" key={entry.label + index}>
+                <li className="ch-bar" key={entry.label + index} data-tone={entry.tone}>
                   <span className="ch-bar__label">{entry.label}</span>
                   {entry.suppressed ? (
                     <>
