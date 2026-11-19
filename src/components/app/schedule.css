@@ -361,3 +361,7 @@
 /* "Show all" / "Hide all" in the Show on calendar header. */
 .sc-layers-all { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
 .sc-layers-all:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; border-radius: 4px; }
+/* The picked day, with what can be added to it. */
+.sc-dayadd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control, 10px); }
+.sc-dayadd > span { margin-inline-end: auto; font-weight: 600; }
+.sc-detail > .ds-status, .sc-detail > [class*="status"] { justify-self: start; }

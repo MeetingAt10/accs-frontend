@@ -1,4 +1,5 @@
 import { campusToday } from '@/lib/campus-date'
+import { parseDate as parseCalendarDate } from '@internationalized/date'
 import {
   Alert,
   Button,
@@ -558,6 +559,10 @@ function CalendarPage({
         <span className="ec-badge" data-etone={entry.tone}>
           {entry.type}
         </span>
+        {/* Whether it is still ahead (testing sheet: the event had no status). */}
+        <StatusChip tone={entry.date === today() ? 'warn' : entry.date > today() ? 'ok' : 'neutral'}>
+          {entry.date === today() ? 'Today' : entry.date > today() ? 'Upcoming' : 'Past'}
+        </StatusChip>
         <dl className="sc-facts sc-facts--stack">
           <div>
             <dt>Date</dt>
@@ -727,9 +732,10 @@ function CalendarPage({
         <div className="accs-split">
           <div className="accs-stack">
             <Panel flush aria-label="Calendar">
+              {/* On a phone, Month is a list grouped by day (testing sheet, P13: the grid was too cramped). */}
               <EventCalendar
                 date={selectedDate}
-                view={view}
+                view={small && view === 'month' ? 'list' : view}
                 events={entries}
                 onDateChange={(date) => update({ date })}
                 onEventPress={(event) =>
@@ -739,6 +745,16 @@ function CalendarPage({
                 }
               />
             </Panel>
+            {/* The day picked on the calendar, with what can be added to it (QA 17 November: adding from a date). */}
+            {(canTodo || session.permissions.includes('announcement.publish')) && selectedDate >= today() && (
+              <div className="sc-dayadd">
+                <span>{formatDate(selectedDate)}</span>
+                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoOpen(true) }}>Add to-do</Button>}
+                {session.permissions.includes('announcement.publish') && (
+                  <Button size="sm" variant="tertiary" icon="calendar" href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate)}`}>Add event</Button>
+                )}
+              </div>
+            )}
             <ActionError error={action.error} />
           </div>
           <div className="accs-stack">
@@ -885,6 +901,7 @@ function CalendarPage({
                 label="Due"
                 isRequired
                 minValue={campusToday()}
+                defaultValue={todoDate ? parseCalendarDate(todoDate) : undefined}
                 onChange={(value) => setTodoDate(value?.toString() ?? '')}
               />
               <PrivacyNotice title="Personal to-do">
@@ -1041,9 +1058,11 @@ function ConsultationsPage({
         ? consultation.facultyId === session.user.id
         : consultation.studentId === session.user.id,
   )
-  const faculty = list<Person>(page.data.faculty).filter((person) =>
-    person.name.toLowerCase().includes(query.toLowerCase()),
-  )
+  // Soonest open time first; professors with none posted come last (QA 17 November: the list was alphabetical).
+  const nextKey = (person: Person) => (person.nextSlot ? `${person.nextSlot.date}${person.nextSlot.start}` : '~')
+  const faculty = list<Person>(page.data.faculty)
+    .filter((person) => person.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => nextKey(a).localeCompare(nextKey(b)) || a.name.localeCompare(b.name))
   const visible =
     status === 'All'
       ? consultations
@@ -1198,7 +1217,9 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const firstOpen = slots
     .filter((slot) => slot.state === 'open' && slot.date >= today())
     .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))[0]
-  const [step, setStep] = useState({ n: 1, dir: 1 })
+  // The professor was picked to get here, so start at their times (QA 17 November: the list of every professor came
+  // again, with Continue at the bottom). Step 1 is still there to change professor.
+  const [step, setStep] = useState({ n: 2, dir: 1 })
   const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
   const [category, setCategory] = useState('')

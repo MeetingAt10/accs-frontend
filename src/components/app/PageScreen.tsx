@@ -213,7 +213,8 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                   {events.map((item, index) => {
                     const time = [clock(item.start), clock(item.end)].filter(Boolean).join(' – ')
                     return (
-                      <Entry key={text(item.id, 'event-' + index)} lead={<DateTile value={item.date} />} href="/calendar">
+                      // An appointment schedule opens Appointments, not the calendar (QA 17 November).
+                      <Entry key={text(item.id, 'event-' + index)} lead={<DateTile value={item.date} />} href={/appoint|consult/i.test(`${text(item.title)} ${text(item.category)} ${text(item.kind)}`) && allow('/consultations') ? '/consultations' : '/calendar'}>
                         <p className="pt-row__title">{text(item.title, 'Campus event')}</p>
                         <Sub>
                           {time && <span className="pt-time">{time}</span>}
