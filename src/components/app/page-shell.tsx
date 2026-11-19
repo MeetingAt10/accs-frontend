@@ -1,3 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
+
+import { sessionQuery } from '@/lib/queries'
+import { roleLine } from '@/lib/role-scope'
 import type { ReactNode } from 'react'
 
 import { siteById, siteForPath } from '@/lib/sites'
@@ -20,6 +24,8 @@ export function PageHeader({
   crumbs?: Crumb[]
   actions?: ReactNode
 }) {
+  // Every page says which role it is shown for (testing sheet: only Home did).
+  const user = useQuery(sessionQuery()).data?.user
   return (
     <header className="accs-page-head">
       <div className="accs-page-head__main">
@@ -34,6 +40,7 @@ export function PageHeader({
             </nav>
           )}
           <h1 className="accs-page-title">{title}</h1>
+          {user && <p className="accs-page-role">{roleLine(user)}</p>}
           {description && <p className="accs-page-desc">{description}</p>}
         </div>
       </div>

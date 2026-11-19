@@ -1059,7 +1059,10 @@ function RecordList({ page }: { page: PageEnvelope }) {
   const [standing, setStanding] = useState("All");
   const [restricted, setRestricted] = useState(false);
   const session = useQuery(sessionQuery());
-  const role = session.data?.user.roles[0];
+  // The role that decides the scope, whatever order the roles are stored in (QA 17 November: a Chair stored as
+  // professor first was shown "Students under OSAS authority" and every program).
+  const roles = session.data?.user.roles ?? [];
+  const role = ["chair", "dean", "guidance", "osas"].find((candidate) => roles.includes(candidate as never));
   const scope =
     role === "chair"
       ? `${word(session.data?.user.program)} program`

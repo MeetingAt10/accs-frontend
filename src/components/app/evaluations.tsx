@@ -1,3 +1,4 @@
+import { campusToday } from "@/lib/campus-date";
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
@@ -34,6 +35,7 @@ import {
   useTransform,
 } from "motion/react";
 import {
+  useRef,
   useEffect,
   useId,
   useState,
@@ -172,12 +174,19 @@ function useFilters() {
 const root = siteCrumb("/evaluations");
 
 function ActionError({ error }: { error: unknown }) {
+  // Brought into view when it appears (QA 17 November: the Dean only saw it after scrolling up).
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
   return error ? (
+    <div ref={box}>
     <Alert tone="danger" title="Couldn't save">
       {error instanceof Error
         ? error.message
         : "Try again. Your text is still here."}
     </Alert>
+    </div>
   ) : null;
 }
 
@@ -472,7 +481,10 @@ function AssignmentCard({ assignment }: { assignment: Item }) {
 function EvaluationHome({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
   const assignments = items(page.data.assignments);
-  const reviews = items(page.data.reviewCycles);
+  // To review, and already reviewed (QA 17 November: reviewed cycles stayed under "Questions to review").
+  const allReviewCycles = items(page.data.reviewCycles);
+  const reviews = allReviewCycles.filter((cycle) => cycle.reviewed !== true);
+  const reviewed = allReviewCycles.filter((cycle) => cycle.reviewed === true);
   const submitted = assignments.filter(
     (assignment) => assignment.status === "Submitted",
   ).length;
@@ -540,6 +552,28 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
     </Panel>
   );
 
+  const reviewedList = reviewed.length ? (
+    <Panel flush>
+      <ul className="accs-rows">
+        {reviewed.map((cycle) => (
+          <li key={words(cycle.id)}>
+            <div className="accs-row ev-row">
+              <div>
+                <p className="accs-row__title">{words(cycle.title)}</p>
+                <p className="accs-row__sub">{words(cycle.term)} · Review sent · {words(cycle.status)}</p>
+              </div>
+              <Link href={"/evaluations/cycles/" + encodeURIComponent(words(cycle.id)) + "/review"}>See my review</Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  ) : (
+    <Panel>
+      <Empty title="No reviews sent yet" />
+    </Panel>
+  );
+
   return (
     <div className="accs-stack accs-stagger">
       <PageHeader
@@ -574,6 +608,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
               count: reviews.length,
               content: review,
             },
+            { id: "reviewed", label: "Reviewed", count: reviewed.length, content: reviewedList },
           ]}
         />
       ) : (
@@ -1010,6 +1045,7 @@ function FacultyResults({
 
 function ResultsOverview({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
+  const router = useRouter();
   const { params, update } = useFilters();
   const [query, setQuery] = useState("");
   const results = items(page.data.results);
@@ -1061,7 +1097,8 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
         Individual answers aren't shown. Results appear after a cycle is
         published.
       </p>
-      {responses > 0 && (
+      {/* Always shown, 0 before any responses (testing sheet: the numbers were missing). */}
+      {(
         <Kpis label="Result summary">
           <Kpi
             label="Completion rate"
@@ -1136,6 +1173,19 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             ))}
           </Select>
         )}
+        {/* Opens one faculty member's results (testing sheet: there was no faculty choice). */}
+        <Select
+          label="Faculty"
+          placeholder="Select a faculty member"
+          selectedKey={null}
+          onSelectionChange={(key) => { if (key) router.history.push("/evaluations/results/" + encodeURIComponent(String(key))); }}
+        >
+          {results.map((result) => (
+            <SelectOption id={words(object(result.faculty).id, words(result.id))} key={words(result.id)}>
+              {words(object(result.faculty).name)}
+            </SelectOption>
+          ))}
+        </Select>
         <CycleSelect cycles={items(page.data.cycles)} />
       </div>
       {responses > 0 ? (
@@ -1388,11 +1438,13 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
             />
             <DatePicker
               label="Opens"
+              minValue={campusToday()}
               onChange={(value) => setOpens(value?.toString() ?? "")}
               isRequired
             />
             <DatePicker
               label="Closes"
+              minValue={campusToday()}
               onChange={(value) => setCloses(value?.toString() ?? "")}
               isRequired
             />
@@ -1775,6 +1827,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
         <div className="ev-fields ev-fields--2">
           <DatePicker
             label="Opens"
+            minValue={campusToday()}
             description={"Saved date: " + formatDate(opens, "Not set")}
             onChange={(value) => setOpens(value?.toString() ?? "")}
             isRequired
@@ -1782,6 +1835,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           />
           <DatePicker
             label="Closes"
+            minValue={campusToday()}
             description={"Saved date: " + formatDate(closes, "Not set")}
             onChange={(value) => setCloses(value?.toString() ?? "")}
             isRequired
@@ -2041,6 +2095,23 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
 
 /* ---------- P32 Faculty question review ---------- */
 
+const capitalized = (value: string) => value.trim().charAt(0).toUpperCase() + value.trim().slice(1);
+
+/**
+ * "Question 1" and its wording, capitalized. The criterion shows only when it says something the number does not
+ * (QA 17 November: "question 1" then "first question", both lowercase).
+ */
+function QuestionHead({ question, index }: { question: EvaluationQuestion; index: number }) {
+  const criterion = capitalized(question.criterion);
+  const extra = criterion && !/^question\s*\d+$/i.test(criterion) ? criterion : "";
+  return (
+    <div className="ev-q__head">
+      <h3>Question {index + 1}{extra ? ` · ${extra}` : ""}</h3>
+      <p>{capitalized(question.text)}</p>
+    </div>
+  );
+}
+
 function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const record = object(page.data.record);
   const formQuestions = questions(record.questions);
@@ -2050,9 +2121,11 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const [sent, setSent] = useState(false);
   const action = useEvaluationAction("P32");
   const readOnly = sent || page.data.canReview !== true;
+  // A "Needs change" says why (QA 17 November: it could be sent with no comment).
+  const missingWhy = formQuestions.filter((question) => decisions[question.id] === "changes" && !comments[question.id]?.trim()).map((question) => question.id);
 
   async function submit() {
-    if (readOnly || action.isPending) return;
+    if (readOnly || action.isPending || missingWhy.length) return;
     const note = formQuestions
       .map(
         (question) =>
@@ -2109,10 +2182,9 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
       {savedReview ? (
         <>
           <Panel flush title="Questions">
-            {formQuestions.map((question) => (
+            {formQuestions.map((question, index) => (
               <div className="ev-review-q" key={question.id}>
-                <h3>{question.criterion}</h3>
-                <p>{question.text}</p>
+                <QuestionHead question={question} index={index} />
               </div>
             ))}
           </Panel>
@@ -2138,12 +2210,9 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         </>
       ) : (
         <Panel flush title="Questions">
-          {formQuestions.map((question) => (
+          {formQuestions.map((question, index) => (
             <section className="ev-review-q" key={question.id}>
-              <div className="ev-q__head">
-                <h3>{question.criterion}</h3>
-                <p>{question.text}</p>
-              </div>
+              <QuestionHead question={question} index={index} />
               <RadioGroup
                 row
                 label="Fits my duties?"
@@ -2161,6 +2230,10 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
               </RadioGroup>
               <TextArea
                 label="Comment"
+                isRequired={decisions[question.id] === "changes"}
+                description={decisions[question.id] === "changes" ? "Say what should change." : "Optional."}
+                isInvalid={missingWhy.includes(question.id) && Boolean(comments[question.id] !== undefined)}
+                errorMessage="Say what should change."
                 value={comments[question.id] ?? ""}
                 onChange={(comment) =>
                   setComments((current) => ({
@@ -2181,8 +2254,8 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
       <ActionError error={action.error} />
       {!readOnly && !savedReview && (
         <div className="ev-submitbar">
-          <p>Go through every question, then send.</p>
-          <Button loading={action.isPending} onPress={() => void submit()}>
+          <p>{missingWhy.length ? `Add a comment to each "Needs change" (${missingWhy.length} left).` : "Go through every question, then send."}</p>
+          <Button loading={action.isPending} isDisabled={missingWhy.length > 0} onPress={() => void submit()}>
             Send review
           </Button>
         </div>

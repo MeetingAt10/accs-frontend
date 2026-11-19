@@ -779,13 +779,15 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                 spaces={spaces}
                 organizations={organizations}
               />
-              {pageCount > 1 && (
+              {pageCount > 1 ? (
                 <Pagination
                   page={pageNumber}
                   pageCount={pageCount}
                   onPageChange={(next) => update({ page: String(next) })}
                   summary={`Showing ${(pageNumber - 1) * 10 + 1}–${Math.min(pageNumber * 10, posts.length)} of ${posts.length} posts`}
                 />
+              ) : (
+                <p className="accs-pager accs-pager--count">{`Showing ${posts.length === 1 ? '1' : `1–${posts.length}`} of ${posts.length} ${posts.length === 1 ? 'post' : 'posts'}`}</p>
               )}
             </>
           ) : (
@@ -1120,12 +1122,13 @@ export function PostComposer({
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
+                  {/* The browser's time picker (QA 17 November: typing the time by hand was hard); it gives HH:MM. */}
                   <TextField
+                    type="time"
                     label="Time"
                     value={eventTime}
                     onChange={setEventTime}
-                    placeholder="14:00"
-                    description="Use 24-hour time, HH:MM."
+                    description="Pick the start time."
                     isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}
@@ -1911,13 +1914,15 @@ function MemberList({
               ))}
             </ul>
           </Panel>
-          {pageCount > 1 && (
+          {pageCount > 1 ? (
             <Pagination
               page={currentPage}
               pageCount={pageCount}
               onPageChange={setPage}
-              summary={`${filtered.length} ${noun}`}
+              summary={`Showing ${(currentPage - 1) * 20 + 1}–${Math.min(currentPage * 20, filtered.length)} of ${filtered.length} ${noun}`}
             />
+          ) : (
+            <p className="accs-pager accs-pager--count">{`Showing ${filtered.length === 1 ? '1' : `1–${filtered.length}`} of ${filtered.length} ${noun}`}</p>
           )}
         </>
       ) : (

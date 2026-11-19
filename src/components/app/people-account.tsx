@@ -1,8 +1,10 @@
+import { PagedList } from "@/components/app/paging";
 import { PersonAvatar, photoFileProblem, squarePhoto } from '@/components/app/photo'
 import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
+  Checkbox,
   Icon,
   Link,
   PrivacyNotice,
@@ -87,6 +89,18 @@ function FactRows({ rows }: { rows: [string, ReactNode][] }) {
   );
 }
 
+/**
+ * Which office a person is in, for the Directory filter: by role first, then by the office name. OSAS staff have the
+ * office written out ("Office of Student Affairs and Services"), so matching the word "OSAS" missed them (QA 17 November).
+ */
+function officeOf(person: Record<string, unknown>) {
+  const roles = strings(person.roles)
+  const office = word(person.office).toLowerCase()
+  if (roles.includes("osas") || /osas|student affairs/.test(office)) return "OSAS"
+  if (roles.includes("guidance") || office.includes("guidance")) return "Guidance"
+  return "CCS"
+}
+
 export function DirectoryPage({ page }: { page: PageEnvelope }) {
   const reduce = useReducedMotion();
   const people = items(page.data.people);
@@ -95,14 +109,14 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
   const [program, setProgram] = useState("All");
   const [role, setRole] = useState("All");
   const roleOptions = [...new Set(people.flatMap((person) => strings(person.roles)))];
+  const officeHasPrograms = office === "All" || office === "CCS";
   const visible = people.filter((person) => {
     const text =
       `${word(person.name)} ${word(person.title)} ${word(person.office)} ${word(person.program)} ${word(person.email)} ${strings(person.roles).join(" ")}`.toLowerCase();
     return (
       (!search || text.includes(search.toLowerCase())) &&
-      (office === "All" ||
-        word(person.office).toLowerCase().includes(office.toLowerCase())) &&
-      (program === "All" ||
+      (office === "All" || officeOf(person) === office) &&
+      (program === "All" || officeOf(person) !== "CCS" ||
         word(person.program).toLowerCase().includes(program.toLowerCase())) &&
       (role === "All" || strings(person.roles).includes(role))
     );
@@ -134,9 +148,11 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             <SelectOption id="Guidance">Guidance</SelectOption>
             <SelectOption id="OSAS">OSAS</SelectOption>
           </Select>
+          {/* Guidance and OSAS are not in a program, so the program filter does not apply to them. */}
           <Select
             label="Program"
-            selectedKey={program}
+            selectedKey={officeHasPrograms ? program : "All"}
+            isDisabled={!officeHasPrograms}
             onSelectionChange={(key) => setProgram(String(key))}
           >
             <SelectOption id="All">All programs</SelectOption>
@@ -159,9 +175,11 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
         />
       </div>
       {visible.length ? (
+        <PagedList items={visible} size={12} noun="people" resetKey={`${search}|${office}|${program}|${role}`}>
+          {(shown) => (
         <div className="pa-grid">
           <AnimatePresence mode="popLayout">
-            {visible.map((person, index) => (
+            {shown.map((person, index) => (
               <motion.div
                 key={word(person.id)}
                 layout={reduce ? false : "position"}
@@ -191,6 +209,8 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             ))}
           </AnimatePresence>
         </div>
+          )}
+        </PagedList>
       ) : (
         <Panel>
           <Empty title="No matches">
@@ -372,6 +392,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const [about, setAbout] = useState(word(record.bio));
   const [education, setEducation] = useState(word(record.education));
   const [officeHours, setOfficeHours] = useState(word(record.officeHours));
+  // Save once something changed, and never an all-blank profile (QA 17 November).
+  const changed = title !== word(record.title) || about !== word(record.bio) || education !== word(record.education) || officeHours !== word(record.officeHours);
+  const blank = ![title, about, education, officeHours].some((value) => value.trim());
   const roles = strings(record.roles);
   return (
     <div className="accs-stack">
@@ -446,8 +469,10 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
         </Alert>
       )}
       <div className="pa-savebar">
+        {blank && <span className="pa-muted">Fill in at least one field.</span>}
         <Button
           loading={action.isPending}
+          isDisabled={!changed || blank}
           onPress={() =>
             action.mutate({
               action: "saveProfile",
@@ -602,6 +627,8 @@ const passwordMessages: Record<string, string> = {
 
 function ChangePasswordPanel() {
   const [current, setCurrent] = useState("");
+  // Show or hide all three passwords (testing sheet: there was no way to see what was typed).
+  const [shown, setShown] = useState(false);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string }>();
@@ -647,14 +674,14 @@ function ChangePasswordPanel() {
       <form className="pa-pw" onSubmit={submit} noValidate>
         <TextField
           label="Current password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="current-password"
           value={current}
           onChange={setCurrent}
         />
         <TextField
           label="New password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={next}
           onChange={setNext}
@@ -667,13 +694,14 @@ function ChangePasswordPanel() {
         </div>
         <TextField
           label="Confirm new password"
-          type="password"
+          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={confirm}
           onChange={setConfirm}
           isInvalid={mismatch}
           errorMessage="The new passwords don't match."
         />
+        <Checkbox isSelected={shown} onChange={setShown}>Show passwords</Checkbox>
         <AnimatePresence initial={false}>
           {message && (
             <motion.p
