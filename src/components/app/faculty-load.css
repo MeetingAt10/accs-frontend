@@ -13,3 +13,7 @@
 .fl-overlap { margin: 0; color: var(--accs-danger-ink, var(--accs-ink)); font-size: 0.8125rem; }
 .fl-file input::file-selector-button { margin-inline-end: 12px; padding: 8px 14px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control, 8px); background: var(--accs-paper); color: var(--accs-ink); font: inherit; font-weight: 500; cursor: pointer; }
 .fl-file input::file-selector-button:hover { background: var(--accs-sunken); }
+/* Compact rows: name and details on one line. */
+.fl-row { padding-block: 8px; }
+.fl-row__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; min-width: 0; }
+.fl-row__head .fl-hint { overflow-wrap: anywhere; }
