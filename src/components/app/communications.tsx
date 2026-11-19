@@ -752,6 +752,36 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   );
 }
 
+/** A notice that has no page of its own to open (it pointed at Notifications itself), so opening it shows its message. */
+export const noticeHasPage = (pageId: string) => Boolean(pageId) && pageId !== "P40";
+
+/** The message a notice shows when opened. Older notices only said "Open this update"; say what they were about. */
+export function noticeMessage(notice: Item) {
+  const body = words(notice.body);
+  if (body && !body.startsWith("Open this update")) return body;
+  if (words(notice.kind) === "moderation")
+    return "A reviewer made a decision on something you posted. If it was kept, it shows as before; if it was removed, it no longer shows. Ask the CCS office if you have questions.";
+  return "There is nothing more to open for this update.";
+}
+
+/**
+ * Shows a notice that has no page to open (QA 19 November: "Content review update" did nothing when clicked, because it
+ * pointed at the Notifications page itself).
+ */
+export function NoticeDialog({ notice, onClose }: { notice?: Item; onClose: () => void }) {
+  return (
+    <Modal title={words(notice?.title, "Update")} isOpen={Boolean(notice)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <ModalBody>
+        <p className="cm-notice-body">{notice ? noticeMessage(notice) : ""}</p>
+        {notice?.at ? <p className="cm-hint">{new Date(words(notice.at)).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</p> : null}
+      </ModalBody>
+      <ModalActions>
+        <Button onPress={onClose}>Close</Button>
+      </ModalActions>
+    </Modal>
+  );
+}
+
 export function notificationHref(pageId: string, recordId: string) {
   const paths: Record<string, string> = {
     P03: "/home",
@@ -859,6 +889,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
     );
   });
 
+  const [shownNotice, setShownNotice] = useState<Item>();
   async function openNotice(notice: Item) {
     setRestrictedSource(false);
     try {
@@ -868,6 +899,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         payload: {},
       });
       const source = object(result.record);
+      if (!noticeHasPage(words(source.pageId))) return setShownNotice(notice);
       router.history.push(
         notificationHref(words(source.pageId), words(source.recordId)),
       );
@@ -879,6 +911,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
 
   return (
     <div className="accs-stack">
+      <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
       <Heading
         title="Notifications"
         description={

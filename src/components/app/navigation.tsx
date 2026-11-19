@@ -22,6 +22,8 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   AssistantPanel,
+  NoticeDialog,
+  noticeHasPage,
   notificationHref,
 } from "@/components/app/communications";
 import {
@@ -695,6 +697,7 @@ function Topbar({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["page", "P40"] }),
   });
 
+  const [shownNotice, setShownNotice] = useState<Record<string, unknown>>();
   async function openNotification(notification: Record<string, unknown>) {
     try {
       const result = await performPageAction("P40", {
@@ -706,6 +709,8 @@ function Topbar({
         result.record && typeof result.record === "object"
           ? (result.record as Record<string, unknown>)
           : {};
+      // Nothing to open (it pointed at Notifications itself): show the message here instead of doing nothing.
+      if (!noticeHasPage(String(source.pageId ?? ""))) return setShownNotice(notification);
       router.history.push(
         notificationHref(
           String(source.pageId ?? ""),
@@ -859,6 +864,7 @@ function Topbar({
           <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
         </div>
       </header>
+      <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
       <Drawer
         title="Assistant"
         side="end"
