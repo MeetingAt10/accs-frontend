@@ -423,6 +423,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   <ConversationList
                     conversations={threads}
                     currentId={words(conversation.id)}
+                    selfId={session.data?.user.id}
                   />
                 </TabPanel>
               ))}
@@ -459,13 +460,11 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   <Avatar name={words(conversation.title)} size={36} />
                   <Stack gap={4}>
                     <h2 style={{ margin: 0 }}>{words(conversation.title)}</h2>
+                    {/* A direct chat shows the other person's role, not "2 members" (QA 17 November). */}
                     <span>
-                      {members.length} members ·{" "}
-                      {conversation.groupKind === "people"
-                        ? "Group"
-                        : conversation.kind === "group"
-                          ? "Class group"
-                          : "Direct conversation"}
+                      {conversation.kind === "group" || conversation.groupKind
+                        ? `${members.length} members · ${conversation.groupKind === "people" ? "Group" : "Class group"}`
+                        : [...new Set(members.filter((member) => member.id !== session.data?.user.id).flatMap((member) => roles(member.roles).map(roleLabelOf)))].join(" · ") || "Direct conversation"}
                     </span>
                   </Stack>
                 </Row>

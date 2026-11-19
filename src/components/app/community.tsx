@@ -674,8 +674,9 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
       <PageHeader
         title="Feed"
         description="Posts and announcements from the audiences you belong to."
+        // One "Start a discussion": the bar above the feed when it shows (QA 17 November: it was there twice).
         actions={
-          canParticipate && (
+          canParticipate && !canPost && (
             <Button
               icon="plus"
               href="/feed/new"
@@ -1891,7 +1892,10 @@ function MemberList({
                   <div className="accs-row fx-member">
                     <Initials name={member.name} />
                     <div className="fx-member__text">
-                      <p className="accs-row__title">{member.name}</p>
+                      {/* Opens their profile (QA 17 November: roster and member names did not). */}
+                      <p className="accs-row__title">
+                        {member.id ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
+                      </p>
                       {academic && (
                         <p className="accs-row__sub">
                           <span className="accs-mono">
@@ -2393,6 +2397,8 @@ function OrganizationPage({
         description={organization.description}
         actions={
           <>
+            {/* Every listed organization is verified by CCS, with a verified representative (testing sheet, P10). */}
+            <StatusChip tone="ok">Verified organization</StatusChip>
             {representative && (
               <Button
                 icon="megaphone"

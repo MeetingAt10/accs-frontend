@@ -224,6 +224,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
 
 export function PersonProfile({ page }: { page: PageEnvelope }) {
   const params = useParams({ strict: false }) as Record<string, string>;
+  const router = useRouter();
   const person = object(page.data.record);
   const session = useQuery(sessionQuery());
   const id = Object.values(params).at(-1) ?? "";
@@ -247,9 +248,15 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
     );
   return (
     <div className="accs-stack">
+      {/* Back to where the profile was opened from, like the calendar (QA 17 November: only Directory was offered). */}
       <div>
-        <Button variant="tertiary" size="sm" icon="arrow-left" href="/directory">
-          Directory
+        <Button
+          variant="tertiary"
+          size="sm"
+          icon="arrow-left"
+          onPress={() => (window.history.length > 1 ? router.history.back() : router.history.push("/directory"))}
+        >
+          Back
         </Button>
       </div>
       <ProfileHeader

@@ -61,9 +61,12 @@ function Mark({ name, photo }: { name: string; photo?: string }) {
 export function ConversationList({
   conversations,
   currentId,
+  selfId,
 }: {
   conversations: Item[];
   currentId?: string;
+  /** The signed-in person, whose own roles are left out of each row (QA 17 November: "Faculty · Student" for a student's chat with a professor). */
+  selfId?: string;
 }) {
   if (!conversations.length) {
     return (
@@ -77,7 +80,7 @@ export function ConversationList({
   return (
     <ul className="ds-next-conversation-list" aria-label="Conversations">
       {conversations.map((conversation) => (
-        <ConversationRow
+        <ConversationRow selfId={selfId}
           conversation={conversation}
           currentId={currentId}
           key={words(conversation.id)}
@@ -90,13 +93,15 @@ export function ConversationList({
 function ConversationRow({
   conversation,
   currentId,
+  selfId,
 }: {
   conversation: Item;
   currentId?: string;
+  selfId?: string;
 }) {
   const memberRoles = [
     ...new Set(
-      items(conversation.members).flatMap((member) => roleNames(member.roles)),
+      items(conversation.members).filter((member) => !selfId || words(member.id) !== selfId).flatMap((member) => roleNames(member.roles)),
     ),
   ];
   const unread = Number(conversation.unread) || 0;
