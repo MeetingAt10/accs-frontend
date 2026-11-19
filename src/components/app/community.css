@@ -754,3 +754,7 @@
 .fx-row-comment__actions { display: flex; gap: 8px; }
 /* With All, each label is shown as included, in a lighter tint than a picked one. */
 .fx-page .fx-cat[data-included] { border-color: color-mix(in srgb, var(--accs-navy) 30%, var(--accs-line)); background: color-mix(in srgb, var(--accs-navy) 6%, transparent); }
+
+/* The organization account's edit button beside a member's position (19 November 2026). */
+.org-member-end { display: inline-flex; align-items: center; gap: 4px; justify-self: end; }
+.org-member-controls { display: inline-flex; }

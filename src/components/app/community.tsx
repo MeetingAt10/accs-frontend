@@ -42,6 +42,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
+import { AddMember, MemberControls, NewOrganization, type StudentChoice } from '@/components/app/organization-admin'
 import { RestrictedView } from '@/components/app/guards'
 import { PagedList } from '@/components/app/paging'
 import {
@@ -1855,10 +1856,13 @@ function MemberList({
   members,
   academic = false,
   organization = false,
+  manage,
 }: {
   members: Person[]
   academic?: boolean
   organization?: boolean
+  /** The organization account manages its members and their positions (19 November 2026). */
+  manage?: { organizationId: string; accountId?: string; students: StudentChoice[] }
 }) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -1887,6 +1891,7 @@ function MemberList({
         <span className="fx-count-label">
           <span className="accs-num">{filtered.length}</span> {noun}
         </span>
+        {manage && <AddMember organizationId={manage.organizationId} students={manage.students} />}
       </div>
       {filtered.length ? (
         <>
@@ -1918,12 +1923,17 @@ function MemberList({
                         <p className="accs-row__sub">{member.section ?? member.program}</p>
                       )}
                     </div>
-                    <span className="accs-tag">
-                      {academic
-                        ? 'Enrolled'
-                        : organization
-                          ? (member.organizationRole ?? member.role ?? 'Member')
-                          : personRole(member)}
+                    <span className="org-member-end">
+                      <span className="accs-tag">
+                        {academic
+                          ? 'Enrolled'
+                          : organization
+                            ? (member.organizationRole ?? member.role ?? 'Member')
+                            : personRole(member)}
+                      </span>
+                      {manage && member.id && member.id !== manage.accountId && (
+                        <MemberControls organizationId={manage.organizationId} member={{ id: member.id, name: member.name, organizationRole: member.organizationRole }} />
+                      )}
                     </span>
                   </div>
                 </li>
@@ -2322,6 +2332,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         title="Organizations"
         description="Approved CCS student organizations."
+        actions={page.data.canCreate === true ? <NewOrganization students={list<StudentChoice>(page.data.studentOptions)} /> : undefined}
       />
       <div className="fx-toolbar fx-toolbar--slim">
         <div className="fx-toolbar__search">
@@ -2515,7 +2526,11 @@ function OrganizationPage({
         {organization.member && (
           <TabPanel id="members">
             <div className="fx-tab">
-              <MemberList members={organization.members ?? []} organization />
+              <MemberList
+                members={organization.members ?? []}
+                organization
+                manage={page.data.canManageMembers === true ? { organizationId: organization.id, accountId: organization.representative?.id, students: list<StudentChoice>(page.data.studentOptions) } : undefined}
+              />
             </div>
           </TabPanel>
         )}

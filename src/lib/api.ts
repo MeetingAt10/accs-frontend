@@ -244,6 +244,10 @@ export const createFaculty = (faculty: NewFaculty[]) => post<Recorded<BatchResul
 /** At most 25 students per request. */
 export const createStudents = (students: NewStudent[]) => post<Recorded<BatchResult>>('/accounts/students', { students })
 
+/** A new organization and its account; the student becomes its President (19 November 2026). */
+export const createOrganization = (input: { name: string; description: string; email: string; presidentId: string }) =>
+  post<Recorded<Provisioned & { organization: { id: string; name: string; president: { id: string; name: string } } }>>('/accounts/organizations', input)
+
 export const getAdvisors = () =>
   request<{ advisors: { yearLevel: number; faculty: AccountSummary[] }[] }>('/accounts/advisors')
 

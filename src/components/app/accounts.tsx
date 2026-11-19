@@ -80,11 +80,11 @@ import './accounts.css'
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 
-const errorText = (error: unknown) =>
+export const errorText = (error: unknown) =>
   error instanceof ApiError ? error.message : "Can't reach ACCS right now. Check your connection and try again."
 
 /** The messages the server attached to single fields, by field name. */
-const fieldErrors = (error: unknown): Record<string, string> =>
+export const fieldErrors = (error: unknown): Record<string, string> =>
   Object.fromEntries((error instanceof ApiError ? (error.fields ?? []) : []).map((field) => [field.path.split('.').pop() ?? field.path, field.message]))
 
 const typesQuery = queryOptions({ queryKey: ['accounts', 'types'], queryFn: getAccountTypes })
@@ -153,7 +153,7 @@ function Gate({ queries, what, children }: { queries: Loadable[]; what: string; 
 
 // --- sign-in details, shown once ---------------------------------------------------------------------------------------
 
-type Issued = { name: string; email: string; credentials: Credentials; invite: Invite }
+export type Issued = { name: string; email: string; credentials: Credentials; invite: Invite }
 
 const issuedFrom = ({ account, credentials, invite }: Provisioned): Issued => ({
   name: account.name,
@@ -187,7 +187,7 @@ function Secret({ label, value }: { label: string; value: string }) {
   )
 }
 
-function CredentialsDialog({ issued, onClose }: { issued?: Issued; onClose: () => void }) {
+export function CredentialsDialog({ issued, onClose }: { issued?: Issued; onClose: () => void }) {
   return (
     <Modal
       title={issued ? `Sign-in details for ${issued.name}` : 'Sign-in details'}
