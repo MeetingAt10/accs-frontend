@@ -15,9 +15,17 @@ export type RestrictionFilters = { q: string; feature: string; program: string }
  * The Restrictions page filters (testing sheet: no search, feature or program filter). The search matches the student's
  * name or ID; "" for a feature or program means all.
  */
-export function filterRestrictions<T extends { features?: unknown; student?: unknown }>(rows: T[], { q, feature, program }: RestrictionFilters) {
+/** When a row began: a restriction's start date, or when a change request was made. */
+const startedAt = (row: { starts?: unknown; at?: unknown; createdAt?: unknown }) => String(row.starts ?? row.at ?? row.createdAt ?? '')
+
+/** Newest first (QA 17 November, V3: the tables put the oldest restriction on top). */
+export function newestFirst<T extends { starts?: unknown; at?: unknown; createdAt?: unknown }>(rows: T[]) {
+  return [...rows].sort((a, b) => startedAt(b).localeCompare(startedAt(a)))
+}
+
+export function filterRestrictions<T extends { features?: unknown; student?: unknown; starts?: unknown; at?: unknown; createdAt?: unknown }>(rows: T[], { q, feature, program }: RestrictionFilters) {
   const needle = q.trim().toLowerCase()
-  return rows.filter((row) => {
+  return newestFirst(rows).filter((row) => {
     const student = (row.student && typeof row.student === 'object' ? row.student : {}) as { id?: unknown; name?: unknown; program?: unknown }
     const features = Array.isArray(row.features) ? row.features.map(String) : []
     return (!needle || `${String(student.name ?? '')} ${String(student.id ?? '')}`.toLowerCase().includes(needle))

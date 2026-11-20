@@ -54,7 +54,7 @@ const entries: Entry[] = [
   { id: 'import', label: 'Student import', about: 'Create student accounts from an Excel file.', icon: 'upload', roles: ['secretary'], to: ['/accounts'], query: '?tab=students' },
 
   { id: 'file-concern', label: 'File a concern', about: 'Tell your advisor or the college what happened.', icon: 'pencil', tone: 'neutral', roles: ['student'], to: ['/reports/new'] },
-  { id: 'my-concerns', label: 'My concerns', about: 'Concerns you filed and the replies to them.', icon: 'file', tone: 'neutral', roles: ['student'], to: ['/reports'] },
+  { id: 'my-concerns', label: 'My reports', about: 'Reports you filed and the replies to them.', icon: 'file', tone: 'neutral', roles: ['student'], to: ['/reports'] },
   { id: 'student-consultations', label: 'Appointments', about: 'Book a time with a faculty member.', icon: 'calendar', tone: 'consult', roles: ['student'], to: ['/consultations', '/calendar'] },
   { id: 'student-messages', label: 'Messages', about: 'Conversations with your advisor and faculty.', icon: 'envelope', tone: 'community', roles: ['student'], to: ['/messages'] },
   { id: 'student-evaluations', label: 'Evaluations', about: 'Evaluate your professors; it counts for clearance.', icon: 'list-checks', roles: ['student'], to: ['/evaluations'] },

@@ -31,6 +31,7 @@
 .rc-toolbar { gap: 10px 20px; }
 .rc-toolbar--fields { align-items: flex-end; }
 .rc-toolbar--fields > .accs-grow { flex-basis: 14rem; }
+.rc-range { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .rc-filter { display: inline-flex; align-items: center; gap: 10px; }
 .rc-filter__label { color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; }
 .rc-count { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }

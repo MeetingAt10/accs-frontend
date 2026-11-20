@@ -1751,9 +1751,21 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     questions: formQuestions,
   };
 
+  // The Save button sits below the form and the list of missing fields above it: bring the first field that needs
+  // something into view and put the cursor there (QA 17 November, V3: the message showed only after scrolling up).
+  function showFirstProblem() {
+    requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>('main [aria-invalid="true"], main [data-invalid] input, main [data-invalid] textarea');
+      const target = field ?? document.querySelector<HTMLElement>('main [role="alert"]');
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      field?.focus({ preventScroll: true });
+    });
+  }
+
   async function save() {
     setValidation(true);
-    if (incomplete.length || action.isPending) return;
+    if (incomplete.length) return showFirstProblem();
+    if (action.isPending) return;
     try {
       await action.mutateAsync({
         action: "saveCycle",
@@ -1767,7 +1779,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
 
   async function advance(status: "In review" | "Published" | "Closed") {
     setValidation(true);
-    if (incomplete.length || action.isPending) return;
+    if (incomplete.length) return showFirstProblem();
+    if (action.isPending) return;
     try {
       if (editable)
         await action.mutateAsync({
@@ -1812,6 +1825,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             maxLength={160}
             isRequired
             isReadOnly={!editable}
+            isInvalid={validation && !title.trim()}
+            errorMessage="Enter a name for the cycle."
           />
           <TextArea
             label="Instructions"
@@ -1820,6 +1835,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             maxLength={4000}
             isRequired
             isReadOnly={!editable}
+            isInvalid={validation && !instructions.trim()}
+            errorMessage="Add the instructions students see."
           />
         </div>
       </Panel>

@@ -227,6 +227,13 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     roles(member.roles).some((role) => ["guidance", "osas"].includes(role)),
   );
 
+  // "1 min ago" moves on by itself (QA 17 November, V3: the times changed only after a reload).
+  const [, setClock] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   // New messages show without notifications too: muting a conversation must not stop it from updating while open.
   useEffect(() => {
     const timer = window.setInterval(() => void queryClient.invalidateQueries({ queryKey: ["page", page.pageId] }), 15_000);
@@ -468,15 +475,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     </span>
                   </Stack>
                 </Row>
-                <MenuButton
-                  label="Conversation options"
-                  icon="dots-three"
-                  iconOnly
-                  onAction={() => setMemberOpen(true)}
-                >
-                  <MenuItem id="members">Members</MenuItem>
-                  <MenuItem id="mute">Mute</MenuItem>
-                </MenuButton>
+                {/* Members and Mute opened the same panel from a menu: the button opens it directly (QA 17 November, V3). */}
+                <IconButton
+                  icon="users"
+                  label="Members and mute"
+                  onPress={() => setMemberOpen(true)}
+                />
               </Row>
               {officeConversation && (
                 <Alert
@@ -678,7 +682,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               <Avatar name={words(member.name)} size={32} />
               <Stack gap={4}>
                 <strong>{words(member.name)}</strong>
-                <RoleBadge>{roles(member.roles).join(" · ")}</RoleBadge>
+                <RoleBadge>{roles(member.roles).map(roleLabelOf).join(" · ")}</RoleBadge>
               </Stack>
             </Row>
           ))}

@@ -29,7 +29,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 
 import { RequirePermission } from '@/components/app/guards'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
-import { PagedList } from '@/components/app/paging'
+import { PagedList, Pager, usePaged } from '@/components/app/paging'
 import {
   chunk,
   columnLabels,
@@ -564,6 +564,8 @@ function FacultyTab() {
   const shown = members.filter(
     (member) => (program === 'all' || member.program === program) && `${member.name} ${member.email}`.toLowerCase().includes(needle),
   )
+  // Ten at a time (QA 17 November, V3: all 57 faculty in one long table). Select all still means every match.
+  const paged = usePaged(shown, 10, `${needle}|${program}`)
   const picked = shown.filter((member) => selected.has(member.id))
   const everyone = shown.length > 0 && picked.length === shown.length
   const toggle = (id: string, on: boolean) =>
@@ -662,7 +664,7 @@ function FacultyTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((member) => {
+                  {paged.shown.map((member) => {
                     const tags = roleTags(member)
                     return (
                       <tr key={member.id}>
@@ -702,6 +704,7 @@ function FacultyTab() {
                 </tbody>
               </table>
             </div>
+            <Pager paged={paged} noun="faculty" />
           </Panel>
         ) : (
           <Panel>
