@@ -1843,6 +1843,11 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
               </Panel>
             )
           ) : (
+            <>
+            {/* Where the dates are changed, said up front (QA 17 November, V3: the way to change a restriction's dates was hard to find). */}
+            {admin && tab === "active" && shown.length > 0 && (
+              <p className="rc-muted">To extend, shorten or lift a restriction, open its Details.</p>
+            )}
             <RestrictionRows
               rows={shown}
               filtered={Boolean(filters.q || filters.feature || filters.program)}
@@ -1850,6 +1855,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
               onOpen={openRestriction}
               onApply={admin && tab === "active" ? openApply : undefined}
             />
+            </>
           )}
         </TabBody>
       </div>
@@ -1871,7 +1877,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             {opened.active === true && admin && (
               <Panel title="Change the end date">
                 <div className="accs-stack">
-                  <DatePicker label="New end date" minValue={campusToday().add({ days: 1 })} description="Later to extend, earlier to shorten. Tomorrow or later." onChange={(value) => setNewEnd(value?.toString() ?? "")} />
+                  <DatePicker label="New end date" minValue={campusToday().add({ days: 1 })} description={`It ends ${formatDate(opened.until)}. Pick a later date to extend it or an earlier one to shorten it, tomorrow or later.`} onChange={(value) => setNewEnd(value?.toString() ?? "")} />
                   <TextArea label="Reason" isRequired value={changeReason} onChange={setChangeReason} maxLength={500} />
                   {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
                   <div className="rc-form__actions">

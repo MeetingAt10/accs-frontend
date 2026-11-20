@@ -387,3 +387,13 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 @media (min-width: 641px) {
   .accs-table tr.adm-row { display: table-row; padding: 0; }
 }
+
+/* Permission requests waiting for the CCS Secretary, and recent decisions (decided 20 November 2026). */
+.adm-requests { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.adm-request { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--accs-line); }
+.adm-request:first-child { border-top: 0; padding-top: 0; }
+.adm-request__text { display: grid; gap: 2px; min-width: 0; flex: 1 1 18rem; }
+.adm-request__actions { display: flex; gap: 8px; }
+/* Permissions no request can change show their state without a button. */
+.adm-matrix__locked { display: block; color: var(--accs-muted); font-size: 0.75rem; }
+.adm-cell[data-locked] { cursor: default; opacity: 0.7; pointer-events: none; }

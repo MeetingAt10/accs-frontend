@@ -554,6 +554,9 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P49",
           icon: "flag",
         },
+        // The Secretary changes roles and approves permission requests (decided 20 November 2026).
+        { label: "Users and roles", href: "/admin/users", pageId: "P46", icon: "users" },
+        { label: "Permissions", href: "/admin/roles", pageId: "P48", icon: "lock" },
         { label: "Calendar", href: "/calendar", pageId: "P13", icon: "calendar" },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
         // The Secretary messages anyone (decided 20 November 2026).
