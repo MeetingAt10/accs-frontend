@@ -1,4 +1,4 @@
-import { canAddRole, fullSectionProblem, sectionLetter, sectionPrefix } from "@/lib/role-rules";
+import { campusYears, canAddRole, sectionPrefix, sectionProblem } from "@/lib/role-rules";
 import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
 import { personMatches } from '@/lib/person-search'
 import { roleLabelOf } from '@/lib/role-labels'
@@ -59,6 +59,7 @@ import {
   type Role,
 } from "@/lib/api";
 import {
+  formatDate,
   formatDateTime,
   initials,
   relativeTime,
@@ -341,6 +342,18 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
   const matrix = items(page.data.permissionMatrix);
   const proposals = object(page.data.permissionProposals);
   const proposalList = Object.entries(proposals);
+  // Requests wait for the CCS Secretary, who approves or rejects each one; an approved change applies (decided 20 November 2026).
+  const requests = items(page.data.permissionRequests);
+  const decisions = items(page.data.permissionDecisions);
+  const [deciding, setDeciding] = useState<{ key: string; decision: "approve" | "reject"; words: string }>();
+  const [decisionReason, setDecisionReason] = useState("");
+  const decide = () => {
+    if (!deciding || !decisionReason.trim()) return;
+    action.mutate(
+      { action: "decidePermission", payload: { key: deciding.key, decision: deciding.decision }, reason: decisionReason },
+      { onSuccess: () => { setDeciding(undefined); setDecisionReason(""); } },
+    );
+  };
   const [reason, setReason] = useState("");
   const [pendingCell, setPendingCell] = useState<{
     role: Role;
@@ -364,8 +377,38 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Permissions" })}
         title="Permission matrix"
-        description="Propose a change to what a role can do. CCS reviews each proposal."
+        description="Propose a change to what a role can do. The CCS Secretary approves each request before it applies."
       />
+      {requests.length > 0 && (
+        <Panel title="Waiting for approval">
+          <ul className="adm-requests">
+            {requests.map((request) => {
+              const key = word(request.key);
+              const words = proposalWords(roleFull(word(request.role)), word(request.permission), request.allowed === true);
+              return (
+                <li key={key} className="adm-request">
+                  <div className="adm-request__text">
+                    <strong>{words}</strong>
+                    <span className="acct-muted">
+                      {word(request.proposedBy)}
+                      {request.proposedAt ? ` · ${formatDate(request.proposedAt)}` : ""}
+                      {request.reason ? ` · ${word(request.reason)}` : ""}
+                    </span>
+                  </div>
+                  {request.canDecide === true ? (
+                    <div className="adm-request__actions">
+                      <Button size="sm" variant="secondary" onPress={() => setDeciding({ key, decision: "reject", words })}>Reject</Button>
+                      <Button size="sm" onPress={() => setDeciding({ key, decision: "approve", words })}>Approve</Button>
+                    </div>
+                  ) : (
+                    <span className="acct-muted">{page.data.canReviewPermissions === true ? "Someone else decides your own request." : "Waiting for the CCS Secretary."}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
       <div className="accs-stack accs-stack--tight">
         <Note>
           Role changes take effect at the next sign-in. This matrix does not
@@ -417,6 +460,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               const group = permission.split(".")[0] ?? "";
               const previous = word(matrix[index - 1]?.key).split(".")[0];
               const granted = strings(entry.roles);
+              const locked = entry.locked === true;
               return (
                 <Fragment key={permission}>
                   {(index === 0 || group !== previous) && (
@@ -434,6 +478,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                       <span className="adm-matrix__key accs-mono">
                         {permission}
                       </span>
+                      {locked && <span className="adm-matrix__locked">Fixed: cannot be changed by a request</span>}
                     </th>
                     {roles.map((role) => {
                       const proposed = proposals[`${role}:${permission}`];
@@ -446,6 +491,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                           <MatrixCell
                             on={effective}
                             proposed={hasProposal}
+                            locked={locked}
                             label={`${roleFull(role)}: ${permissionLabel(permission)}, ${
                               effective ? "allowed" : "no access"
                             }${hasProposal ? " (proposed)" : ""}. Propose a change`}
@@ -520,8 +566,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               )}
             </ul>
             <p className="adm-proposed__note">
-              CCS reviews each proposal. Approved changes apply at each
-              person's next sign-in.
+              The CCS Secretary approves or rejects each request. An approved
+              change applies at each person's next page load.
             </p>
           </motion.aside>
         )}
@@ -536,7 +582,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
         <ModalBody>
           <p>
             <strong>{pendingCell ? proposalWords(roleFull(pendingCell.role), pendingCell.permission, pendingCell.allowed) : ""}</strong>.
-            CCS reviews the proposal before it applies.
+            The CCS Secretary approves the request before it applies.
           </p>
           <TextArea
             label="Reason"
@@ -559,6 +605,47 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
+      <Modal
+        title={deciding?.decision === "approve" ? "Approve this change?" : "Reject this change?"}
+        isOpen={Boolean(deciding)}
+        onOpenChange={(open) => { if (!open) setDeciding(undefined); }}
+      >
+        <ModalBody>
+          <p>
+            <strong>{deciding?.words}</strong>.{" "}
+            {deciding?.decision === "approve" ? "It applies to everyone with that role at their next page load." : "Nothing changes."}
+          </p>
+          <TextArea label="Reason" isRequired value={decisionReason} onChange={setDecisionReason} maxLength={1000} />
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setDeciding(undefined)}>Cancel</Button>
+          <Button loading={action.isPending} isDisabled={!decisionReason.trim()} onPress={decide}>
+            {deciding?.decision === "approve" ? "Approve" : "Reject"}
+          </Button>
+        </ModalActions>
+      </Modal>
+      {decisions.length > 0 && (
+        <Panel title="Recent decisions">
+          <ul className="adm-requests">
+            {decisions.slice(0, 5).map((entry, index) => {
+              const key = word(entry.key);
+              const role = key.slice(0, key.indexOf(":"));
+              const permission = key.slice(key.indexOf(":") + 1);
+              return (
+                <li key={key + index} className="adm-request">
+                  <div className="adm-request__text">
+                    <strong>{proposalWords(roleFull(role), permission, entry.allowed === true)}</strong>
+                    <span className="acct-muted">
+                      {word(entry.decision)} by {word(entry.by)}{entry.at ? ` · ${formatDate(entry.at)}` : ""}{entry.reason ? ` · ${word(entry.reason)}` : ""}
+                    </span>
+                  </div>
+                  <StatusChip tone={entry.decision === "Approved" ? "ok" : "neutral"}>{word(entry.decision)}</StatusChip>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
     </div>
   );
 }
@@ -566,15 +653,25 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
 function MatrixCell({
   on,
   proposed,
+  locked = false,
   label,
   onPress,
 }: {
   on: boolean;
   proposed: boolean;
+  locked?: boolean;
   label: string;
   onPress: () => void;
 }) {
   const reduce = useReducedMotion();
+  if (locked)
+    return (
+      <span className="adm-cell" data-on={on} data-locked aria-label={label.replace(/\. Propose a change$/, ". Fixed")}>
+        <span className="adm-cell__glyph">
+          <Icon name={on ? "check" : "minus"} size={16} weight={on ? "bold" : "regular"} />
+        </span>
+      </span>
+    );
   return (
     <motion.button
       type="button"
@@ -884,7 +981,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Users" })}
         title="Users and roles"
-        description="Role changes take effect at the next sign-in and go in the audit trail. Only the System Administrator sees this list; students and staff never see each other's roles here."
+        description="Role changes take effect at the next sign-in and go in the audit trail. Only the System Administrator and the CCS Secretary see this list; students and staff never see each other's roles here."
         actions={
           <Button
             variant="secondary"
@@ -1135,15 +1232,16 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(
     Array.isArray(record.roles) ? (record.roles as Role[]) : [],
   );
-  const [addRoleOpen, setAddRoleOpen] = useState(false);
-  const [roleToAdd, setRoleToAdd] = useState("");
   const [program, setProgram] = useState(word(record.program));
-  // The Section field shows and takes the full name, like SBIT4A (QA 19 November); the letter is what gets saved.
-  const prefixFor = (programCode: string) => sectionPrefix({ campus: word(record.campus), program: programCode, year: word(record.year) });
-  const [sectionText, setSectionText] = useState(record.section ? word(record.sectionName, prefixFor(word(record.program)) + word(record.section)) : "");
-  const prefix = prefixFor(program);
-  const section = sectionLetter(sectionText, prefix) ?? "";
-  const sectionError = fullSectionProblem(sectionText, prefix);
+  // A student's section is campus + program + year + letter, like SBIT4K (decided 20 November 2026): the year level is
+  // chosen here (QA 17 November, V3: "SBITK" had no year), and only the letter is typed.
+  const campus = word(record.campus, "SB");
+  const [year, setYear] = useState(word(record.year));
+  const [section, setSection] = useState(word(record.section));
+  const prefix = sectionPrefix({ campus, program, year });
+  const sectionError = sectionProblem(section);
+  const isStudent = selectedRoles.includes("student");
+  const studentIncomplete = isStudent && (!year || !section.trim());
   const [reason, setReason] = useState("");
   if (!record.id)
     return (
@@ -1187,10 +1285,11 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Role changes apply at the next sign-in. The current session keeps
               its roles. The audit trail records this change.
             </Note>
-            {/* A student or organization account has that one role; anyone else at most two (decided 19 November 2026). */}
+            {/* At most two roles; a student may also be a CCS student organization representative (decided 20 November 2026).
+                The checkboxes are the only way to add a role: an "Add role" button did the same (QA 17 November, V3). */}
             <CheckboxGroup
               label="Assigned roles"
-              description="A student or organization account has that one role. Faculty and staff have at most two, like Dean and professor."
+              description="At most two roles, like Dean and professor. A student can also be a CCS student organization representative, and nothing else."
               value={selectedRoles}
               onChange={(next) => setSelectedRoles(next as Role[])}
             >
@@ -1200,66 +1299,43 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 </Checkbox>
               ))}
             </CheckboxGroup>
-            <div>
-              <Button variant="secondary" size="sm" icon="plus" isDisabled={!roles.some((role) => !selectedRoles.includes(role) && canAddRole(selectedRoles, role))} onPress={() => { setRoleToAdd(""); setAddRoleOpen(true); }}>
-                Add role
-              </Button>
-            </div>
-            <Modal title="Add role" isOpen={addRoleOpen} onOpenChange={setAddRoleOpen}>
-              <ModalBody>
-                <Select label="Role" placeholder="Select a role" selectedKey={roleToAdd || null} onSelectionChange={(key) => setRoleToAdd(key ? String(key) : "")}>
-                  {roles.filter((role) => !selectedRoles.includes(role) && canAddRole(selectedRoles, role)).map((role) => (
-                    <SelectOption key={role} id={role}>{roleFull(role)}</SelectOption>
-                  ))}
-                </Select>
-                {["chair", "student"].includes(roleToAdd) && (
-                  <Select label="Program" placeholder="Select a program" selectedKey={program || null} onSelectionChange={(key) => setProgram(key ? String(key) : "")}>
-                    <SelectOption id="BSIT">BSIT</SelectOption>
-                    <SelectOption id="BSCS">BSCS</SelectOption>
-                    <SelectOption id="BSIS">BSIS</SelectOption>
-                  </Select>
-                )}
-                {["guidance", "osas"].includes(roleToAdd) && <Note>{roleToAdd === "osas" ? "Office: OSAS." : "Office: Guidance."}</Note>}
-                <Note>The role is added to the list above. Give a reason and save to apply it.</Note>
-              </ModalBody>
-              <ModalActions>
-                <Button variant="secondary" onPress={() => setAddRoleOpen(false)}>Cancel</Button>
-                <Button
-                  isDisabled={!roleToAdd || (["chair", "student"].includes(roleToAdd) && !program)}
-                  onPress={() => { setSelectedRoles([...selectedRoles, roleToAdd as Role]); setAddRoleOpen(false); }}
-                >
-                  Add
-                </Button>
-              </ModalActions>
-            </Modal>
             <div className="adm-form__grid">
               <Select
                 label="Program"
                 selectedKey={program || "none"}
-                onSelectionChange={(key) => {
-                  const next = key === "none" ? "" : String(key);
-                  // The section name follows the program: SBIT4A becomes SBCS4A.
-                  if (section) setSectionText(prefixFor(next) + section);
-                  setProgram(next);
-                }}
+                onSelectionChange={(key) => setProgram(key === "none" ? "" : String(key))}
               >
                 <SelectOption id="none">No program</SelectOption>
                 <SelectOption id="BSIT">BSIT</SelectOption>
                 <SelectOption id="BSCS">BSCS</SelectOption>
                 <SelectOption id="BSIS">BSIS</SelectOption>
               </Select>
-              {selectedRoles.includes("student") && (
+              {isStudent && (
+                <Select
+                  label="Year level"
+                  placeholder="Select a year"
+                  selectedKey={year || null}
+                  onSelectionChange={(key) => setYear(key ? String(key) : "")}
+                  description={campus === "SB" ? undefined : "This campus teaches 1st and 2nd year only."}
+                >
+                  {campusYears(campus).map((level) => (
+                    <SelectOption key={level} id={String(level)}>{`${level}${["st", "nd", "rd", "th"][level - 1]} year`}</SelectOption>
+                  ))}
+                </Select>
+              )}
+              {isStudent && (
                 <TextField
-                  label="Section"
-                  placeholder={`${prefix}A`}
-                  value={sectionText}
-                  onChange={(value) => setSectionText(value.toUpperCase())}
-                  maxLength={12}
+                  label="Section letter"
+                  placeholder="A"
+                  value={section}
+                  onChange={(value) => setSection(value.toUpperCase())}
+                  maxLength={3}
                   isInvalid={Boolean(sectionError)}
                   errorMessage={sectionError}
                 />
               )}
             </div>
+            {isStudent && <p className="acct-muted">Section name: {prefix}{section.trim() || "A"}</p>}
             <TextArea
               label="Reason"
               isRequired
@@ -1275,7 +1351,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
             <div className="adm-form__actions">
               <Button
                 loading={action.isPending}
-                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionError)}
+                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionError) || studentIncomplete}
                 onPress={() =>
                   action.mutate({
                     action: "updateRoles",
@@ -1283,7 +1359,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                     payload: {
                       roles: selectedRoles,
                       ...(program ? { program } : {}),
-                      ...(section && selectedRoles.includes("student") ? { section } : {}),
+                      ...(isStudent ? { year: Number(year), section: section.trim() } : {}),
                     },
                     reason,
                   })
@@ -2093,10 +2169,13 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     ),
   );
   const session = useQuery(sessionQuery());
-  // Moderation pages are also the Secretary's, for referred items; the rest of administration is the administrator's.
+  // Moderation pages are also the Secretary's, for referred items, and so are Users and roles and Permissions, where she
+  // changes roles and approves permission requests (decided 20 November 2026); the rest of administration is the administrator's.
+  const has = (key: string) => session.data?.permissions.includes(key) === true;
   const roleAllowed =
     session.data?.user.roles.includes("administrator") === true ||
-    (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some((key) => session.data?.permissions.includes(key) === true));
+    (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some(has)) ||
+    (["P46", "P47", "P48"].includes(pageId) && has("role.manage"));
   if (session.isPending || page.isPending)
     return (
       <div

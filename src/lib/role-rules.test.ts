@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import { canAddRole, sectionProblem } from './role-rules'
+import { campusYears, canAddRole, sectionProblem } from './role-rules'
 
 describe('canAddRole', () => {
-  it('keeps a student or organization account to that one role', () => {
+  // 20 November 2026: a student may also be a CCS student organization representative, and nothing else.
+  it('lets a student add only the organization role, and an organization account only the student role', () => {
+    expect(canAddRole(['student'], 'organization')).toBe(true)
+    expect(canAddRole(['organization'], 'student')).toBe(true)
     expect(canAddRole(['student'], 'administrator')).toBe(false)
     expect(canAddRole(['student'], 'professor')).toBe(false)
     expect(canAddRole(['professor'], 'student')).toBe(false)
     expect(canAddRole(['organization'], 'guidance')).toBe(false)
+    expect(canAddRole(['student', 'organization'], 'professor')).toBe(false)
     expect(canAddRole([], 'student')).toBe(true)
+  })
+
+  it('knows which years each campus teaches', () => {
+    expect(campusYears('SB')).toEqual([1, 2, 3, 4])
+    expect(campusYears(undefined)).toEqual([1, 2, 3, 4])
+    expect(campusYears('BAT')).toEqual([1, 2])
   })
 
   it('allows two roles for faculty and staff, and no third', () => {

@@ -585,3 +585,7 @@ select {
 .accs-status[data-office="guidance"] { --office: #0d9488; }
 .accs-status[data-office="osas"] { --office: #dc2626; }
 .accs-status[data-closed] { background: var(--accs-sunken); color: var(--accs-muted); }
+
+/* A select or combo box list scrolls by itself; its popover must not scroll too, or two scroll bars show (QA 17 November,
+   V3: the Assign role list had two). */
+.ds-popover:has(> .ds-listbox) { overflow: hidden; }
