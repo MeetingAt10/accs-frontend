@@ -54,6 +54,8 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { messageFileLink, messageFilePath } from "@/lib/api";
+import { replaceFilters } from "@/lib/url-filters";
 import {
   ConversationList,
   MessageBubble,
@@ -168,6 +170,31 @@ export function matchesPerson(name: string, input: string) {
   return typed.every((word) => parts.some((part) => part.startsWith(word)))
 }
 
+/**
+ * Puts a picture from a message on the clipboard. Browsers take PNG pictures only, so others are redrawn as PNG first.
+ * Where the browser or the file link does not allow it, the person is pointed to Copy file link.
+ */
+async function copyPicture(threadId: string, messageId: string, fileId: string) {
+  try {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("Clipboard pictures are not supported.");
+    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId))).blob();
+    const png = source.type === "image/png" ? source : await toPng(source);
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    toast("Image copied.");
+  } catch {
+    toast("This browser couldn't copy the image. Use Copy file link instead.");
+  }
+}
+
+async function toPng(picture: Blob) {
+  const bitmap = await createImageBitmap(picture);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not redraw the picture."))), "image/png"));
+}
+
 function MessagesPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -195,7 +222,17 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     ? Boolean(groupName.trim() && groupIds.length >= 2 && newBody.trim())
     : Boolean(recipientId && newBody.trim());
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("all");
+  // The tab is in the address, so opening a conversation from Groups stays on Groups (QA 17 November, V3: it jumped to All).
+  const tab = ["direct", "group"].includes(new URLSearchParams(search).get("tab") ?? "") ? new URLSearchParams(search).get("tab")! : "all";
+  const setTab = (next: string) => {
+    const params = new URLSearchParams(search);
+    if (next === "all") params.delete("tab");
+    else params.set("tab", next);
+    replaceFilters(router, router.state.location.pathname, params);
+  };
+  const tabSearch = tab === "all" ? "" : `?tab=${tab}`;
+  const [addingPeople, setAddingPeople] = useState(false);
+  const [newPeople, setNewPeople] = useState<string[]>([]);
   const [body, setBody] = useState("");
   const [memberOpen, setMemberOpen] = useState(false);
   const [reportedMessage, setReportedMessage] = useState<Item>();
@@ -279,14 +316,34 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const latestFiles = useRef(pendingFiles);
   latestFiles.current = pendingFiles;
   useEffect(() => () => { for (const file of latestFiles.current) if (file.preview) URL.revokeObjectURL(file.preview); }, []);
-  // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
+  // A draft belongs to its conversation: opening another one shows that conversation's own draft, kept on the server so a
+  // refresh or another device does not lose it (decided 20 November 2026), and never carries words or files to other people.
+  const savedDraft = useRef("");
   useEffect(() => {
-    setBody("");
+    const draft = object(conversation.draft);
+    const files = (Array.isArray(draft.attachments) ? draft.attachments : []).map((file) => object(file) as unknown as MessageFile);
+    setBody(words(draft.body));
     setPendingFiles((current) => {
       for (const file of current) if (file.preview) URL.revokeObjectURL(file.preview);
-      return [];
+      return files.map((file) => ({ key: file.id, name: file.fileName, size: file.size, state: "ready" as const, file }));
     });
+    savedDraft.current = JSON.stringify({ body: words(draft.body), attachments: files.map((file) => file.id) });
+    // Only when the conversation changes: a refresh of the page must not overwrite what is being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+  const draftFiles = pendingFiles.filter((file) => file.state === "ready").map((file) => file.file!);
+  const draftKey = JSON.stringify({ body, attachments: draftFiles.map((file) => file.id) });
+  useEffect(() => {
+    if (!isThread || !conversationId || draftKey === savedDraft.current) return;
+    const timer = window.setTimeout(() => {
+      savedDraft.current = draftKey;
+      void performPageAction("P12", { action: "saveMessageDraft", recordId: conversationId, payload: { body, attachments: draftFiles } }).catch(() => {
+        savedDraft.current = "";
+      });
+    }, 1000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, conversationId, isThread]);
   function removePendingFile(key: string) {
     setPendingFiles((current) => {
       const gone = current.find((file) => file.key === key);
@@ -326,6 +383,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
         recordId: words(conversation.id),
         payload: { body: body.trim(), attachments: readyFiles.map((file) => file.file!) },
       });
+      savedDraft.current = JSON.stringify({ body: "", attachments: [] });
       setBody("");
       for (const file of pendingFiles) if (file.preview) URL.revokeObjectURL(file.preview);
       setPendingFiles([]);
@@ -431,6 +489,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     conversations={threads}
                     currentId={words(conversation.id)}
                     selfId={session.data?.user.id}
+                    linkSearch={tabSearch}
                   />
                 </TabPanel>
               ))}
@@ -535,17 +594,23 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                 icon="dots-three"
                                 iconOnly
                                 onAction={(key) => {
-                                  // A message with only files has no text: copy the file names, so Copy is never empty.
-                                  const fileNames = (Array.isArray(message.attachments) ? message.attachments : []).map((file) => words(object(file).fileName)).filter(Boolean);
+                                  // Copy the words, the picture itself, or a lasting link to the file (QA 17 November, V3: Copy gave
+                                  // only the file name). A browser can put a picture on the clipboard, but not other kinds of file.
+                                  const files = (Array.isArray(message.attachments) ? message.attachments : []).map(object);
                                   if (key === "copy")
                                     void navigator.clipboard
-                                      ?.writeText([words(message.body), ...fileNames.map((name) => `Attachment: ${name}`)].filter(Boolean).join("\n"))
+                                      ?.writeText(words(message.body))
                                       .then(() => toast("Message copied."))
-                                      .catch(() =>
-                                        toast(
-                                          "Copy is unavailable in this browser.",
-                                        ),
-                                      );
+                                      .catch(() => toast("Copy is unavailable in this browser."));
+                                  if (key === "copy-image") {
+                                    const picture = files.find((file) => words(file.contentType).startsWith("image/"));
+                                    if (picture) void copyPicture(words(conversation.id), words(message.id), words(picture.id));
+                                  }
+                                  if (key === "copy-link")
+                                    void navigator.clipboard
+                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)), window.location.origin).toString()).join("\n"))
+                                      .then(() => toast(files.length === 1 ? "File link copied. It opens for people in this conversation." : "File links copied. They open for people in this conversation."))
+                                      .catch(() => toast("Copy is unavailable in this browser."));
                                   if (key === "report")
                                     setReportedMessage(message);
                                   if (key === "edit") {
@@ -556,7 +621,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                     setDeletedMessage(message);
                                 }}
                               >
-                                <MenuItem id="copy">Copy</MenuItem>
+                                {words(message.body) && <MenuItem id="copy">{Array.isArray(message.attachments) && message.attachments.length ? "Copy text" : "Copy"}</MenuItem>}
+                                {(Array.isArray(message.attachments) ? message.attachments : []).some((file) => words(object(file).contentType).startsWith("image/")) && <MenuItem id="copy-image">Copy image</MenuItem>}
+                                {Array.isArray(message.attachments) && message.attachments.length > 0 && <MenuItem id="copy-link">{message.attachments.length === 1 ? "Copy file link" : "Copy file links"}</MenuItem>}
                                 {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && words(message.body) && <MenuItem id="edit">Edit message</MenuItem>}
                                 {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && <MenuItem id="delete">Delete message</MenuItem>}
                                 {sender.id !== session.data?.user.id && <MenuItem id="report">Report message</MenuItem>}
@@ -686,9 +753,64 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               </Stack>
             </Row>
           ))}
+          {conversation.canAddMembers === true && (
+            <div>
+              <Button variant="secondary" size="sm" icon="plus" onPress={() => { setNewPeople([]); setAddingPeople(true); }}>
+                Add people
+              </Button>
+            </div>
+          )}
           <MuteSwitch conversationId={words(conversation.id)} muted={conversation.muted === true} />
         </Stack>
       </Drawer>
+      {/* People join an existing group (QA 17 November, V3: there was no way to add anyone after it started). */}
+      <Modal title="Add people" isOpen={addingPeople} onOpenChange={setAddingPeople}>
+        <ModalBody>
+          <Stack gap={16}>
+            <ComboBox
+              key={`more-${newPeople.length}`}
+              label="Add people"
+              placeholder="Search people"
+              description="They see the conversation from the start."
+              defaultFilter={matchesPerson}
+              onSelectionChange={(key) => { const id = String(key ?? ""); if (id) setNewPeople((current) => (current.includes(id) ? current : [...current, id])); }}
+              emptyMessage="No one else to add"
+            >
+              {recipients
+                .filter((recipient) => !newPeople.includes(words(recipient.id)) && !members.some((member) => words(member.id) === words(recipient.id)))
+                .map((recipient) => (
+                  <SelectOption id={words(recipient.id)} key={words(recipient.id)} textValue={words(recipient.name)}>
+                    {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
+                  </SelectOption>
+                ))}
+            </ComboBox>
+            {newPeople.length > 0 && (
+              <ul className="cm-group-people" aria-label="People to add">
+                {newPeople.map((id) => {
+                  const person = recipients.find((recipient) => words(recipient.id) === id);
+                  return (
+                    <li key={id}>
+                      <span>{words(person?.name, id)}</span>
+                      <IconButton icon="x" size="sm" label={`Remove ${words(person?.name, id)}`} onPress={() => setNewPeople((current) => current.filter((value) => value !== id))} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setAddingPeople(false)}>Cancel</Button>
+          <Button
+            loading={action.isPending}
+            isDisabled={!newPeople.length}
+            onPress={() => action.mutate({ action: "addGroupMembers", recordId: words(conversation.id), payload: { memberIds: newPeople } }, { onSuccess: () => setAddingPeople(false) })}
+          >
+            Add
+          </Button>
+        </ModalActions>
+      </Modal>
       <Modal title="Edit message" isOpen={Boolean(editedMessage)} onOpenChange={(open) => { if (!open) setEditedMessage(undefined); }}>
         <ModalBody>
           <Stack gap={16}>
