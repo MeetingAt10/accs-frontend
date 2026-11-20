@@ -29,7 +29,8 @@ describe('module picker tiles', () => {
   it('gives a faculty account the advisor tiles', () => {
     expect(links(session(['professor'], [...own, '/cases', '/consultations', '/consultations/availability']))).toEqual([
       ['assigned-concerns', '/cases'],
-      ['faculty-schedule', '/calendar'],
+      // Appointments, not the calendar (QA 17 November, V3: the tile opened the calendar).
+      ['faculty-schedule', '/consultations'],
       ['availability', '/consultations/availability'],
       ['faculty-messages', '/messages'],
     ])

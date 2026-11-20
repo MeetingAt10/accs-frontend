@@ -61,7 +61,7 @@ const entries: Entry[] = [
   { id: 'student-standing', label: 'My standing', about: 'Your clearance and any paused features.', icon: 'info', roles: ['student'], to: ['/standing'] },
 
   { id: 'assigned-concerns', label: 'Assigned concerns', about: 'Concerns from the students you advise.', icon: 'file', tone: 'neutral', roles: ['professor'], to: ['/cases', '/reports'] },
-  { id: 'faculty-schedule', label: 'Appointment schedule', about: 'Appointment requests and your calendar.', icon: 'calendar', tone: 'consult', roles: ['professor'], to: ['/calendar', '/consultations'] },
+  { id: 'faculty-schedule', label: 'Appointment schedule', about: 'Appointment requests and your calendar.', icon: 'calendar', tone: 'consult', roles: ['professor'], to: ['/consultations', '/calendar'] },
   { id: 'availability', label: 'My availability', about: 'Set when students can book you.', icon: 'clock', tone: 'consult', roles: ['professor'], to: ['/consultations/availability'] },
   { id: 'faculty-messages', label: 'Messages', about: 'Conversations with students and faculty.', icon: 'envelope', tone: 'community', roles: ['professor'], to: ['/messages'] },
   { id: 'faculty-results', label: 'Evaluation results', about: 'What your students said about your classes.', icon: 'list', roles: ['professor'], to: ['/evaluations/results'] },

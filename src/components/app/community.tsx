@@ -604,7 +604,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
   ) {
     scopes.push({ id: `program:${session.user.program}`, label: 'My program' })
   }
-  if (roles.includes('dean')) {
+  // The Secretary reads the Faculty and program audiences like the Dean (QA 17 November, V3: her feed had CCS only).
+  if (roles.some((role) => ['dean', 'secretary'].includes(role))) {
     scopes.push(
       ...['BSIT', 'BSCS', 'BSIS'].map((program) => ({
         id: `program:${program}`,
@@ -623,7 +624,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
         .map((space) => ({ id: `space:${space.id}`, label: spaceName(space) })),
     )
   }
-  if (roles.some((role) => ['professor', 'chair', 'dean'].includes(role))) {
+  if (roles.some((role) => ['professor', 'chair', 'dean', 'secretary'].includes(role))) {
     scopes.push({ id: 'faculty', label: 'Faculty' })
   }
   scopes.push(

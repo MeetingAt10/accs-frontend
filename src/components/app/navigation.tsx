@@ -19,7 +19,8 @@ import {
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { OverlayTriggerStateContext } from "react-aria-components";
 
 import {
   AssistantPanel,
@@ -554,6 +555,8 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
         },
         { label: "Calendar", href: "/calendar", pageId: "P13", icon: "calendar" },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+        // The Secretary messages anyone (decided 20 November 2026).
+        { label: "Messages", href: "/messages", pageId: "P11", icon: "envelope" },
         {
           label: "Organizations",
           href: "/organizations",
@@ -575,6 +578,18 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
     },
   ],
 };
+
+/** Hands the bell's close function to the shell: the design-system Popover keeps its open state to itself. */
+function BellCloser({ closeRef }: { closeRef: React.RefObject<(() => void) | undefined> }) {
+  const state = useContext(OverlayTriggerStateContext);
+  useEffect(() => {
+    closeRef.current = state ? () => state.close() : undefined;
+    return () => {
+      closeRef.current = undefined;
+    };
+  }, [closeRef, state]);
+  return null;
+}
 
 export const accountNavigation: RoleGroup[] = [
   {
@@ -699,7 +714,11 @@ function Topbar({
   });
 
   const [shownNotice, setShownNotice] = useState<Record<string, unknown>>();
+  // Closes the bell. Opening a notification leaves it, so it must not stay open over the page or the message it opens
+  // (QA 17 November, V3: "Content review update" opened behind the bell).
+  const closeBell = useRef<() => void>(undefined);
   async function openNotification(notification: Record<string, unknown>) {
+    closeBell.current?.();
     try {
       const result = await performPageAction("P40", {
         action: "openNotification",
@@ -825,6 +844,7 @@ function Topbar({
               />
             ) : recentNotifications.length ? (
               <Stack gap={12}>
+                <BellCloser closeRef={closeBell} />
                 <NotificationList>
                   {recentNotifications.map((notification) => (
                     <NotificationItem
