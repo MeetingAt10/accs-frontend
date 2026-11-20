@@ -62,9 +62,12 @@ export function ConversationList({
   conversations,
   currentId,
   selfId,
+  linkSearch = "",
 }: {
   conversations: Item[];
   currentId?: string;
+  /** Kept on each link, like "?tab=group", so opening a conversation stays on the same tab (QA 17 November, V3). */
+  linkSearch?: string;
   /** The signed-in person, whose own roles are left out of each row (QA 17 November: "Faculty · Student" for a student's chat with a professor). */
   selfId?: string;
 }) {
@@ -81,6 +84,7 @@ export function ConversationList({
     <ul className="ds-next-conversation-list" aria-label="Conversations">
       {conversations.map((conversation) => (
         <ConversationRow selfId={selfId}
+          linkSearch={linkSearch}
           conversation={conversation}
           currentId={currentId}
           key={words(conversation.id)}
@@ -94,10 +98,12 @@ function ConversationRow({
   conversation,
   currentId,
   selfId,
+  linkSearch,
 }: {
   conversation: Item;
   currentId?: string;
   selfId?: string;
+  linkSearch: string;
 }) {
   const memberRoles = [
     ...new Set(
@@ -113,7 +119,7 @@ function ConversationRow({
       <Link
         variant="quiet"
         className="ds-next-conversation"
-        href={"/messages/" + encodeURIComponent(words(conversation.id))}
+        href={"/messages/" + encodeURIComponent(words(conversation.id)) + linkSearch}
         aria-current={currentId === conversation.id ? "page" : undefined}
       >
         <Mark name={title} />
