@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { featureWords } from "@/lib/restrictions";
 import { AssistantIconButton, assistantIconName } from "@/components/app/assistant-icon";
 import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
@@ -976,8 +977,11 @@ export function AppChrome({
     enabled: restricted,
   });
   const settings = appearance.data?.data.settings;
-  const theme =
-    settings && typeof settings === "object" && "theme" in settings
+  // Unknown until the saved settings load. Treating that as "system" cleared the theme theme-boot.js had already set,
+  // so a light page on a dark device flashed dark for a frame on every reload (QA 17 November, V3).
+  const theme = !appearance.isSuccess
+    ? undefined
+    : settings && typeof settings === "object" && "theme" in settings
       ? String(settings.theme)
       : "system";
   const savedDensity =
@@ -1047,7 +1051,8 @@ export function AppChrome({
                   .map((entry) => {
                     const restriction = entry as Record<string, unknown>;
                     const features = featureWords(restriction.features) || "Some features";
-                    return `${features} paused until ${String(restriction.until ?? "review")}`;
+                    // A readable date, not "2026-12-01" (QA 17 November, V3).
+                    return `${features} paused until ${restriction.until ? formatDate(String(restriction.until)) : "review"}`;
                   })
                   .join("; ")
               : "Some account features are paused."}

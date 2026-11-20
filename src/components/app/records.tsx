@@ -1,4 +1,4 @@
-import { featureLabels, filterRestrictions, type RestrictionFilters } from "@/lib/restrictions";
+import { featureLabels, filterRestrictions, newestFirst, type RestrictionFilters } from "@/lib/restrictions";
 import { campusToday } from "@/lib/campus-date";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
@@ -47,7 +47,8 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { personMatches } from "@/lib/person-search";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
 import { replaceFilters } from "@/lib/url-filters";
 import { TypedSearch, typingPause } from "@/components/app/typed-search";
 
@@ -395,7 +396,8 @@ export function RestrictionPanel({
   restrictions: Item[];
   title?: string;
 }) {
-  const ordered = [...restrictions].sort(
+  // Active first, then newest first.
+  const ordered = newestFirst(restrictions).sort(
     (left, right) =>
       Number(right.active === true) - Number(left.active === true),
   );
@@ -773,6 +775,16 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 /* ---------- Analytics ---------- */
 
 const stages = ["adviser", "chair", "dean", "guidance", "osas"];
+/** Office names for case stages ("Chair" and "Osas" read as typos; QA 17 November, V3). */
+const stageOffice: Record<string, string> = { adviser: "Adviser", chair: "Program Chair", dean: "Dean", guidance: "Guidance Office", osas: "OSAS" };
+/** Case analytics periods: days back from today, counting today. */
+const analyticsPeriods = [
+  { id: "7", label: "Last 7 days" },
+  { id: "30", label: "Last 30 days" },
+  { id: "90", label: "Last 90 days" },
+  { id: "365", label: "Last 12 months" },
+];
+const daysAgo = (days: number) => campusToday().subtract({ days: days - 1 }).toString();
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 /** Severity colors in analytics: High red, Medium yellow, Low green (QA 19 November). */
@@ -823,6 +835,21 @@ function Analytics({ page }: { page: PageEnvelope }) {
     }, typingPause);
   };
   const program = search.get("program") ?? "All";
+  const from = search.get("from") ?? "";
+  const to = search.get("to") ?? "";
+  const periodKey = !from && !to ? "all" : analyticsPeriods.find((period) => !to && from === daysAgo(Number(period.id)))?.id ?? "custom";
+  const choosePeriod = (key: string) => {
+    if (key === "custom") return;
+    clearTimeout(rangeTimer.current);
+    setRangeDraft({});
+    setRangeProblem("");
+    const params = new URLSearchParams(router.state.location.searchStr);
+    params.delete("period");
+    params.delete("to");
+    if (key === "all") params.delete("from");
+    else params.set("from", daysAgo(Number(key)));
+    replaceFilters(router, router.state.location.pathname, params);
+  };
   return (
     <Screen
       header={
@@ -878,7 +905,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           <SelectOption id="All">All stages</SelectOption>
           {stages.map((stage) => (
             <SelectOption key={stage} id={stage}>
-              {cap(stage)}
+              {stageOffice[stage]}
             </SelectOption>
           ))}
         </Select>
@@ -901,17 +928,24 @@ function Analytics({ page }: { page: PageEnvelope }) {
             </SelectOption>
           ))}
         </Select>
+        {/* Real ranges instead of the placeholder "Available period" and "No matching period" (QA 17 November, V3). A
+            preset fills From and To; dates typed by hand show as a custom range. */}
         <Select
           label="Period"
-          selectedKey={search.get("period") ?? "current"}
-          onSelectionChange={(key) =>
-            updateFilter("period", String(key) === "current" ? "" : String(key))
-          }
+          selectedKey={periodKey}
+          onSelectionChange={(key) => choosePeriod(String(key))}
         >
-          <SelectOption id="current">Available period</SelectOption>
-          <SelectOption id="none">No matching period</SelectOption>
+          <SelectOption id="all">Any time</SelectOption>
+          {analyticsPeriods.map((period) => (
+            <SelectOption key={period.id} id={period.id}>
+              {period.label}
+            </SelectOption>
+          ))}
+          {periodKey === "custom" && <SelectOption id="custom">Custom range</SelectOption>}
         </Select>
-        {/* A range that ends before it starts is not applied: the field says why instead. */}
+        {/* A range that ends before it starts is not applied: the field says why instead. From and To share a row
+            aligned at the top, so the message under one no longer pushes the other out of line (QA 17 November, V3). */}
+        <div className="rc-range">
         <TextField
           type="date"
           label="From"
@@ -928,6 +962,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           isInvalid={rangeProblem === "to"}
           errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
         />
+        </div>
       </div>
       <Kpis label="Case counts">
         {stats.map((stat) => (
@@ -1040,7 +1075,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                         </Link>
                       </td>
                       <td>
-                        {cap(word(entry.stage, "—"))}
+                        {stageOffice[word(entry.stage)] ?? cap(word(entry.stage, "—"))}
                       </td>
                       <td>
                         {analyticsSeverityTone[word(entry.severity)] ? (
@@ -1640,6 +1675,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const [tab, setTab] = useState("active");
   const [filters, setFilters] = useState<RestrictionFilters>({ q: "", feature: "", program: "" });
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [studentQuery, setStudentQuery] = useState("");
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [decisionReference, setDecisionReference] = useState("");
   const [basis, setBasis] = useState("");
@@ -1665,6 +1701,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const resetApply = () => {
     setSelectedStudent("");
     setSelectedFeatures([]);
+    setStudentQuery("");
     setDecisionReference("");
     setBasis("");
     setUntil("");
@@ -1903,15 +1940,25 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             label="Student"
             placeholder="Select a student"
             selectedKey={selectedStudent || null}
-            onSelectionChange={(key) => setSelectedStudent(key ? String(key) : "")}
-            emptyMessage="No student with that name or ID"
+            onSelectionChange={(key) => {
+              setSelectedStudent(key ? String(key) : "");
+              // The field shows the chosen name; with the text controlled here, React Aria leaves that to us.
+              const chosen = students.find((student) => word(student.id) === String(key));
+              if (chosen) setStudentQuery(word(chosen.name));
+            }}
+            inputValue={studentQuery}
+            onInputChange={setStudentQuery}
+            defaultFilter={() => true}
+            emptyMessage="No student with that name or student number"
             isRequired
           >
-            {students.map((student) => (
-              <SelectOption key={word(student.id)} id={word(student.id)} textValue={`${word(student.name)} ${word(student.studentId)} ${word(student.id)}`}>
-                {word(student.name)} · {word(student.studentId, word(student.id))}
-              </SelectOption>
-            ))}
+            {students
+              .filter((student) => word(student.id) === selectedStudent || personMatches(studentQuery, word(student.name), word(student.studentId)))
+              .map((student) => (
+                <SelectOption key={word(student.id)} id={word(student.id)} textValue={word(student.name)}>
+                  {word(student.name)}{word(student.studentId) ? ` · ${word(student.studentId)}` : ""}
+                </SelectOption>
+              ))}
           </ComboBox>
           <CheckboxGroup label="Features" value={selectedFeatures} onChange={setSelectedFeatures}>
             <Checkbox value="post.create">Posting</Checkbox>
@@ -2441,7 +2488,9 @@ function ClearanceList({ page }: { page: PageEnvelope }) {
                         <td>{row.evaluation ? <StatusChip tone={evaluationTone[word(evaluation.status)] ?? "neutral"}>{evaluationText(evaluation)}</StatusChip> : "—"}</td>
                         <td>
                           <ClearanceChip clearance={clearance} />
-                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i}>{word(reason.message)}</li>)}</ul>}
+                          {/* The cycle is named above the table, so a row says only what holds it; the full reason is on hover and on
+                              the student's record (QA 17 November, V3: "Evaluations not finished for ye..." was cut off). */}
+                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i} title={word(reason.message)}>{word(reason.kind) === "evaluation" ? "Evaluation not finished" : word(reason.message)}</li>)}</ul>}
                         </td>
                       </tr>
                     );
@@ -2469,13 +2518,14 @@ export function OversightScreen({ pageId }: { pageId: string }) {
       return search.toString();
     },
   });
-  const page = useQuery(
-    pageQuery(
-      pageId,
-      ["P24", "P34"].includes(pageId) ? recordId : undefined,
-      filters,
-    ),
-  );
+  const record = ["P24", "P34"].includes(pageId) ? recordId : undefined;
+  // A changed filter keeps the page on screen while the new figures load, as PageScreen does. It used to show the
+  // skeleton and rebuild the page, so a date field lost focus after one arrow key (QA 17 November, V3).
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) =>
+      keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  });
   if (page.isPending) return <Skeleton />;
   if (page.isError)
     return page.error instanceof ApiError &&

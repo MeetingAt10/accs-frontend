@@ -1,5 +1,6 @@
 import { canAddRole, fullSectionProblem, sectionLetter, sectionPrefix } from "@/lib/role-rules";
 import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
+import { personMatches } from '@/lib/person-search'
 import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
 import {
@@ -863,6 +864,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState("");
+  const [userQuery, setUserQuery] = useState("");
   const rolesPresent = roles.filter((role) =>
     users.some((user) => strings(user.roles).includes(role)),
   );
@@ -887,7 +889,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
           <Button
             variant="secondary"
             icon="plus"
-            onPress={() => setAssignOpen(true)}
+            onPress={() => { setSelectedUser(""); setUserQuery(""); setAssignOpen(true); }}
           >
             Assign role
           </Button>
@@ -1022,19 +1024,29 @@ function UsersPage({ page }: { page: PageEnvelope }) {
         onOpenChange={setAssignOpen}
       >
         <ModalBody>
-          {/* Type a name or ID (QA 17 November: a long dropdown that said "Select an item", with two scroll bars). */}
+          {/* Type a name or email (QA 17 November: a long dropdown that said "Select an item", with two scroll bars). */}
           <ComboBox
             label="Choose a user"
             placeholder="Select a user"
             selectedKey={selectedUser || null}
-            onSelectionChange={(key) => setSelectedUser(key ? String(key) : "")}
-            emptyMessage="No user with that name or ID"
+            onSelectionChange={(key) => {
+              setSelectedUser(key ? String(key) : "");
+              // The field shows the chosen name; with the text controlled here, React Aria leaves that to us.
+              const chosen = users.find((user) => word(user.id) === String(key));
+              if (chosen) setUserQuery(word(chosen.name));
+            }}
+            inputValue={userQuery}
+            onInputChange={setUserQuery}
+            defaultFilter={() => true}
+            emptyMessage="No user with that name or email"
           >
-            {users.map((user) => (
-              <SelectOption key={word(user.id)} id={word(user.id)} textValue={`${word(user.name)} ${word(user.id)}`}>
-                {word(user.name)} · {word(user.id)}
-              </SelectOption>
-            ))}
+            {users
+              .filter((user) => word(user.id) === selectedUser || personMatches(userQuery, word(user.name), word(user.email), word(user.studentId)))
+              .map((user) => (
+                <SelectOption key={word(user.id)} id={word(user.id)} textValue={word(user.name)}>
+                  {word(user.name)} · {strings(user.roles).map(roleFull).join(", ") || word(user.email)}
+                </SelectOption>
+              ))}
           </ComboBox>
         </ModalBody>
         <ModalActions>

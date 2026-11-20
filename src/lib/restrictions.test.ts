@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { featureWords, filterRestrictions } from './restrictions'
+import { featureWords, filterRestrictions, newestFirst } from './restrictions'
 
 describe('restricted features', () => {
   it('names features in words, not codes', () => {
@@ -24,5 +24,13 @@ describe('filterRestrictions', () => {
     expect(ids('', 'report.anonymous')).toEqual(['b'])
     expect(ids('', '', 'BSIT')).toEqual(['a'])
     expect(ids('ana', '', 'BSCS')).toEqual([])
+  })
+})
+
+describe('newestFirst', () => {
+  it('puts the latest start date first, and a change request by when it was made', () => {
+    const rows = [{ id: 'old', starts: '2026-10-01' }, { id: 'new', starts: '2026-11-18' }, { id: 'mid', at: '2026-11-02T08:00:00.000Z' }]
+    expect(newestFirst(rows).map((row) => row.id)).toEqual(['new', 'mid', 'old'])
+    expect(rows.map((row) => row.id)).toEqual(['old', 'new', 'mid'])
   })
 })
