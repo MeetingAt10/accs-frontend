@@ -103,7 +103,18 @@ export function SitePanel({
 }
 
 /** Avatar button that pops a small account panel (scale-in). */
-export function AccountMenu({ session, links, onSignOut }: { session: Session; links: NavEntry[]; onSignOut: () => void }) {
+export function AccountMenu({
+  session,
+  links,
+  onSignOut,
+  paused,
+}: {
+  session: Session
+  links: NavEntry[]
+  onSignOut: () => void
+  /** The paused-features notice is hidden: a dot on the avatar, and a menu item that shows it again (QA 17 November, V3). */
+  paused?: { onShow: () => void }
+}) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
@@ -122,13 +133,13 @@ export function AccountMenu({ session, links, onSignOut }: { session: Session; l
     }
   }, [open])
   return (
-    <div className="shell-account" ref={root}>
+    <div className="shell-account" ref={root} data-paused={paused ? true : undefined}>
       <button
         type="button"
         className="shell-avatar"
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Account menu, ${session.user.name}`}
+        aria-label={`Account menu, ${session.user.name}${paused ? ', some features paused' : ''}`}
         title={session.user.name}
         onClick={() => setOpen((value) => !value)}
       >
@@ -150,6 +161,12 @@ export function AccountMenu({ session, links, onSignOut }: { session: Session; l
               <span>{session.user.email}</span>
               <span>{session.user.roles.map(roleLabel).join(' · ')}</span>
             </div>
+            {paused && (
+              <button type="button" className="shell-menu__item shell-menu__item--paused" onClick={() => { setOpen(false); paused.onShow() }}>
+                <Icon name="warning-circle" size={16} />
+                Some features paused
+              </button>
+            )}
             {links.map((link) => (
               <NavLink key={link.href} href={link.href} className="shell-menu__item" onNavigate={() => setOpen(false)}>
                 {link.icon && <Icon name={link.icon as never} size={16} />}

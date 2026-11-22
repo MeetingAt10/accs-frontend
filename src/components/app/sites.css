@@ -277,3 +277,30 @@
 @media (prefers-reduced-motion: reduce) {
   .shell-page > .app-page > *, .shell-drawer > *, .shell-denied { animation: none !important; }
 }
+/* The bell is the same size for everyone: a fixed width, titles kept to two lines, and a height cap with the list
+   scrolling inside, so long titles or many notifications never cover half the screen (QA 17 November, V3). */
+.ds-popover:has(.shell-bell__foot) { width: min(24rem, calc(100vw - 32px)); max-height: min(32rem, 70vh); }
+.ds-popover:has(.shell-bell__foot) .ds-next-notification-item__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.ds-popover:has(.shell-bell__foot) .ds-next-notification-item__text { overflow-wrap: anywhere; }
+/* Hide on the paused-features banner, at the end of its row; once hidden, a dot on the avatar marks it (QA 17 November, V3). */
+.shell-banner__hide { margin-inline-start: auto; }
+.shell-account { position: relative; }
+.shell-account[data-paused]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accs-warn);
+  box-shadow: 0 0 0 2px var(--accs-surface);
+  pointer-events: none;
+}
+.shell-menu__item--paused { color: var(--accs-warn); font-weight: 600; }

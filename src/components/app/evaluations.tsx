@@ -2138,6 +2138,17 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const [sent, setSent] = useState(false);
   const action = useEvaluationAction("P32");
   const readOnly = sent || page.data.canReview !== true;
+  // Send review waits until the last question has been on screen, as the note under the questions asks (QA 17 November, V3).
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const endMarker = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const marker = endMarker.current;
+    if (!marker || reachedEnd) return;
+    if (typeof IntersectionObserver === "undefined") return setReachedEnd(true);
+    const observer = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) setReachedEnd(true); });
+    observer.observe(marker);
+    return () => observer.disconnect();
+  }, [reachedEnd, formQuestions.length]);
   // A "Needs change" says why (QA 17 November: it could be sent with no comment).
   const missingWhy = formQuestions.filter((question) => decisions[question.id] === "changes" && !comments[question.id]?.trim()).map((question) => question.id);
 
@@ -2197,34 +2208,29 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         </div>
       )}
       {savedReview ? (
-        <>
-          <Panel flush title="Questions">
-            {formQuestions.map((question, index) => (
+        // Each question with the answer given to it, instead of a history-style list (QA 17 November, V3).
+        <Panel flush title="Your review">
+          {formQuestions.map((question, index) => {
+            const line = recorded[index] ?? "";
+            const answer = line.slice(line.indexOf(": ") + 2);
+            const changes = answer.startsWith("Needs change");
+            const comment = answer.includes(" · ") ? answer.slice(answer.indexOf(" · ") + 3) : "";
+            return (
               <div className="ev-review-q" key={question.id}>
                 <QuestionHead question={question} index={index} />
+                {line ? (
+                  <div className="ev-review-answer">
+                    <StatusChip tone={changes ? "warn" : "ok"}>{changes ? "Needs change" : "Fits my duties"}</StatusChip>
+                    {comment && <p className="ev-comment">{comment}</p>}
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </Panel>
-          <Panel title="Your recorded review">
-            <ol className="accs-timeline">
-              {recorded.map((line, index) => {
-                const split = line.indexOf(": ");
-                return (
-                  <li key={index}>
-                    {split > 0 ? (
-                      <>
-                        <strong>{line.slice(0, split)}</strong>
-                        <p className="ev-comment">{line.slice(split + 2)}</p>
-                      </>
-                    ) : (
-                      <p className="ev-comment">{line}</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </Panel>
-        </>
+            );
+          })}
+          {recorded.length > formQuestions.length || (recorded.length === 1 && !recorded[0]!.includes(": ")) ? (
+            <div className="ev-review-q"><p className="ev-comment">{recorded.join(" ")}</p></div>
+          ) : null}
+        </Panel>
       ) : (
         <Panel flush title="Questions">
           {formQuestions.map((question, index) => (
@@ -2266,13 +2272,14 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
               />
             </section>
           ))}
+          <div ref={endMarker} aria-hidden />
         </Panel>
       )}
       <ActionError error={action.error} />
       {!readOnly && !savedReview && (
         <div className="ev-submitbar">
-          <p>{missingWhy.length ? `Add a comment to each "Needs change" (${missingWhy.length} left).` : "Go through every question, then send."}</p>
-          <Button loading={action.isPending} isDisabled={missingWhy.length > 0} onPress={() => void submit()}>
+          <p>{missingWhy.length ? `Add a comment to each "Needs change" (${missingWhy.length} left).` : reachedEnd ? "Check every question, then send." : "Go through every question to the last one, then send."}</p>
+          <Button loading={action.isPending} isDisabled={missingWhy.length > 0 || !reachedEnd} onPress={() => void submit()}>
             Send review
           </Button>
         </div>
