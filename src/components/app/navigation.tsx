@@ -688,6 +688,7 @@ function Topbar({
   accountLinks,
   onMenu,
   onSignOut,
+  paused,
 }: {
   title: string;
   site: SiteId;
@@ -695,6 +696,7 @@ function Topbar({
   accountLinks: NavEntry[];
   onMenu: () => void;
   onSignOut: () => void;
+  paused?: { onShow: () => void };
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -882,7 +884,7 @@ function Topbar({
               </Stack>
             )}
           </Popover>
-          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
+          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} paused={paused} />
         </div>
       </header>
       <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
@@ -1006,6 +1008,27 @@ export function AppChrome({
     standing.data?.data.record && typeof standing.data.data.record === "object"
       ? (standing.data.data.record as Record<string, unknown>).restrictions
       : undefined;
+  // The banner can be hidden on this device (decided 20 November 2026). It comes back by itself when the restrictions
+  // change, and the avatar keeps a small marker with a menu item that shows it again.
+  const restrictionKey = restricted ? JSON.stringify(session.user.restrictions) : "";
+  const [hiddenKey, setHiddenKey] = useState(() => {
+    try {
+      return window.localStorage.getItem("accs.pausedNoticeHidden") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const bannerHidden = restricted && hiddenKey === restrictionKey;
+  const hideBanner = (hide: boolean) => {
+    const next = hide ? restrictionKey : "";
+    setHiddenKey(next);
+    try {
+      if (next) window.localStorage.setItem("accs.pausedNoticeHidden", next);
+      else window.localStorage.removeItem("accs.pausedNoticeHidden");
+    } catch {
+      // Without storage the choice lasts until the page reloads.
+    }
+  };
 
   useEffect(() => {
     if (theme === "system")
@@ -1043,7 +1066,7 @@ export function AppChrome({
         Skip to main content
       </a>
       <QuickJump session={session} isOpen={jumpOpen} onOpenChange={setJumpOpen} />
-      {restricted && (
+      {restricted && !bannerHidden && (
         <div className="shell-banner" role="status">
           <Badge tone="warning" form="pending">
             Some features paused
@@ -1061,6 +1084,9 @@ export function AppChrome({
               : "Some account features are paused."}
           </span>
           <NavLink href="/standing">View account standing</NavLink>
+          <Button variant="tertiary" size="sm" className="shell-banner__hide" onPress={() => hideBanner(true)}>
+            Hide
+          </Button>
         </div>
       )}
       {signOutAction.isError && (
@@ -1095,6 +1121,7 @@ export function AppChrome({
             accountLinks={menuLinks}
             onMenu={() => setMenuOpen(true)}
             onSignOut={() => void onSignOut()}
+            paused={bannerHidden ? { onShow: () => hideBanner(false) } : undefined}
           />
           <main className="shell-content" id="main-content" tabIndex={-1}>
             <div className="shell-content__inner">

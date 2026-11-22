@@ -4,7 +4,7 @@ import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
-  Checkbox,
+  Field,
   Icon,
   Link,
   PrivacyNotice,
@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Input, TextField as AriaTextField } from "react-aria-components";
 
 import { Empty, PageHeader, Panel, StatusChip } from "@/components/app/page-shell";
 import { Collapse, SlidePills, ease } from "@/components/app/portal-motion";
@@ -314,7 +315,7 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
               ]}
             />
           </Panel>
-          {Boolean(person.officeHours) && (
+          {Boolean(person.officeHours) && !isStudent && (
             <Panel title="Office hours">
               <p className="pa-prose">{word(person.officeHours)}</p>
             </Panel>
@@ -400,6 +401,8 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const [about, setAbout] = useState(word(record.bio));
   const [education, setEducation] = useState(word(record.education));
   const [officeHours, setOfficeHours] = useState(word(record.officeHours));
+  // Students hold no office hours (QA 17 November, V3).
+  const student = strings(record.roles).includes("student");
   // Save once something changed, and never an all-blank profile (QA 17 November).
   const changed = title !== word(record.title) || about !== word(record.bio) || education !== word(record.education) || officeHours !== word(record.officeHours);
   const blank = ![title, about, education, officeHours].some((value) => value.trim());
@@ -433,14 +436,16 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               showCount
             />
           </Panel>
-          <Panel title="Office hours">
-            <TextField
-              label="Office hours"
-              value={officeHours}
-              onChange={setOfficeHours}
-              maxLength={200}
-            />
-          </Panel>
+          {!student && (
+            <Panel title="Office hours">
+              <TextField
+                label="Office hours"
+                value={officeHours}
+                onChange={setOfficeHours}
+                maxLength={200}
+              />
+            </Panel>
+          )}
           <Panel title="Education">
             <TextField
               label="Degree and school"
@@ -633,7 +638,6 @@ const passwordMessages: Record<string, string> = {
 function ChangePasswordPanel() {
   const [current, setCurrent] = useState("");
   // Show or hide all three passwords (testing sheet: there was no way to see what was typed).
-  const [shown, setShown] = useState(false);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string }>();
@@ -677,16 +681,14 @@ function ChangePasswordPanel() {
   return (
     <Panel title="Change password">
       <form className="pa-pw" onSubmit={submit} noValidate>
-        <TextField
+        <PasswordField
           label="Current password"
-          type={shown ? "text" : "password"}
           autoComplete="current-password"
           value={current}
           onChange={setCurrent}
         />
-        <TextField
+        <PasswordField
           label="New password"
-          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={next}
           onChange={setNext}
@@ -697,16 +699,14 @@ function ChangePasswordPanel() {
             <span key={index} data-on={index < score || undefined} />
           ))}
         </div>
-        <TextField
+        <PasswordField
           label="Confirm new password"
-          type={shown ? "text" : "password"}
           autoComplete="new-password"
           value={confirm}
           onChange={setConfirm}
           isInvalid={mismatch}
           errorMessage="The new passwords don't match."
         />
-        <Checkbox isSelected={shown} onChange={setShown}>Show passwords</Checkbox>
         <AnimatePresence initial={false}>
           {message && (
             <motion.p
@@ -937,4 +937,46 @@ export function PeopleAccountScreen({
   if (pageId === "P39") return <MyProfilePage page={page.data} />;
   if (pageId === "P42") return <HelpPage page={page.data} />;
   return <SettingsPage page={page.data} />;
+}
+
+/**
+ * A password with an eye button inside the field that shows or hides it, as on sign-in (QA 17 November, V3: Profile had a
+ * "Show passwords" box instead).
+ */
+function PasswordField({
+  label,
+  description,
+  errorMessage,
+  isInvalid,
+  autoComplete,
+  value,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  errorMessage?: string;
+  isInvalid?: boolean;
+  autoComplete: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <AriaTextField className="ds-field" type={shown ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={onChange} isInvalid={isInvalid}>
+      <Field label={label} description={description} errorMessage={errorMessage}>
+        <div className="ds-input-group pa-pwfield">
+          <Input className="ds-input" />
+          <button
+            type="button"
+            className="ds-input-group__action pa-eye"
+            aria-label={shown ? "Hide password" : "Show password"}
+            aria-pressed={shown}
+            onClick={() => setShown((current) => !current)}
+          >
+            <Icon name={shown ? "eye-slash" : "eye"} size={20} />
+          </button>
+        </div>
+      </Field>
+    </AriaTextField>
+  );
 }

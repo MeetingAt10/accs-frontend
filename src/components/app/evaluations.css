@@ -340,3 +340,5 @@
   .ev-bar > i { animation: none !important; }
   .ev-tab, .rs__opt { transition: none; }
 }
+/* A recorded review: each question with its answer (QA 17 November, V3). */
+.ev-review-answer { display: grid; justify-items: start; gap: 8px; }

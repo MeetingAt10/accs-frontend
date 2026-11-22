@@ -119,3 +119,8 @@
 /* On a filter pill: a dot in the role's color before the name. */
 .pa-role--pill[data-role] { display: inline-flex; align-items: center; gap: 6px; }
 .pa-role--pill[data-role]::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--role); flex: none; }
+/* Password with an eye button inside the field (QA 17 November, V3). No start icon, so the text keeps the usual inset. */
+.pa-pwfield > .ds-input { padding-inline-start: var(--ds-space-16); }
+.pa-eye { display: grid; place-items: center; width: var(--ds-size-control-sm); height: var(--ds-size-control-sm); padding: 0; border: 0; border-radius: var(--ds-radius-control); background: transparent; color: var(--ds-text-secondary); cursor: pointer; }
+.pa-eye:hover { color: var(--ds-text-primary); background: var(--ds-surface-sunken, rgba(0 0 0 / 0.04)); }
+.pa-eye:focus-visible { outline: 2px solid var(--ds-focus, currentColor); outline-offset: 1px; }
