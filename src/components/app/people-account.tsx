@@ -1,8 +1,10 @@
+import { PagedList } from "@/components/app/paging";
 import { PersonAvatar, photoFileProblem, squarePhoto } from '@/components/app/photo'
 import { roleLabelOf } from '@/lib/role-labels'
 import {
   Alert,
   Button,
+  Field,
   Icon,
   Link,
   PrivacyNotice,
@@ -18,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Input, TextField as AriaTextField } from "react-aria-components";
 
 import { Empty, PageHeader, Panel, StatusChip } from "@/components/app/page-shell";
 import { Collapse, SlidePills, ease } from "@/components/app/portal-motion";
@@ -66,9 +69,10 @@ function useAction(pageId: string) {
   });
 }
 
+// Each role has its own color, the same on the Directory filters and on every role tag (QA 19 November).
 const roleTags = (roles: string[]) =>
   roles.map((role) => (
-    <span className="accs-tag pa-role" key={role}>
+    <span className="accs-tag pa-role" data-role={role} key={role}>
       {roleLabelOf(role)}
     </span>
   ));
@@ -87,6 +91,18 @@ function FactRows({ rows }: { rows: [string, ReactNode][] }) {
   );
 }
 
+/**
+ * Which office a person is in, for the Directory filter: by role first, then by the office name. OSAS staff have the
+ * office written out ("Office of Student Affairs and Services"), so matching the word "OSAS" missed them (QA 17 November).
+ */
+function officeOf(person: Record<string, unknown>) {
+  const roles = strings(person.roles)
+  const office = word(person.office).toLowerCase()
+  if (roles.includes("osas") || /osas|student affairs/.test(office)) return "OSAS"
+  if (roles.includes("guidance") || office.includes("guidance")) return "Guidance"
+  return "CCS"
+}
+
 export function DirectoryPage({ page }: { page: PageEnvelope }) {
   const reduce = useReducedMotion();
   const people = items(page.data.people);
@@ -95,14 +111,14 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
   const [program, setProgram] = useState("All");
   const [role, setRole] = useState("All");
   const roleOptions = [...new Set(people.flatMap((person) => strings(person.roles)))];
+  const officeHasPrograms = office === "All" || office === "CCS";
   const visible = people.filter((person) => {
     const text =
       `${word(person.name)} ${word(person.title)} ${word(person.office)} ${word(person.program)} ${word(person.email)} ${strings(person.roles).join(" ")}`.toLowerCase();
     return (
       (!search || text.includes(search.toLowerCase())) &&
-      (office === "All" ||
-        word(person.office).toLowerCase().includes(office.toLowerCase())) &&
-      (program === "All" ||
+      (office === "All" || officeOf(person) === office) &&
+      (program === "All" || officeOf(person) !== "CCS" ||
         word(person.program).toLowerCase().includes(program.toLowerCase())) &&
       (role === "All" || strings(person.roles).includes(role))
     );
@@ -134,9 +150,11 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             <SelectOption id="Guidance">Guidance</SelectOption>
             <SelectOption id="OSAS">OSAS</SelectOption>
           </Select>
+          {/* Guidance and OSAS are not in a program, so the program filter does not apply to them. */}
           <Select
             label="Program"
-            selectedKey={program}
+            selectedKey={officeHasPrograms ? program : "All"}
+            isDisabled={!officeHasPrograms}
             onSelectionChange={(key) => setProgram(String(key))}
           >
             <SelectOption id="All">All programs</SelectOption>
@@ -153,15 +171,17 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             { id: "All", label: "Everyone" },
             ...roleOptions.map((value) => ({
               id: value,
-              label: <span className="pa-role">{roleLabelOf(value)}</span>,
+              label: <span className="pa-role pa-role--pill" data-role={value}>{roleLabelOf(value)}</span>,
             })),
           ]}
         />
       </div>
       {visible.length ? (
+        <PagedList items={visible} size={12} noun="people" resetKey={`${search}|${office}|${program}|${role}`}>
+          {(shown) => (
         <div className="pa-grid">
           <AnimatePresence mode="popLayout">
-            {visible.map((person, index) => (
+            {shown.map((person, index) => (
               <motion.div
                 key={word(person.id)}
                 layout={reduce ? false : "position"}
@@ -191,6 +211,8 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
             ))}
           </AnimatePresence>
         </div>
+          )}
+        </PagedList>
       ) : (
         <Panel>
           <Empty title="No matches">
@@ -204,6 +226,7 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
 
 export function PersonProfile({ page }: { page: PageEnvelope }) {
   const params = useParams({ strict: false }) as Record<string, string>;
+  const router = useRouter();
   const person = object(page.data.record);
   const session = useQuery(sessionQuery());
   const id = Object.values(params).at(-1) ?? "";
@@ -227,9 +250,15 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
     );
   return (
     <div className="accs-stack">
+      {/* Back to where the profile was opened from, like the calendar (QA 17 November: only Directory was offered). */}
       <div>
-        <Button variant="tertiary" size="sm" icon="arrow-left" href="/directory">
-          Directory
+        <Button
+          variant="tertiary"
+          size="sm"
+          icon="arrow-left"
+          onPress={() => (window.history.length > 1 ? router.history.back() : router.history.push("/directory"))}
+        >
+          Back
         </Button>
       </div>
       <ProfileHeader
@@ -286,7 +315,7 @@ export function PersonProfile({ page }: { page: PageEnvelope }) {
               ]}
             />
           </Panel>
-          {Boolean(person.officeHours) && (
+          {Boolean(person.officeHours) && !isStudent && (
             <Panel title="Office hours">
               <p className="pa-prose">{word(person.officeHours)}</p>
             </Panel>
@@ -372,6 +401,11 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   const [about, setAbout] = useState(word(record.bio));
   const [education, setEducation] = useState(word(record.education));
   const [officeHours, setOfficeHours] = useState(word(record.officeHours));
+  // Students hold no office hours (QA 17 November, V3).
+  const student = strings(record.roles).includes("student");
+  // Save once something changed, and never an all-blank profile (QA 17 November).
+  const changed = title !== word(record.title) || about !== word(record.bio) || education !== word(record.education) || officeHours !== word(record.officeHours);
+  const blank = ![title, about, education, officeHours].some((value) => value.trim());
   const roles = strings(record.roles);
   return (
     <div className="accs-stack">
@@ -402,14 +436,16 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               showCount
             />
           </Panel>
-          <Panel title="Office hours">
-            <TextField
-              label="Office hours"
-              value={officeHours}
-              onChange={setOfficeHours}
-              maxLength={200}
-            />
-          </Panel>
+          {!student && (
+            <Panel title="Office hours">
+              <TextField
+                label="Office hours"
+                value={officeHours}
+                onChange={setOfficeHours}
+                maxLength={200}
+              />
+            </Panel>
+          )}
           <Panel title="Education">
             <TextField
               label="Degree and school"
@@ -446,8 +482,10 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
         </Alert>
       )}
       <div className="pa-savebar">
+        {blank && <span className="pa-muted">Fill in at least one field.</span>}
         <Button
           loading={action.isPending}
+          isDisabled={!changed || blank}
           onPress={() =>
             action.mutate({
               action: "saveProfile",
@@ -503,11 +541,8 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
   const faqs = items(page.data.faq);
   const [search, setSearch] = useState("");
-  const visible = faqs.filter((faq) =>
-    `${word(faq.question)} ${word(faq.answer)}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  // Matches the question only (QA 17 November: "report" or "can" also listed questions whose answers mention them).
+  const visible = faqs.filter((faq) => word(faq.question).toLowerCase().includes(search.trim().toLowerCase()));
   const topics = [...new Set(visible.map(topicFor))];
   // Never offer a link to a page this role cannot open.
   const canOpen = (href: string) => {
@@ -520,7 +555,7 @@ export function HelpPage({ page }: { page: PageEnvelope }) {
         title="Help"
         description="Answers on reports, appointments, evaluations, and your account."
         actions={
-          <Button href="/assistant" variant="secondary" icon="chats">
+          <Button href="/assistant" variant="secondary">
             Ask the assistant
           </Button>
         }
@@ -602,6 +637,7 @@ const passwordMessages: Record<string, string> = {
 
 function ChangePasswordPanel() {
   const [current, setCurrent] = useState("");
+  // Show or hide all three passwords (testing sheet: there was no way to see what was typed).
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string }>();
@@ -645,16 +681,14 @@ function ChangePasswordPanel() {
   return (
     <Panel title="Change password">
       <form className="pa-pw" onSubmit={submit} noValidate>
-        <TextField
+        <PasswordField
           label="Current password"
-          type="password"
           autoComplete="current-password"
           value={current}
           onChange={setCurrent}
         />
-        <TextField
+        <PasswordField
           label="New password"
-          type="password"
           autoComplete="new-password"
           value={next}
           onChange={setNext}
@@ -665,9 +699,8 @@ function ChangePasswordPanel() {
             <span key={index} data-on={index < score || undefined} />
           ))}
         </div>
-        <TextField
+        <PasswordField
           label="Confirm new password"
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={setConfirm}
@@ -754,7 +787,7 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
                   "Roles",
                   <span className="pa-tags" key="roles">
                     {roleLabels.map((role) => (
-                      <span className="accs-tag pa-role" key={role}>
+                      <span className="accs-tag pa-role" data-role={role} key={role}>
                         {role}
                         {record.program && ["chair", "student"].includes(role)
                           ? ` · ${word(record.program)}`
@@ -904,4 +937,46 @@ export function PeopleAccountScreen({
   if (pageId === "P39") return <MyProfilePage page={page.data} />;
   if (pageId === "P42") return <HelpPage page={page.data} />;
   return <SettingsPage page={page.data} />;
+}
+
+/**
+ * A password with an eye button inside the field that shows or hides it, as on sign-in (QA 17 November, V3: Profile had a
+ * "Show passwords" box instead).
+ */
+function PasswordField({
+  label,
+  description,
+  errorMessage,
+  isInvalid,
+  autoComplete,
+  value,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  errorMessage?: string;
+  isInvalid?: boolean;
+  autoComplete: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <AriaTextField className="ds-field" type={shown ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={onChange} isInvalid={isInvalid}>
+      <Field label={label} description={description} errorMessage={errorMessage}>
+        <div className="ds-input-group pa-pwfield">
+          <Input className="ds-input" />
+          <button
+            type="button"
+            className="ds-input-group__action pa-eye"
+            aria-label={shown ? "Hide password" : "Show password"}
+            aria-pressed={shown}
+            onClick={() => setShown((current) => !current)}
+          >
+            <Icon name={shown ? "eye-slash" : "eye"} size={20} />
+          </button>
+        </div>
+      </Field>
+    </AriaTextField>
+  );
 }

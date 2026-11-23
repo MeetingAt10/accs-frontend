@@ -1,0 +1,8 @@
+/* The page's background from the very first frame, in the chosen theme (theme-boot.js sets data-theme before this
+   applies), so a refresh in dark mode never flashes white before the app's styles load (QA 19 November). The same
+   colors as --accs-paper (the page background) in theme.css. */
+html { background: #ffffff; color-scheme: light; }
+html[data-theme="dark"] { background: #09090b; color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) { background: #09090b; color-scheme: dark; }
+}

@@ -30,6 +30,7 @@ import {
   TabPanel,
   Tabs,
   TextArea,
+  TextField,
   ViewState,
   toast,
 } from "@meetingat10/design-system/react";
@@ -53,6 +54,8 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { messageFileLink, messageFilePath } from "@/lib/api";
+import { replaceFilters } from "@/lib/url-filters";
 import {
   ConversationList,
   MessageBubble,
@@ -102,6 +105,32 @@ function useCommunicationAction(pageId: string, showToast = true) {
   });
 }
 
+/** Mute a conversation. The switch flips at once and pages refresh in the background, so it can be switched back right away. */
+function MuteSwitch({ conversationId, muted }: { conversationId: string; muted: boolean }) {
+  const queryClient = useQueryClient();
+  const [on, setOn] = useState(muted);
+  useEffect(() => setOn(muted), [muted]);
+  const save = useMutation({
+    mutationFn: (next: boolean) => performPageAction("P12", { action: "muteThread", recordId: conversationId, payload: { muted: next } }),
+    // Only the message pages change. Reloading every page on each toggle sent a burst of requests that failed after a
+    // few quick toggles (QA 17 November).
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["page", "P11"] });
+      void queryClient.invalidateQueries({ queryKey: ["page", "P12"] });
+      toast(result.message, { tone: "success" });
+    },
+    onError: (_error, next) => setOn(!next),
+  });
+  return (
+    <>
+      <Switch isSelected={on} isDisabled={save.isPending} onChange={(next) => { setOn(next); save.mutate(next); }}>
+        Mute this conversation
+      </Switch>
+      <ActionError error={save.error} />
+    </>
+  );
+}
+
 function ActionError({ error }: { error: unknown }) {
   return error ? (
     <Alert tone="danger" title="The change couldn't be saved">
@@ -141,6 +170,31 @@ export function matchesPerson(name: string, input: string) {
   return typed.every((word) => parts.some((part) => part.startsWith(word)))
 }
 
+/**
+ * Puts a picture from a message on the clipboard. Browsers take PNG pictures only, so others are redrawn as PNG first.
+ * Where the browser or the file link does not allow it, the person is pointed to Copy file link.
+ */
+async function copyPicture(threadId: string, messageId: string, fileId: string) {
+  try {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("Clipboard pictures are not supported.");
+    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId))).blob();
+    const png = source.type === "image/png" ? source : await toPng(source);
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    toast("Image copied.");
+  } catch {
+    toast("This browser couldn't copy the image. Use Copy file link instead.");
+  }
+}
+
+async function toPng(picture: Blob) {
+  const bitmap = await createImageBitmap(picture);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not redraw the picture."))), "image/png"));
+}
+
 function MessagesPage({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -160,12 +214,33 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   );
   const [recipientId, setRecipientId] = useState(requestedRecipient);
   const [newBody, setNewBody] = useState("");
+  // A new conversation is with one person or a named group (anyone may start a group, decided 16 November 2026).
+  const [groupMode, setGroupMode] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const canSendNew = groupMode
+    ? Boolean(groupName.trim() && groupIds.length >= 2 && newBody.trim())
+    : Boolean(recipientId && newBody.trim());
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("all");
+  // The tab is in the address, so opening a conversation from Groups stays on Groups (QA 17 November, V3: it jumped to All).
+  const tab = ["direct", "group"].includes(new URLSearchParams(search).get("tab") ?? "") ? new URLSearchParams(search).get("tab")! : "all";
+  const setTab = (next: string) => {
+    const params = new URLSearchParams(search);
+    if (next === "all") params.delete("tab");
+    else params.set("tab", next);
+    replaceFilters(router, router.state.location.pathname, params);
+  };
+  const tabSearch = tab === "all" ? "" : `?tab=${tab}`;
+  const [addingPeople, setAddingPeople] = useState(false);
+  const [newPeople, setNewPeople] = useState<string[]>([]);
   const [body, setBody] = useState("");
   const [memberOpen, setMemberOpen] = useState(false);
   const [reportedMessage, setReportedMessage] = useState<Item>();
   const [reportReason, setReportReason] = useState("");
+  // Editing or deleting one's own message (decided 19 November 2026).
+  const [editedMessage, setEditedMessage] = useState<Item>();
+  const [editText, setEditText] = useState("");
+  const [deletedMessage, setDeletedMessage] = useState<Item>();
   const [earlier, setEarlier] = useState(20);
   const create = useCommunicationAction("P11");
   const action = useCommunicationAction("P12");
@@ -189,6 +264,13 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     roles(member.roles).some((role) => ["guidance", "osas"].includes(role)),
   );
 
+  // "1 min ago" moves on by itself (QA 17 November, V3: the times changed only after a reload).
+  const [, setClock] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   // New messages show without notifications too: muting a conversation must not stop it from updating while open.
   useEffect(() => {
     const timer = window.setInterval(() => void queryClient.invalidateQueries({ queryKey: ["page", page.pageId] }), 15_000);
@@ -207,14 +289,17 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   }, [isThread, conversationId, messages.length, queryClient]);
 
   async function createConversation() {
-    if (!recipientId || !newBody.trim() || create.isPending) return;
+    if (!canSendNew || create.isPending) return;
     try {
-      const result = await create.mutateAsync({
-        action: "createThread",
-        payload: { recipientId, body: newBody.trim() },
-      });
+      const result = await create.mutateAsync(
+        groupMode
+          ? { action: "createGroupThread", payload: { title: groupName.trim(), memberIds: groupIds, body: newBody.trim() } }
+          : { action: "createThread", payload: { recipientId, body: newBody.trim() } },
+      );
       setNewOpen(false);
       setNewBody("");
+      setGroupName("");
+      setGroupIds([]);
       router.history.push(
         "/messages/" + encodeURIComponent(words(object(result.record).id)),
       );
@@ -231,14 +316,39 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   const latestFiles = useRef(pendingFiles);
   latestFiles.current = pendingFiles;
   useEffect(() => () => { for (const file of latestFiles.current) if (file.preview) URL.revokeObjectURL(file.preview); }, []);
-  // A draft belongs to its conversation: opening another one clears the words and files, so they never go to other people.
+  // A draft belongs to its conversation: opening another one shows that conversation's own draft, kept on the server so a
+  // refresh or another device does not lose it (decided 20 November 2026), and never carries words or files to other people.
+  const savedDraft = useRef("");
   useEffect(() => {
-    setBody("");
+    const draft = object(conversation.draft);
+    const files = (Array.isArray(draft.attachments) ? draft.attachments : []).map((file) => object(file) as unknown as MessageFile);
+    setBody(words(draft.body));
     setPendingFiles((current) => {
       for (const file of current) if (file.preview) URL.revokeObjectURL(file.preview);
-      return [];
+      return files.map((file) => ({ key: file.id, name: file.fileName, size: file.size, state: "ready" as const, file }));
     });
+    savedDraft.current = JSON.stringify({ body: words(draft.body), attachments: files.map((file) => file.id) });
+    // Only when the conversation changes: a refresh of the page must not overwrite what is being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+  const draftFiles = pendingFiles.filter((file) => file.state === "ready").map((file) => file.file!);
+  const draftKey = JSON.stringify({ body, attachments: draftFiles.map((file) => file.id) });
+  // A send waits for a draft save already on its way and stops new ones, so a save that lands after the send cannot put
+  // the sent words back as a draft (code review, 23 November 2026).
+  const draftSave = useRef<Promise<unknown>>(Promise.resolve());
+  const sending = useRef(false);
+  useEffect(() => {
+    if (!isThread || !conversationId || draftKey === savedDraft.current) return;
+    const timer = window.setTimeout(() => {
+      if (sending.current) return;
+      savedDraft.current = draftKey;
+      draftSave.current = performPageAction("P12", { action: "saveMessageDraft", recordId: conversationId, payload: { body, attachments: draftFiles } }).catch(() => {
+        savedDraft.current = "";
+      });
+    }, 1000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, conversationId, isThread]);
   function removePendingFile(key: string) {
     setPendingFiles((current) => {
       const gone = current.find((file) => file.key === key);
@@ -246,7 +356,12 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       return current.filter((file) => file.key !== key);
     });
   }
+  // After the file picker closes, focus is still on the attach button, so the first Enter went there and the message
+  // needed a second Enter (QA 17 November). Put the cursor back in the message box.
+  const composerBox = useRef<HTMLDivElement>(null);
+  const focusMessageBox = () => requestAnimationFrame(() => composerBox.current?.querySelector<HTMLElement>("textarea, [contenteditable=true]")?.focus());
   function addFiles(chosen: File[]) {
+    focusMessageBox();
     const room = messageFilesPerMessage - pendingFiles.length;
     if (room <= 0) {
       toast(`Send at most ${messageFilesPerMessage} files at a time.`);
@@ -266,18 +381,23 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   }
 
   async function sendMessage() {
-    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending) return;
+    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending || sending.current) return;
+    sending.current = true;
     try {
+      await draftSave.current;
       await action.mutateAsync({
         action: "sendMessage",
         recordId: words(conversation.id),
         payload: { body: body.trim(), attachments: readyFiles.map((file) => file.file!) },
       });
+      savedDraft.current = JSON.stringify({ body: "", attachments: [] });
       setBody("");
       for (const file of pendingFiles) if (file.preview) URL.revokeObjectURL(file.preview);
       setPendingFiles([]);
     } catch {
       // The composer keeps the entered text and files after an error.
+    } finally {
+      sending.current = false;
     }
   }
 
@@ -297,6 +417,22 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       setReportReason("");
     } catch {
       // The modal keeps the reason after an error.
+    }
+  }
+
+  async function changeMessage(kind: "editMessage" | "deleteMessage") {
+    const target = kind === "editMessage" ? editedMessage : deletedMessage;
+    if (!target || action.isPending) return;
+    try {
+      await action.mutateAsync({
+        action: kind,
+        recordId: words(conversation.id),
+        payload: kind === "editMessage" ? { messageId: words(target.id), body: editText.trim() } : { messageId: words(target.id) },
+      });
+      setEditedMessage(undefined);
+      setDeletedMessage(undefined);
+    } catch {
+      // The dialog stays open with the error and the text.
     }
   }
 
@@ -361,6 +497,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   <ConversationList
                     conversations={threads}
                     currentId={words(conversation.id)}
+                    selfId={session.data?.user.id}
+                    linkSearch={tabSearch}
                   />
                 </TabPanel>
               ))}
@@ -397,23 +535,20 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   <Avatar name={words(conversation.title)} size={36} />
                   <Stack gap={4}>
                     <h2 style={{ margin: 0 }}>{words(conversation.title)}</h2>
+                    {/* A direct chat shows the other person's role, not "2 members" (QA 17 November). */}
                     <span>
-                      {members.length} members ·{" "}
-                      {conversation.kind === "group"
-                        ? "Class group"
-                        : "Direct conversation"}
+                      {conversation.kind === "group" || conversation.groupKind
+                        ? `${members.length} members · ${conversation.groupKind === "people" ? "Group" : "Class group"}`
+                        : [...new Set(members.filter((member) => member.id !== session.data?.user.id).flatMap((member) => roles(member.roles).map(roleLabelOf)))].join(" · ") || "Direct conversation"}
                     </span>
                   </Stack>
                 </Row>
-                <MenuButton
-                  label="Conversation options"
-                  icon="dots-three"
-                  iconOnly
-                  onAction={() => setMemberOpen(true)}
-                >
-                  <MenuItem id="members">Members</MenuItem>
-                  <MenuItem id="mute">Mute</MenuItem>
-                </MenuButton>
+                {/* Members and Mute opened the same panel from a menu: the button opens it directly (QA 17 November, V3). */}
+                <IconButton
+                  icon="users"
+                  label="Members and mute"
+                  onPress={() => setMemberOpen(true)}
+                />
               </Row>
               {officeConversation && (
                 <Alert
@@ -452,7 +587,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                             photo={words(sender.photo)}
                             sender={words(sender.name, "ACCS member")}
                             role={roles(sender.roles).map(roleLabelOf).join(" · ")}
-                            body={message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body)}
+                            body={message.deleted === true ? "Message deleted" : message.underReview === true ? `${words(message.body)}\n\nUnder review. Only you can see this until a moderator reviews it.` : words(message.body) + (message.editedAt ? " (edited)" : "")}
                             at={words(message.at)}
                             own={sender.id === session.data?.user.id}
                             children={
@@ -468,21 +603,39 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                 icon="dots-three"
                                 iconOnly
                                 onAction={(key) => {
+                                  // Copy the words, the picture itself, or a lasting link to the file (QA 17 November, V3: Copy gave
+                                  // only the file name). A browser can put a picture on the clipboard, but not other kinds of file.
+                                  const files = (Array.isArray(message.attachments) ? message.attachments : []).map(object);
                                   if (key === "copy")
                                     void navigator.clipboard
                                       ?.writeText(words(message.body))
                                       .then(() => toast("Message copied."))
-                                      .catch(() =>
-                                        toast(
-                                          "Copy is unavailable in this browser.",
-                                        ),
-                                      );
+                                      .catch(() => toast("Copy is unavailable in this browser."));
+                                  if (key === "copy-image") {
+                                    const picture = files.find((file) => words(file.contentType).startsWith("image/"));
+                                    if (picture) void copyPicture(words(conversation.id), words(message.id), words(picture.id));
+                                  }
+                                  if (key === "copy-link")
+                                    void navigator.clipboard
+                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)), window.location.origin).toString()).join("\n"))
+                                      .then(() => toast(files.length === 1 ? "File link copied. It opens for people in this conversation." : "File links copied. They open for people in this conversation."))
+                                      .catch(() => toast("Copy is unavailable in this browser."));
                                   if (key === "report")
                                     setReportedMessage(message);
+                                  if (key === "edit") {
+                                    setEditText(words(message.body));
+                                    setEditedMessage(message);
+                                  }
+                                  if (key === "delete")
+                                    setDeletedMessage(message);
                                 }}
                               >
-                                <MenuItem id="copy">Copy</MenuItem>
-                                <MenuItem id="report">Report message</MenuItem>
+                                {words(message.body) && <MenuItem id="copy">{Array.isArray(message.attachments) && message.attachments.length ? "Copy text" : "Copy"}</MenuItem>}
+                                {(Array.isArray(message.attachments) ? message.attachments : []).some((file) => words(object(file).contentType).startsWith("image/")) && <MenuItem id="copy-image">Copy image</MenuItem>}
+                                {Array.isArray(message.attachments) && message.attachments.length > 0 && <MenuItem id="copy-link">{message.attachments.length === 1 ? "Copy file link" : "Copy file links"}</MenuItem>}
+                                {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && words(message.body) && <MenuItem id="edit">Edit message</MenuItem>}
+                                {sender.id === session.data?.user.id && message.deleted !== true && message.underReview !== true && <MenuItem id="delete">Delete message</MenuItem>}
+                                {sender.id !== session.data?.user.id && <MenuItem id="report">Report message</MenuItem>}
                               </MenuButton>
                             }
                           />
@@ -497,6 +650,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                 />
               )}
               <ActionError error={action.error} />
+              <div ref={composerBox}>
               <MessageComposer
                 value={body}
                 onChange={setBody}
@@ -512,6 +666,7 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                   .filter((member) => member.id !== session.data?.user.id)
                   .map((member) => ({ id: words(member.id), name: words(member.name) }))}
               />
+              </div>
             </Stack>
           )}
         </section>
@@ -519,26 +674,54 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       <Modal title="New message" isOpen={newOpen} onOpenChange={setNewOpen}>
         <ModalBody>
           <Stack gap={16}>
+            <RadioGroup label="Send to" row value={groupMode ? "group" : "person"} onChange={(value) => setGroupMode(value === "group")}>
+              <Radio value="person">One person</Radio>
+              <Radio value="group">A group</Radio>
+            </RadioGroup>
+            {groupMode && (
+              <TextField label="Group name" value={groupName} onChange={setGroupName} maxLength={80} isRequired description="For example, Capstone team." />
+            )}
             <ComboBox
-              label="To"
+              // In a group, a fresh box after each person is added, so the next search starts empty.
+              key={groupMode ? `add-${groupIds.length}` : "to"}
+              label={groupMode ? "Add people" : "To"}
               placeholder="Search people"
-              description="Type a name, or @ and a name."
+              description={groupMode ? "Add at least two people. Type a name, or @ and a name." : "Type a name, or @ and a name."}
               defaultFilter={matchesPerson}
-              selectedKey={recipientId || null}
-              onSelectionChange={(key) => setRecipientId(String(key ?? ""))}
+              {...(groupMode ? {} : { selectedKey: recipientId || null })}
+              onSelectionChange={(key) => {
+                const id = String(key ?? "");
+                if (!groupMode) setRecipientId(id);
+                else if (id) setGroupIds((current) => (current.includes(id) ? current : [...current, id]));
+              }}
               emptyMessage="No matching recipients"
-              isRequired
+              isRequired={!groupMode}
             >
-              {recipients.map((recipient) => (
-                <SelectOption
-                  id={words(recipient.id)}
-                  key={words(recipient.id)}
-                  textValue={words(recipient.name)}
-                >
-                  {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
-                </SelectOption>
-              ))}
+              {recipients
+                .filter((recipient) => !groupMode || !groupIds.includes(words(recipient.id)))
+                .map((recipient) => (
+                  <SelectOption
+                    id={words(recipient.id)}
+                    key={words(recipient.id)}
+                    textValue={words(recipient.name)}
+                  >
+                    {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
+                  </SelectOption>
+                ))}
             </ComboBox>
+            {groupMode && groupIds.length > 0 && (
+              <ul className="cm-group-people" aria-label="People in the group">
+                {groupIds.map((id) => {
+                  const person = recipients.find((recipient) => words(recipient.id) === id);
+                  return (
+                    <li key={id}>
+                      <span>{words(person?.name, id)}</span>
+                      <IconButton icon="x" size="sm" label={`Remove ${words(person?.name, id)}`} onPress={() => setGroupIds((current) => current.filter((value) => value !== id))} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <TextArea
               label="Message"
               value={newBody}
@@ -557,9 +740,9 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
           <Button
             onPress={() => void createConversation()}
             loading={create.isPending}
-            isDisabled={!recipientId || !newBody.trim()}
+            isDisabled={!canSendNew}
           >
-            Send
+            {groupMode ? "Start group" : "Send"}
           </Button>
         </ModalActions>
       </Modal>
@@ -575,26 +758,93 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
               <Avatar name={words(member.name)} size={32} />
               <Stack gap={4}>
                 <strong>{words(member.name)}</strong>
-                <RoleBadge>{roles(member.roles).join(" · ")}</RoleBadge>
+                <RoleBadge>{roles(member.roles).map(roleLabelOf).join(" · ")}</RoleBadge>
               </Stack>
             </Row>
           ))}
-          <Switch
-            isSelected={conversation.muted === true}
-            onChange={(muted) =>
-              action.mutate({
-                action: "muteThread",
-                recordId: words(conversation.id),
-                payload: { muted },
-              })
-            }
-            isDisabled={action.isPending}
-          >
-            Mute this conversation
-          </Switch>
-          <ActionError error={action.error} />
+          {conversation.canAddMembers === true && (
+            <div>
+              <Button variant="secondary" size="sm" icon="plus" onPress={() => { setNewPeople([]); setAddingPeople(true); }}>
+                Add people
+              </Button>
+            </div>
+          )}
+          <MuteSwitch conversationId={words(conversation.id)} muted={conversation.muted === true} />
         </Stack>
       </Drawer>
+      {/* People join an existing group (QA 17 November, V3: there was no way to add anyone after it started). */}
+      <Modal title="Add people" isOpen={addingPeople} onOpenChange={setAddingPeople}>
+        <ModalBody>
+          <Stack gap={16}>
+            <ComboBox
+              key={`more-${newPeople.length}`}
+              label="Add people"
+              placeholder="Search people"
+              description="They see the conversation from the start."
+              defaultFilter={matchesPerson}
+              onSelectionChange={(key) => { const id = String(key ?? ""); if (id) setNewPeople((current) => (current.includes(id) ? current : [...current, id])); }}
+              emptyMessage="No one else to add"
+            >
+              {recipients
+                .filter((recipient) => !newPeople.includes(words(recipient.id)) && !members.some((member) => words(member.id) === words(recipient.id)))
+                .map((recipient) => (
+                  <SelectOption id={words(recipient.id)} key={words(recipient.id)} textValue={words(recipient.name)}>
+                    {words(recipient.name)} · {roles(recipient.roles).map(roleLabelOf).join(", ")}
+                  </SelectOption>
+                ))}
+            </ComboBox>
+            {newPeople.length > 0 && (
+              <ul className="cm-group-people" aria-label="People to add">
+                {newPeople.map((id) => {
+                  const person = recipients.find((recipient) => words(recipient.id) === id);
+                  return (
+                    <li key={id}>
+                      <span>{words(person?.name, id)}</span>
+                      <IconButton icon="x" size="sm" label={`Remove ${words(person?.name, id)}`} onPress={() => setNewPeople((current) => current.filter((value) => value !== id))} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setAddingPeople(false)}>Cancel</Button>
+          <Button
+            loading={action.isPending}
+            isDisabled={!newPeople.length}
+            onPress={() => action.mutate({ action: "addGroupMembers", recordId: words(conversation.id), payload: { memberIds: newPeople } }, { onSuccess: () => setAddingPeople(false) })}
+          >
+            Add
+          </Button>
+        </ModalActions>
+      </Modal>
+      <Modal title="Edit message" isOpen={Boolean(editedMessage)} onOpenChange={(open) => { if (!open) setEditedMessage(undefined); }}>
+        <ModalBody>
+          <Stack gap={16}>
+            <TextArea label="Message" value={editText} onChange={setEditText} maxLength={4000} isRequired />
+            <p className="cm-hint">Everyone in the conversation sees that it was edited.</p>
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setEditedMessage(undefined)}>Cancel</Button>
+          <Button onPress={() => void changeMessage("editMessage")} loading={action.isPending} isDisabled={!editText.trim() || editText.trim() === words(editedMessage?.body)}>Save</Button>
+        </ModalActions>
+      </Modal>
+      <Modal title="Delete this message?" isOpen={Boolean(deletedMessage)} onOpenChange={(open) => { if (!open) setDeletedMessage(undefined); }}>
+        <ModalBody>
+          <Stack gap={16}>
+            <p>It is removed for everyone in the conversation, with its files. The conversation shows "Message deleted" in its place. This can't be undone.</p>
+            <ActionError error={action.error} />
+          </Stack>
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setDeletedMessage(undefined)}>Cancel</Button>
+          <Button variant="destructive" onPress={() => void changeMessage("deleteMessage")} loading={action.isPending}>Delete</Button>
+        </ModalActions>
+      </Modal>
       <Modal
         title="Report this message"
         isOpen={Boolean(reportedMessage)}
@@ -634,6 +884,36 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
         </ModalActions>
       </Modal>
     </Stack>
+  );
+}
+
+/** A notice that has no page of its own to open (it pointed at Notifications itself), so opening it shows its message. */
+export const noticeHasPage = (pageId: string) => Boolean(pageId) && pageId !== "P40";
+
+/** The message a notice shows when opened. Older notices only said "Open this update"; say what they were about. */
+export function noticeMessage(notice: Item) {
+  const body = words(notice.body);
+  if (body && !body.startsWith("Open this update")) return body;
+  if (words(notice.kind) === "moderation")
+    return "A reviewer made a decision on something you posted. If it was kept, it shows as before; if it was removed, it no longer shows. Ask the CCS office if you have questions.";
+  return "There is nothing more to open for this update.";
+}
+
+/**
+ * Shows a notice that has no page to open (QA 19 November: "Content review update" did nothing when clicked, because it
+ * pointed at the Notifications page itself).
+ */
+export function NoticeDialog({ notice, onClose }: { notice?: Item; onClose: () => void }) {
+  return (
+    <Modal title={words(notice?.title, "Update")} isOpen={Boolean(notice)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <ModalBody>
+        <p className="cm-notice-body">{notice ? noticeMessage(notice) : ""}</p>
+        {notice?.at ? <p className="cm-hint">{new Date(words(notice.at)).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</p> : null}
+      </ModalBody>
+      <ModalActions>
+        <Button onPress={onClose}>Close</Button>
+      </ModalActions>
+    </Modal>
   );
 }
 
@@ -744,6 +1024,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
     );
   });
 
+  const [shownNotice, setShownNotice] = useState<Item>();
   async function openNotice(notice: Item) {
     setRestrictedSource(false);
     try {
@@ -753,6 +1034,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
         payload: {},
       });
       const source = object(result.record);
+      if (!noticeHasPage(words(source.pageId))) return setShownNotice(notice);
       router.history.push(
         notificationHref(words(source.pageId), words(source.recordId)),
       );
@@ -764,6 +1046,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
 
   return (
     <div className="accs-stack">
+      <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
       <Heading
         title="Notifications"
         description={
@@ -843,6 +1126,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const reduce = useReducedMotion();
   const scroller = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState("");
+  const askBox = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const proposed = suggestions ?? [
     "What can you help me with?",
@@ -956,12 +1240,17 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                 type="button"
                 className="accs-pill"
                 key={prompt}
-                onClick={() => setQuestion(prompt)}
+                onClick={() => {
+                  setQuestion(prompt);
+                  // The cursor goes to the question, so Enter sends it (QA 17 November: Enter pressed the prompt again).
+                  requestAnimationFrame(() => askBox.current?.querySelector<HTMLElement>("textarea, [contenteditable=true]")?.focus());
+                }}
               >
                 {prompt}
               </button>
             ))}
           </div>
+          <div ref={askBox}>
           <MessageComposer
             label="Question for the assistant"
             value={question}
@@ -970,6 +1259,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
             isPending={action.isPending}
             maxLength={2000}
           />
+          </div>
           {/* TBD(D-08): assistant provider data handling and log retention require approval. */}
           <div className="cm-chat__note">
             <small>

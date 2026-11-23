@@ -78,6 +78,9 @@ describe('site access by role', () => {
     expect(canOpenPath(student, '/records')).toBe(false)
     expect(canOpenPath(student, '/feed')).toBe(true)
     expect(canOpenPath(student, '/no-such-page')).toBe(false)
+    // Search is open to everyone signed in; the API limits the results.
+    expect(canOpenPath(student, '/search')).toBe(true)
+    expect(canOpenPath(sessionFor('administrator'), '/search?q=case')).toBe(true)
     expect(canOpenPath(sessionFor('administrator'), '/admin/users')).toBe(true)
   })
 

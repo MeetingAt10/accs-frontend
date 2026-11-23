@@ -6,7 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { ApiError, type PageEnvelope } from '@/lib/api'
 import { formatDate, initials, relativeTime } from '@/lib/format'
 import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
-import { pageQuery, sessionQuery } from '@/lib/queries'
+import { keepFilteredPage, pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { CommunityHeader, dashboardStats, isCommunityRole } from '@/components/app/community-home'
@@ -213,7 +213,8 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
                   {events.map((item, index) => {
                     const time = [clock(item.start), clock(item.end)].filter(Boolean).join(' – ')
                     return (
-                      <Entry key={text(item.id, 'event-' + index)} lead={<DateTile value={item.date} />} href="/calendar">
+                      // An appointment schedule opens Appointments, not the calendar (QA 17 November).
+                      <Entry key={text(item.id, 'event-' + index)} lead={<DateTile value={item.date} />} href={/appoint|consult/i.test(`${text(item.title)} ${text(item.category)} ${text(item.kind)}`) && allow('/consultations') ? '/consultations' : '/calendar'}>
                         <p className="pt-row__title">{text(item.title, 'Campus event')}</p>
                         <Sub>
                           {time && <span className="pt-time">{time}</span>}
@@ -229,12 +230,15 @@ function DashboardPanel({ data, role, lead, intro }: { data: Item; role: string;
               <Panel flush title="Announcements" action={<PanelLink href="/feed">View feed</PanelLink>}>
                 <Rows>
                   {announcements.map((item, index) => {
-                    const urgent = text(item.priority) === 'high'
+                    // Urgent and Important show their own colored tag beside a blue Announcement tag (QA 19 November).
+                    const priority = text(item.priority)
                     return (
                       <Entry key={text(item.id, 'announcement-' + index)} href={text(item.id) ? '/feed/' + encodeURIComponent(text(item.id)) : '/feed'}>
                         <p className="pt-row__title">{text(item.title, 'Announcement')}</p>
                         <Sub>
-                          <StatusChip tone={urgent ? 'warn' : 'neutral'}>{urgent ? 'Priority' : text(item.label, 'Announcement')}</StatusChip>
+                          <StatusChip tone="info">{text(item.label, 'Announcement')}</StatusChip>
+                          {(priority === 'urgent' || priority === 'high') && <StatusChip tone="danger">Urgent</StatusChip>}
+                          {priority === 'important' && <StatusChip tone="warn">Important</StatusChip>}
                           {nameOf(item.author, text(item.source)) && <span>{nameOf(item.author, text(item.source))}</span>}
                           {text(item.at, text(item.date)) && <span>{relativeTime(item.at ?? item.date)}</span>}
                         </Sub>
@@ -503,7 +507,14 @@ export function PageScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>
   const recordId = Object.values(params).at(-1)
   const filters = useRouterState({ select: (state) => state.location.searchStr.slice(1) })
-  const page = useQuery(pageQuery(pageId, pageId === 'P03' ? undefined : recordId, filters))
+  const record = pageId === 'P03' ? undefined : recordId
+  // Typing in a search box or changing a filter only changes `filters`: keep showing the page while the new results load.
+  // It used to swap the whole page for "Loading page" on every key, which also threw away the search box. Another page
+  // or record still starts from the loading state.
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  })
   return (
     <RequirePermission pageId={pageId}>
       <div className="app-page">

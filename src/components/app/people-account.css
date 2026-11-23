@@ -98,3 +98,29 @@
 .pa-msg svg { flex: none; margin-top: 2px; }
 
 @media (prefers-reduced-motion: reduce) { .pa-toolbar { animation: none; } }
+
+/* One color per role, on the Directory filters and on role tags (QA 19 November: all tags looked the same). */
+.pa-role[data-role] { --role: var(--accs-muted); }
+.pa-role[data-role="student"] { --role: #16a34a; }
+.pa-role[data-role="organization"] { --role: #ea580c; }
+.pa-role[data-role="professor"] { --role: #2563eb; }
+.pa-role[data-role="chair"] { --role: #7c3aed; }
+.pa-role[data-role="dean"] { --role: #b45309; }
+.pa-role[data-role="administrator"] { --role: #475569; }
+.pa-role[data-role="guidance"] { --role: #0d9488; }
+.pa-role[data-role="osas"] { --role: #dc2626; }
+.pa-role[data-role="secretary"] { --role: #db2777; }
+.pa-role[data-role="staff"] { --role: #0891b2; }
+.accs-tag.pa-role[data-role] {
+  border-color: color-mix(in srgb, var(--role) 45%, transparent);
+  background: color-mix(in srgb, var(--role) 12%, transparent);
+  color: color-mix(in srgb, var(--role) 80%, var(--accs-ink));
+}
+/* On a filter pill: a dot in the role's color before the name. */
+.pa-role--pill[data-role] { display: inline-flex; align-items: center; gap: 6px; }
+.pa-role--pill[data-role]::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--role); flex: none; }
+/* Password with an eye button inside the field (QA 17 November, V3). No start icon, so the text keeps the usual inset. */
+.pa-pwfield > .ds-input { padding-inline-start: var(--ds-space-16); }
+.pa-eye { display: grid; place-items: center; width: var(--ds-size-control-sm); height: var(--ds-size-control-sm); padding: 0; border: 0; border-radius: var(--ds-radius-control); background: transparent; color: var(--ds-text-secondary); cursor: pointer; }
+.pa-eye:hover { color: var(--ds-text-primary); background: var(--ds-surface-sunken, rgba(0 0 0 / 0.04)); }
+.pa-eye:focus-visible { outline: 2px solid var(--ds-focus, currentColor); outline-offset: 1px; }

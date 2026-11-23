@@ -1,9 +1,18 @@
+import { campusYears, canAddRole, sectionPrefix, sectionProblem } from "@/lib/role-rules";
+import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
+import { personMatches } from '@/lib/person-search'
 import { roleLabelOf } from '@/lib/role-labels'
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
   Button,
   Checkbox,
+  ComboBox,
+  Drawer,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   CheckboxGroup,
   Icon,
   Link,
@@ -50,6 +59,7 @@ import {
   type Role,
 } from "@/lib/api";
 import {
+  formatDate,
   formatDateTime,
   initials,
   relativeTime,
@@ -310,6 +320,18 @@ const DECISIONS: Record<string, string> = {
   remove: "Content removed",
   warn: "Removed, author warned",
   refer: "Referred to the CCS Secretary",
+  dismiss: "Flag dismissed, content shown again",
+  osas: "Sent to OSAS",
+};
+
+/** How each decision reads as a choice; the API says which ones the reader may make (decided 19 November 2026). */
+const DECISION_CHOICES: Record<string, { label: string; description?: string }> = {
+  keep: { label: "Keep, no action" },
+  remove: { label: "Remove content" },
+  warn: { label: "Remove and warn the author" },
+  refer: { label: "Refer to the CCS Secretary", description: "The CCS Secretary dismisses the flag or sends it to OSAS." },
+  dismiss: { label: "Dismiss the flag", description: "The content is shown again. Nothing else happens." },
+  osas: { label: "Send to OSAS", description: "OSAS reviews it and decides. The content stays hidden until then." },
 };
 
 /* ---------- P48 Permission matrix ---------- */
@@ -320,6 +342,18 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
   const matrix = items(page.data.permissionMatrix);
   const proposals = object(page.data.permissionProposals);
   const proposalList = Object.entries(proposals);
+  // Requests wait for the CCS Secretary, who approves or rejects each one; an approved change applies (decided 20 November 2026).
+  const requests = items(page.data.permissionRequests);
+  const decisions = items(page.data.permissionDecisions);
+  const [deciding, setDeciding] = useState<{ key: string; decision: "approve" | "reject"; words: string }>();
+  const [decisionReason, setDecisionReason] = useState("");
+  const decide = () => {
+    if (!deciding || !decisionReason.trim()) return;
+    action.mutate(
+      { action: "decidePermission", payload: { key: deciding.key, decision: deciding.decision }, reason: decisionReason },
+      { onSuccess: () => { setDeciding(undefined); setDecisionReason(""); } },
+    );
+  };
   const [reason, setReason] = useState("");
   const [pendingCell, setPendingCell] = useState<{
     role: Role;
@@ -343,8 +377,38 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Permissions" })}
         title="Permission matrix"
-        description="Propose a change to what a role can do. CCS reviews each proposal."
+        description="Propose a change to what a role can do. The CCS Secretary approves each request before it applies."
       />
+      {requests.length > 0 && (
+        <Panel title="Waiting for approval">
+          <ul className="adm-requests">
+            {requests.map((request) => {
+              const key = word(request.key);
+              const words = proposalWords(roleFull(word(request.role)), word(request.permission), request.allowed === true);
+              return (
+                <li key={key} className="adm-request">
+                  <div className="adm-request__text">
+                    <strong>{words}</strong>
+                    <span className="acct-muted">
+                      {word(request.proposedBy)}
+                      {request.proposedAt ? ` · ${formatDate(request.proposedAt)}` : ""}
+                      {request.reason ? ` · ${word(request.reason)}` : ""}
+                    </span>
+                  </div>
+                  {request.canDecide === true ? (
+                    <div className="adm-request__actions">
+                      <Button size="sm" variant="secondary" onPress={() => setDeciding({ key, decision: "reject", words })}>Reject</Button>
+                      <Button size="sm" onPress={() => setDeciding({ key, decision: "approve", words })}>Approve</Button>
+                    </div>
+                  ) : (
+                    <span className="acct-muted">{page.data.canReviewPermissions === true ? "Someone else decides your own request." : "Waiting for the CCS Secretary."}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
       <div className="accs-stack accs-stack--tight">
         <Note>
           Role changes take effect at the next sign-in. This matrix does not
@@ -385,7 +449,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               </th>
               {roles.map((role) => (
                 <th scope="col" key={role} title={roleFull(role)}>
-                  <span className="adm-matrix__role">{roleShort(role)}</span>
+                  <span className="adm-matrix__role">{roleFull(role)}</span>
                 </th>
               ))}
             </tr>
@@ -396,23 +460,25 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               const group = permission.split(".")[0] ?? "";
               const previous = word(matrix[index - 1]?.key).split(".")[0];
               const granted = strings(entry.roles);
+              const locked = entry.locked === true;
               return (
                 <Fragment key={permission}>
                   {(index === 0 || group !== previous) && (
                     <tr className="adm-matrix__group">
                       <th scope="rowgroup" colSpan={roles.length + 1}>
-                        {group}
+                        {permissionGroup(permission)}
                       </th>
                     </tr>
                   )}
                   <tr>
                     <th scope="row" className="adm-matrix__perm">
+                      <span className="adm-matrix__human">
+                        {permissionLabel(permission)}
+                      </span>
                       <span className="adm-matrix__key accs-mono">
                         {permission}
                       </span>
-                      <span className="adm-matrix__human">
-                        {cap(permission.replace(/[._]/g, " "))}
-                      </span>
+                      {locked && <span className="adm-matrix__locked">Fixed: cannot be changed by a request</span>}
                     </th>
                     {roles.map((role) => {
                       const proposed = proposals[`${role}:${permission}`];
@@ -425,7 +491,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                           <MatrixCell
                             on={effective}
                             proposed={hasProposal}
-                            label={`${roleFull(role)}: ${permission}, ${
+                            locked={locked}
+                            label={`${roleFull(role)}: ${permissionLabel(permission)}, ${
                               effective ? "allowed" : "no access"
                             }${hasProposal ? " (proposed)" : ""}. Propose a change`}
                             onPress={() =>
@@ -475,15 +542,19 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                     <motion.li
                       key={key}
                       layout={!reduce}
-                      className="adm-proposed__chip"
                       initial={reduce ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={{ duration: 0.25, ease: EASE }}
                     >
-                      {roleShort(role)} ·{" "}
-                      <span className="accs-mono">{rest.join(":")}</span>
-                      <b>{value ? "allow" : "remove"}</b>
+                      {/* Opens that change, so it can be reviewed or reversed from here. */}
+                      <button
+                        type="button"
+                        className="adm-proposed__chip"
+                        onClick={() => setPendingCell({ role: role as Role, permission: rest.join(":"), allowed: !value })}
+                      >
+                        {proposalWords(roleFull(role), rest.join(":"), Boolean(value))}
+                      </button>
                     </motion.li>
                   );
                 })}
@@ -495,8 +566,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               )}
             </ul>
             <p className="adm-proposed__note">
-              CCS reviews each proposal. Approved changes apply at each
-              person's next sign-in.
+              The CCS Secretary approves or rejects each request. An approved
+              change applies at each person's next page load.
             </p>
           </motion.aside>
         )}
@@ -510,9 +581,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       >
         <ModalBody>
           <p>
-            {pendingCell?.allowed ? "Allow" : "Remove"}{" "}
-            <strong>{pendingCell?.role}</strong> access to{" "}
-            <strong>{pendingCell?.permission}</strong>.
+            <strong>{pendingCell ? proposalWords(roleFull(pendingCell.role), pendingCell.permission, pendingCell.allowed) : ""}</strong>.
+            The CCS Secretary approves the request before it applies.
           </p>
           <TextArea
             label="Reason"
@@ -535,6 +605,47 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
+      <Modal
+        title={deciding?.decision === "approve" ? "Approve this change?" : "Reject this change?"}
+        isOpen={Boolean(deciding)}
+        onOpenChange={(open) => { if (!open) setDeciding(undefined); }}
+      >
+        <ModalBody>
+          <p>
+            <strong>{deciding?.words}</strong>.{" "}
+            {deciding?.decision === "approve" ? "It applies to everyone with that role at their next page load." : "Nothing changes."}
+          </p>
+          <TextArea label="Reason" isRequired value={decisionReason} onChange={setDecisionReason} maxLength={1000} />
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" onPress={() => setDeciding(undefined)}>Cancel</Button>
+          <Button loading={action.isPending} isDisabled={!decisionReason.trim()} onPress={decide}>
+            {deciding?.decision === "approve" ? "Approve" : "Reject"}
+          </Button>
+        </ModalActions>
+      </Modal>
+      {decisions.length > 0 && (
+        <Panel title="Recent decisions">
+          <ul className="adm-requests">
+            {decisions.slice(0, 5).map((entry, index) => {
+              const key = word(entry.key);
+              const role = key.slice(0, key.indexOf(":"));
+              const permission = key.slice(key.indexOf(":") + 1);
+              return (
+                <li key={key + index} className="adm-request">
+                  <div className="adm-request__text">
+                    <strong>{proposalWords(roleFull(role), permission, entry.allowed === true)}</strong>
+                    <span className="acct-muted">
+                      {word(entry.decision)} by {word(entry.by)}{entry.at ? ` · ${formatDate(entry.at)}` : ""}{entry.reason ? ` · ${word(entry.reason)}` : ""}
+                    </span>
+                  </div>
+                  <StatusChip tone={entry.decision === "Approved" ? "ok" : "neutral"}>{word(entry.decision)}</StatusChip>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
     </div>
   );
 }
@@ -542,15 +653,25 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
 function MatrixCell({
   on,
   proposed,
+  locked = false,
   label,
   onPress,
 }: {
   on: boolean;
   proposed: boolean;
+  locked?: boolean;
   label: string;
   onPress: () => void;
 }) {
   const reduce = useReducedMotion();
+  if (locked)
+    return (
+      <span className="adm-cell" data-on={on} data-locked aria-label={label.replace(/\. Propose a change$/, ". Fixed")}>
+        <span className="adm-cell__glyph">
+          <Icon name={on ? "check" : "minus"} size={16} weight={on ? "bold" : "regular"} />
+        </span>
+      </span>
+    );
   return (
     <motion.button
       type="button"
@@ -585,7 +706,8 @@ function MatrixCell({
 
 /* ---------- Service status ---------- */
 
-export function SystemStatus({ status }: { status: Item }) {
+/** Service status. On the overview it links to Monitoring (testing sheet, P45: the numbers led nowhere). */
+export function SystemStatus({ status, linked = false }: { status: Item; linked?: boolean }) {
   const api = word(status.api, "Unknown");
   const storage = word(status.storage, "Unknown");
   const rows: Array<{
@@ -622,7 +744,7 @@ export function SystemStatus({ status }: { status: Item }) {
     },
   ];
   return (
-    <Panel flush title="Service status">
+    <Panel flush title="Service status" action={linked ? <Link variant="standalone" href="/admin/monitoring">Open monitoring</Link> : undefined}>
       <ul className="adm-rows">
         {rows.map((row) => (
           <li key={row.name}>
@@ -811,7 +933,7 @@ function AdminOverview({ page }: { page: PageEnvelope }) {
         </Panel>
       </div>
       <div className="adm-cols">
-        <SystemStatus status={status} />
+        <SystemStatus status={status} linked />
         <Panel flush title="Accounts by role">
           {adoption.length ? (
             <Meters
@@ -839,6 +961,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState("");
+  const [userQuery, setUserQuery] = useState("");
   const rolesPresent = roles.filter((role) =>
     users.some((user) => strings(user.roles).includes(role)),
   );
@@ -858,12 +981,12 @@ function UsersPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Users" })}
         title="Users and roles"
-        description="Role changes take effect at the next sign-in and go in the audit trail."
+        description="Role changes take effect at the next sign-in and go in the audit trail. Only the System Administrator and the CCS Secretary see this list; students and staff never see each other's roles here."
         actions={
           <Button
             variant="secondary"
             icon="plus"
-            onPress={() => setAssignOpen(true)}
+            onPress={() => { setSelectedUser(""); setUserQuery(""); setAssignOpen(true); }}
           >
             Assign role
           </Button>
@@ -998,17 +1121,30 @@ function UsersPage({ page }: { page: PageEnvelope }) {
         onOpenChange={setAssignOpen}
       >
         <ModalBody>
-          <Select
+          {/* Type a name or email (QA 17 November: a long dropdown that said "Select an item", with two scroll bars). */}
+          <ComboBox
             label="Choose a user"
+            placeholder="Select a user"
             selectedKey={selectedUser || null}
-            onSelectionChange={(key) => setSelectedUser(String(key))}
+            onSelectionChange={(key) => {
+              setSelectedUser(key ? String(key) : "");
+              // The field shows the chosen name; with the text controlled here, React Aria leaves that to us.
+              const chosen = users.find((user) => word(user.id) === String(key));
+              if (chosen) setUserQuery(word(chosen.name));
+            }}
+            inputValue={userQuery}
+            onInputChange={setUserQuery}
+            defaultFilter={() => true}
+            emptyMessage="No user with that name or email"
           >
-            {users.map((user) => (
-              <SelectOption key={word(user.id)} id={word(user.id)}>
-                {word(user.name)} · {word(user.id)}
-              </SelectOption>
-            ))}
-          </Select>
+            {users
+              .filter((user) => word(user.id) === selectedUser || personMatches(userQuery, word(user.name), word(user.email), word(user.studentId)))
+              .map((user) => (
+                <SelectOption key={word(user.id)} id={word(user.id)} textValue={word(user.name)}>
+                  {word(user.name)} · {strings(user.roles).map(roleFull).join(", ") || word(user.email)}
+                </SelectOption>
+              ))}
+          </ComboBox>
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setAssignOpen(false)}>
@@ -1097,9 +1233,16 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
     Array.isArray(record.roles) ? (record.roles as Role[]) : [],
   );
   const [program, setProgram] = useState(word(record.program));
+  // A student's section is campus + program + year + letter, like SBIT4K (decided 20 November 2026): the year level is
+  // chosen here (QA 17 November, V3: "SBITK" had no year), and only the letter is typed.
+  const campus = word(record.campus, "SB");
+  const [year, setYear] = useState(word(record.year));
   const [section, setSection] = useState(word(record.section));
+  const prefix = sectionPrefix({ campus, program, year });
+  const sectionError = sectionProblem(section);
+  const isStudent = selectedRoles.includes("student");
+  const studentIncomplete = isStudent && (!year || !section.trim());
   const [reason, setReason] = useState("");
-  const audit = items(page.data.audit);
   if (!record.id)
     return (
       <ViewState
@@ -1142,29 +1285,57 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Role changes apply at the next sign-in. The current session keeps
               its roles. The audit trail records this change.
             </Note>
+            {/* At most two roles; a student may also be a CCS student organization representative (decided 20 November 2026).
+                The checkboxes are the only way to add a role: an "Add role" button did the same (QA 17 November, V3). */}
             <CheckboxGroup
               label="Assigned roles"
+              description="At most two roles, like Dean and professor. A student can also be a CCS student organization representative, and nothing else."
               value={selectedRoles}
               onChange={(next) => setSelectedRoles(next as Role[])}
             >
               {roles.map((role) => (
-                <Checkbox key={role} value={role}>
+                <Checkbox key={role} value={role} isDisabled={!canAddRole(selectedRoles, role)}>
                   {roleFull(role)}
                 </Checkbox>
               ))}
             </CheckboxGroup>
             <div className="adm-form__grid">
-              <TextField
+              <Select
                 label="Program"
-                value={program}
-                onChange={setProgram}
-              />
-              <TextField
-                label="Section"
-                value={section}
-                onChange={setSection}
-              />
+                selectedKey={program || "none"}
+                onSelectionChange={(key) => setProgram(key === "none" ? "" : String(key))}
+              >
+                <SelectOption id="none">No program</SelectOption>
+                <SelectOption id="BSIT">BSIT</SelectOption>
+                <SelectOption id="BSCS">BSCS</SelectOption>
+                <SelectOption id="BSIS">BSIS</SelectOption>
+              </Select>
+              {isStudent && (
+                <Select
+                  label="Year level"
+                  placeholder="Select a year"
+                  selectedKey={year || null}
+                  onSelectionChange={(key) => setYear(key ? String(key) : "")}
+                  description={campus === "SB" ? undefined : "This campus teaches 1st and 2nd year only."}
+                >
+                  {campusYears(campus).map((level) => (
+                    <SelectOption key={level} id={String(level)}>{`${level}${["st", "nd", "rd", "th"][level - 1]} year`}</SelectOption>
+                  ))}
+                </Select>
+              )}
+              {isStudent && (
+                <TextField
+                  label="Section letter"
+                  placeholder="A"
+                  value={section}
+                  onChange={(value) => setSection(value.toUpperCase())}
+                  maxLength={3}
+                  isInvalid={Boolean(sectionError)}
+                  errorMessage={sectionError}
+                />
+              )}
             </div>
+            {isStudent && <p className="acct-muted">Section name: {prefix}{section.trim() || "A"}</p>}
             <TextArea
               label="Reason"
               isRequired
@@ -1180,7 +1351,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
             <div className="adm-form__actions">
               <Button
                 loading={action.isPending}
-                isDisabled={!selectedRoles.length || !reason.trim()}
+                isDisabled={!selectedRoles.length || !reason.trim() || Boolean(sectionError) || studentIncomplete}
                 onPress={() =>
                   action.mutate({
                     action: "updateRoles",
@@ -1188,7 +1359,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                     payload: {
                       roles: selectedRoles,
                       ...(program ? { program } : {}),
-                      ...(section ? { section } : {}),
+                      ...(isStudent ? { year: Number(year), section: section.trim() } : {}),
                     },
                     reason,
                   })
@@ -1207,7 +1378,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 ["Email", word(record.email, "—")],
                 ["Roles", <Tags values={strings(record.roles)} />],
                 ["Program", word(record.program, "—")],
-                ["Section", word(record.section, "—")],
+                ["Section", word(record.sectionName, word(record.section, "—"))],
                 ["Office", word(record.office, "—")],
                 ["Title", word(record.title, "—")],
               ]}
@@ -1231,32 +1402,10 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               Manage restrictions
             </Button>
           </Panel>
-          <Panel title="Recent activity">
-            {audit.length ? (
-              <ol className="accs-timeline">
-                {audit.map((entry, index) => (
-                  <li key={word(entry.id, String(index))}>
-                    <div className="adm-timeline-body">
-                      <strong>{word(entry.action)}</strong>
-                      <span>
-                        {word(object(entry.actor).name, "System")} ·{" "}
-                        {word(entry.module)}
-                      </span>
-                      {entry.reason ? <span>{word(entry.reason)}</span> : null}
-                      <span className="accs-timeline__time accs-mono">
-                        {formatDateTime(entry.at)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <Empty title="No recorded activity">
-                Role changes and account events for this person show up here.
-                Sign-in history isn't recorded.
-              </Empty>
-            )}
-          </Panel>
+          {/* Recent activity listed every entry for the person and grew too long (QA 19 November); it lives in the audit trail. */}
+          <Button variant="tertiary" size="sm" href="/admin/audit">
+            See activity in the audit trail
+          </Button>
         </div>
       </div>
     </div>
@@ -1281,7 +1430,7 @@ function ModerationQueue({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Moderation" })}
         title="Moderation"
-        description="A flag is not proof of a violation. Read the context before you decide."
+        description="A flag is not proof of a violation. Read the context before you decide. Only reviewers see flagged items; the author is not told who flagged them, and the person who flagged is not told the outcome."
       />
       <div className="accs-toolbar adm-toolbar">
         <Pills
@@ -1399,12 +1548,13 @@ function ModerationReview({
   page: PageEnvelope;
   itemId: string;
 }) {
-  const secretaryRole = useQuery(sessionQuery()).data?.user.roles ?? [];
-  // The CCS Secretary decides referred items; only moderators refer.
-  const secretary = secretaryRole.includes("secretary") && !secretaryRole.includes("administrator");
   const record = object(page.data.record);
   const action = useAction("P50");
-  const [decision, setDecision] = useState("keep");
+  // The decisions this reader may make now: a moderator on a pending item, the CCS Secretary on a referred one (dismiss
+  // or send to OSAS), OSAS on one sent to it. Before, the panel showed only on pending items, so the Secretary could only read.
+  const decisions = (Array.isArray(page.data.decisions) ? page.data.decisions : []).map(String).filter((key) => key in DECISION_CHOICES);
+  const [decision, setDecision] = useState("");
+  const chosenDecision = decisions.includes(decision) ? decision : decisions[0] ?? "";
   const [reason, setReason] = useState("");
   const [notifyAuthor, setNotifyAuthor] = useState(true);
   if (!record.id)
@@ -1415,7 +1565,6 @@ function ModerationReview({
         description="It may not exist or may no longer be visible."
       />
     );
-  const userReport = record.source === "User";
   const messages = items(page.data.messages);
   const post = object(page.data.post);
   const history = items(record.history);
@@ -1437,17 +1586,35 @@ function ModerationReview({
           <Panel title="Flagged content">
             <div className="adm-context">
               {messages.length ? (
-                messages.map((message) => (
-                  <div key={word(message.id)}>
-                    <blockquote className="adm-quote">
-                      {word(message.body)}
-                    </blockquote>
-                    <p className="adm-quote__by">
-                      {word(object(message.author).name, "Community member")} ·{" "}
-                      {formatDateTime(message.at)}
-                    </p>
-                  </div>
-                ))
+                // The flagged message with the messages around it; the flagged one is marked (QA 17 November).
+                <ol className="adm-thread" aria-label="Conversation around the flagged message">
+                  {messages.map((message) => (
+                    <li key={word(message.id)} className="adm-bubble" data-flagged={message.flagged === true || undefined}>
+                      {message.flagged === true && <span className="adm-bubble__tag">Flagged</span>}
+                      <p className="adm-bubble__body">{word(message.body, message.deleted ? "Message deleted" : "")}</p>
+                      <p className="adm-quote__by">
+                        {word(object(message.author).name, "Community member")} · {formatDateTime(message.at)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : record.itemType === "comment" && items(post.comments).length ? (
+                <div className="accs-stack">
+                  {word(post.title) && <p className="accs-row__title">{word(post.title)}</p>}
+                  <p className="adm-quote__by">{word(post.body)}</p>
+                  <ol className="adm-thread" aria-label="Comments on the post">
+                    {items(post.comments).map((comment) => {
+                      const flagged = word(comment.id) === word(record.itemId);
+                      return (
+                        <li key={word(comment.id)} className="adm-bubble" data-flagged={flagged || undefined}>
+                          {flagged && <span className="adm-bubble__tag">Flagged</span>}
+                          <p className="adm-bubble__body">{word(comment.body)}</p>
+                          <p className="adm-quote__by">{word(object(comment.author).name, "Community member")} · {formatDateTime(comment.at)}</p>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
               ) : (
                 <div>
                   {word(post.title) && (
@@ -1467,30 +1634,19 @@ function ModerationReview({
               </Note>
             </div>
           </Panel>
-          {status === "Pending" && (
+          {decisions.length > 0 && (
             <Panel title="Decision">
               <div className="adm-form">
                 <RadioGroup
                   label="Decision"
-                  value={decision}
+                  value={chosenDecision}
                   onChange={setDecision}
                 >
-                  <Radio value="keep" card>
-                    Keep, no action
-                  </Radio>
-                  <Radio value="remove" card>
-                    Remove content
-                  </Radio>
-                  <Radio value="warn" card>
-                    Remove and warn the author
-                  </Radio>
-                  {!secretary && (
-                    <Radio value="refer" card isDisabled={!userReport} description="The CCS Secretary reviews it and decides.">
-                      {userReport
-                        ? "Refer to the CCS Secretary"
-                        : "Refer to the CCS Secretary (user reports only)"}
+                  {decisions.map((key) => (
+                    <Radio key={key} value={key} card description={DECISION_CHOICES[key]!.description}>
+                      {DECISION_CHOICES[key]!.label}
                     </Radio>
-                  )}
+                  ))}
                 </RadioGroup>
                 <TextArea
                   label="Reason"
@@ -1515,7 +1671,7 @@ function ModerationReview({
                       action.mutate({
                         action: "moderate",
                         recordId: itemId,
-                        payload: { decision, notifyAuthor },
+                        payload: { decision: chosenDecision, notifyAuthor },
                         reason,
                       })
                     }
@@ -1558,7 +1714,7 @@ function ModerationReview({
               <li>
                 <div className="adm-timeline-body">
                   <strong>
-                    Flagged{userReport ? " by a community member" : " by filter"}
+                    Flagged{record.source === "User" ? " by a community member" : " by filter"}
                   </strong>
                   <span>{word(record.reason, "No reason given")}</span>
                   <span className="accs-timeline__time accs-mono">
@@ -1604,6 +1760,8 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
   const telemetry = items(page.data.telemetry);
   const recent = telemetry.slice(-10).reverse();
   const peak = Math.max(1, ...trend.map((row) => Number(row.value ?? 0)));
+  const [tab, setTab] = useState("status");
+  const [openTiming, setOpenTiming] = useState<Item>();
   return (
     <div className="accs-stack accs-stagger adm">
       <PageHeader
@@ -1621,6 +1779,14 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
           />
         ))}
       </Kpis>
+      {/* Tabs (testing sheet, P52): status and activity, response times, incidents. */}
+      <Tabs selectedKey={tab} onSelectionChange={(key) => setTab(String(key))}>
+        <TabList aria-label="Monitoring views">
+          <Tab id="status">Status and activity</Tab>
+          <Tab id="timings">Response times</Tab>
+          <Tab id="incidents">Incidents</Tab>
+        </TabList>
+        <TabPanel id="status">
       <div className="adm-cols">
         <SystemStatus status={object(page.data.systemStatus)} />
         <Panel flush title="Assistant sessions per day">
@@ -1659,23 +1825,32 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
           )}
         </Panel>
       </div>
-      <div className="adm-cols">
+        </TabPanel>
+        <TabPanel id="timings">
         <Panel flush title="Recent response times">
           {recent.length ? (
-            <Meters
-              rows={recent.map((entry) => ({
-                label: formatDateTime(entry.at),
-                value: Number(entry.durationMs ?? 0),
-                display: `${word(entry.durationMs, "0")} ms`,
-                tone: entry.success ? undefined : "danger",
-              }))}
-            />
+            <ul className="adm-rows">
+              {recent.map((entry, index) => (
+                <li key={index}>
+                  {/* Each answer opens its details: no conversation text is kept, only timing and result. */}
+                  <button type="button" className="adm-row adm-row--button" onClick={() => setOpenTiming(entry)}>
+                    <div>
+                      <p className="adm-row__title">{word(entry.durationMs, "0")} ms</p>
+                      <p className="adm-row__sub">{entry.success ? "Answered" : "Failed"} · {word(entry.category, "assistant")}</p>
+                    </div>
+                    <Time value={entry.at} />
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : (
             <Empty title="No timings recorded">
               The last 10 assistant answers show up here.
             </Empty>
           )}
         </Panel>
+        </TabPanel>
+        <TabPanel id="incidents">
         <Panel flush title="Incidents">
           {incidents.length ? (
             <ul className="adm-rows">
@@ -1699,7 +1874,22 @@ export function SystemMonitoring({ page }: { page: PageEnvelope }) {
             </Empty>
           )}
         </Panel>
-      </div>
+        </TabPanel>
+      </Tabs>
+      <Drawer title="Assistant answer" isOpen={Boolean(openTiming)} onOpenChange={(open) => { if (!open) setOpenTiming(undefined); }}>
+        {openTiming && (
+          <dl className="adm-entry">
+            {([
+              ["Time", formatDateTime(openTiming.at)],
+              ["Response time", `${word(openTiming.durationMs, "0")} ms`],
+              ["Result", openTiming.success ? "Answered" : "Failed"],
+              ["Kind", word(openTiming.category, "assistant")],
+            ] as Array<[string, string]>).map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        )}
+      </Drawer>
     </div>
   );
 }
@@ -1716,6 +1906,9 @@ const AUDIT_MODULES = [
 ];
 const AUDIT_ACTIONS = [
   "Role assignment changed",
+  "Restriction extended",
+  "Restriction shortened",
+  "Restriction change declined",
   "Permission change proposed",
   "Restriction applied",
   "Restriction lifted",
@@ -1733,6 +1926,9 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [pageIndex, setPageIndex] = useState(0);
+  const [openEntry, setOpenEntry] = useState<Item>();
+  // From after To is not a range (QA 17 November): say so and leave the dates out of the filter.
+  const backwards = Boolean(from && to && from > to);
   const reset =
     <T,>(set: (value: T) => void) =>
     (value: T) => {
@@ -1746,8 +1942,8 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
       (!query || text.includes(query.toLowerCase())) &&
       (module === "All" || word(row.module) === module) &&
       (actionFilter === "All" || word(row.action) === actionFilter) &&
-      (!from || word(row.at).slice(0, 10) >= from) &&
-      (!to || word(row.at).slice(0, 10) <= to)
+      (backwards || !from || word(row.at).slice(0, 10) >= from) &&
+      (backwards || !to || word(row.at).slice(0, 10) <= to)
     );
   });
   const pages = Math.max(1, Math.ceil(filtered.length / AUDIT_PAGE));
@@ -1809,12 +2005,16 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
             label="From"
             value={from}
             onChange={reset(setFrom)}
+            isInvalid={backwards}
+            errorMessage={backwards ? "Choose a date on or before the To date." : undefined}
           />
           <TextField
             type="date"
             label="To"
             value={to}
             onChange={reset(setTo)}
+            isInvalid={backwards}
+            errorMessage={backwards ? "Choose a date on or after the From date." : undefined}
           />
         </div>
       </div>
@@ -1835,7 +2035,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
               </thead>
               <tbody>
                 {shown.map((entry, index) => (
-                  <tr key={word(entry.id, String(start + index))}>
+                  <tr key={word(entry.id, String(start + index))} className="adm-row" onClick={() => setOpenEntry(entry)}>
                     <td data-label="Time">
                       <Time value={entry.at} />
                     </td>
@@ -1920,6 +2120,24 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
           </Empty>
         </div>
       )}
+      <Drawer title="Audit entry" isOpen={Boolean(openEntry)} onOpenChange={(open) => { if (!open) setOpenEntry(undefined); }}>
+        {openEntry && (
+          <dl className="adm-entry">
+            {([
+              ["Time", formatDateTime(openEntry.at)],
+              ["Actor", word(object(openEntry.actor).name, "System")],
+              ["Action", word(openEntry.action, "—")],
+              ["Module", word(openEntry.module, "—")],
+              ["Reference", word(openEntry.reference, "—")],
+              ["Purpose", word(openEntry.purpose, "—")],
+              ["Reason", word(openEntry.reason, "—")],
+              ["Result", word(openEntry.result, "—")],
+            ] as Array<[string, string]>).map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+            ))}
+          </dl>
+        )}
+      </Drawer>
     </div>
   );
 }
@@ -1951,10 +2169,13 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     ),
   );
   const session = useQuery(sessionQuery());
-  // Moderation pages are also the Secretary's, for referred items; the rest of administration is the administrator's.
+  // Moderation pages are also the Secretary's, for referred items, and so are Users and roles and Permissions, where she
+  // changes roles and approves permission requests (decided 20 November 2026); the rest of administration is the administrator's.
+  const has = (key: string) => session.data?.permissions.includes(key) === true;
   const roleAllowed =
     session.data?.user.roles.includes("administrator") === true ||
-    (["P49", "P50"].includes(pageId) && session.data?.permissions.includes("moderation.referral") === true);
+    (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some(has)) ||
+    (["P46", "P47", "P48"].includes(pageId) && has("role.manage"));
   if (session.isPending || page.isPending)
     return (
       <div

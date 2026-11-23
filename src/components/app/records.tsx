@@ -1,3 +1,5 @@
+import { featureLabels, filterRestrictions, newestFirst, type RestrictionFilters } from "@/lib/restrictions";
+import { campusToday } from "@/lib/campus-date";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -5,6 +7,9 @@ import {
   Button,
   Checkbox,
   CheckboxGroup,
+  ComboBox,
+  DatePicker,
+  Drawer,
   Icon,
   Link,
   Modal,
@@ -21,7 +26,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
   Empty,
@@ -42,7 +47,10 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { personMatches } from "@/lib/person-search";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
+import { replaceFilters } from "@/lib/url-filters";
+import { TypedSearch, typingPause } from "@/components/app/typed-search";
 
 import "./records.css";
 
@@ -63,7 +71,7 @@ const word = (value: unknown, fallback = "") =>
 const firstRole = (value: unknown, fallback = "Office not recorded") =>
   Array.isArray(value) ? word(value[0], fallback) : fallback;
 const features = (restriction: Item) =>
-  Array.isArray(restriction.features) ? restriction.features.map(String) : [];
+  Array.isArray(restriction.features) ? restriction.features.map((code) => featureLabels[String(code)] ?? String(code)) : [];
 const isPaused = (standing: unknown) =>
   /paused|restrict/i.test(word(standing));
 const hasRestrictions = (student: Item) =>
@@ -388,7 +396,8 @@ export function RestrictionPanel({
   restrictions: Item[];
   title?: string;
 }) {
-  const ordered = [...restrictions].sort(
+  // Active first, then newest first.
+  const ordered = newestFirst(restrictions).sort(
     (left, right) =>
       Number(right.active === true) - Number(left.active === true),
   );
@@ -766,7 +775,20 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 /* ---------- Analytics ---------- */
 
 const stages = ["adviser", "chair", "dean", "guidance", "osas"];
+/** Office names for case stages ("Chair" and "Osas" read as typos; QA 17 November, V3). */
+const stageOffice: Record<string, string> = { adviser: "Adviser", chair: "Program Chair", dean: "Dean", guidance: "Guidance Office", osas: "OSAS" };
+/** Case analytics periods: days back from today, counting today. */
+const analyticsPeriods = [
+  { id: "7", label: "Last 7 days" },
+  { id: "30", label: "Last 30 days" },
+  { id: "90", label: "Last 90 days" },
+  { id: "365", label: "Last 12 months" },
+];
+const daysAgo = (days: number) => campusToday().subtract({ days: days - 1 }).toString();
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+/** Severity colors in analytics: High red, Medium yellow, Low green (QA 19 November). */
+const analyticsSeverityTone: Record<string, "danger" | "warn" | "ok" | undefined> = { high: "danger", medium: "warn", low: "ok" };
 
 function Analytics({ page }: { page: PageEnvelope }) {
   const router = useRouter();
@@ -776,19 +798,58 @@ function Analytics({ page }: { page: PageEnvelope }) {
   const stats = items(page.data.stats);
   const stageRows = items(page.data.byStage);
   const categories = items(page.data.byCategory);
+  const severities = items(page.data.bySeverity);
   const trend = items(page.data.trend);
   const waiting = items(page.data.waitingByStage);
-  const cases = items(page.data.cases);
+  // Newest first: the cases a reader is looking for are usually the recent ones (oldest came first before).
+  const cases = items(page.data.cases).sort((a, b) => word(b.createdAt ?? b.at).localeCompare(word(a.createdAt ?? a.at)));
   const updateFilter = (name: string, value: string) => {
     const next = new URLSearchParams(location.searchStr);
     if (value) next.set(name, value);
     else next.delete(name);
-    router.history.replace(
-      location.pathname + (next.size ? "?" + next.toString() : ""),
-    );
+    replaceFilters(router, location.pathname, next);
   };
   const filtered = [...search.keys()].length > 0;
+  // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
+  const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
+  const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  // Arrow keys in a date field change it once per press: apply the range after a short pause, not on every press
+  // (QA 17 November: each press loaded the page again).
+  const rangeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(rangeTimer.current), []);
+  const changeRange = (name: "from" | "to", value: string) => {
+    const next = { from: search.get("from") ?? "", to: search.get("to") ?? "", ...rangeDraft, [name]: value };
+    setRangeDraft(next);
+    clearTimeout(rangeTimer.current);
+    if (next.from && next.to && next.from > next.to) { setRangeProblem(name); return; }
+    setRangeProblem("");
+    rangeTimer.current = setTimeout(() => {
+      setRangeDraft({});
+      // Both dates in one change of address: two updateFilter calls would each start from the old address.
+      const params = new URLSearchParams(router.state.location.searchStr);
+      for (const key of ["from", "to"] as const) {
+        if (next[key]) params.set(key, next[key]);
+        else params.delete(key);
+      }
+      replaceFilters(router, router.state.location.pathname, params);
+    }, typingPause);
+  };
   const program = search.get("program") ?? "All";
+  const from = search.get("from") ?? "";
+  const to = search.get("to") ?? "";
+  const periodKey = !from && !to ? "all" : analyticsPeriods.find((period) => !to && from === daysAgo(Number(period.id)))?.id ?? "custom";
+  const choosePeriod = (key: string) => {
+    if (key === "custom") return;
+    clearTimeout(rangeTimer.current);
+    setRangeDraft({});
+    setRangeProblem("");
+    const params = new URLSearchParams(router.state.location.searchStr);
+    params.delete("period");
+    params.delete("to");
+    if (key === "all") params.delete("from");
+    else params.set("from", daysAgo(Number(key)));
+    replaceFilters(router, router.state.location.pathname, params);
+  };
   return (
     <Screen
       header={
@@ -800,7 +861,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
             filtered ? (
               <Button
                 variant="secondary"
-                onPress={() => router.history.replace(location.pathname)}
+                onPress={() => replaceFilters(router, location.pathname, new URLSearchParams())}
               >
                 Clear filters
               </Button>
@@ -811,7 +872,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
     >
       <div className="accs-toolbar rc-toolbar rc-toolbar--fields" role="search">
         <div className="accs-grow">
-          <Search
+          <TypedSearch
             label="Search by case reference"
             placeholder="Case reference"
             size="sm"
@@ -829,6 +890,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                 { id: "All", label: "All" },
                 { id: "BSIT", label: "BSIT" },
                 { id: "BSCS", label: "BSCS" },
+                { id: "BSIS", label: "BSIS" },
               ]}
             />
           </FilterField>
@@ -843,7 +905,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           <SelectOption id="All">All stages</SelectOption>
           {stages.map((stage) => (
             <SelectOption key={stage} id={stage}>
-              {cap(stage)}
+              {stageOffice[stage]}
             </SelectOption>
           ))}
         </Select>
@@ -866,28 +928,41 @@ function Analytics({ page }: { page: PageEnvelope }) {
             </SelectOption>
           ))}
         </Select>
+        {/* Real ranges instead of the placeholder "Available period" and "No matching period" (QA 17 November, V3). A
+            preset fills From and To; dates typed by hand show as a custom range. */}
         <Select
           label="Period"
-          selectedKey={search.get("period") ?? "current"}
-          onSelectionChange={(key) =>
-            updateFilter("period", String(key) === "current" ? "" : String(key))
-          }
+          selectedKey={periodKey}
+          onSelectionChange={(key) => choosePeriod(String(key))}
         >
-          <SelectOption id="current">Available period</SelectOption>
-          <SelectOption id="none">No matching period</SelectOption>
+          <SelectOption id="all">Any time</SelectOption>
+          {analyticsPeriods.map((period) => (
+            <SelectOption key={period.id} id={period.id}>
+              {period.label}
+            </SelectOption>
+          ))}
+          {periodKey === "custom" && <SelectOption id="custom">Custom range</SelectOption>}
         </Select>
+        {/* A range that ends before it starts is not applied: the field says why instead. From and To share a row
+            aligned at the top, so the message under one no longer pushes the other out of line (QA 17 November, V3). */}
+        <div className="rc-range">
         <TextField
           type="date"
           label="From"
-          value={search.get("from") ?? ""}
-          onChange={(value) => updateFilter("from", value)}
+          value={rangeDraft.from ?? search.get("from") ?? ""}
+          onChange={(value) => changeRange("from", value)}
+          isInvalid={rangeProblem === "from"}
+          errorMessage={rangeProblem === "from" ? "Choose a date on or before the To date." : undefined}
         />
         <TextField
           type="date"
           label="To"
-          value={search.get("to") ?? ""}
-          onChange={(value) => updateFilter("to", value)}
+          value={rangeDraft.to ?? search.get("to") ?? ""}
+          onChange={(value) => changeRange("to", value)}
+          isInvalid={rangeProblem === "to"}
+          errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
         />
+        </div>
       </div>
       <Kpis label="Case counts">
         {stats.map((stat) => (
@@ -910,6 +985,19 @@ function Analytics({ page }: { page: PageEnvelope }) {
             }))}
           />
         </Panel>
+        {severities.length > 0 && (
+          <Panel title="Cases by severity">
+            <BarChart
+              title="Cases by severity"
+              hideTitle
+              data={severities.map((row) => ({
+                label: word(row.label),
+                value: Number(row.value ?? 0),
+                tone: analyticsSeverityTone[word(row.severity)],
+              }))}
+            />
+          </Panel>
+        )}
         <Panel title="Category counts">
           <BarChart
             title="Category counts"
@@ -969,6 +1057,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                   <tr>
                     <th scope="col">Reference</th>
                     <th scope="col">Stage</th>
+                    <th scope="col">Severity</th>
                     <th scope="col">Status</th>
                     <th scope="col">Opened</th>
                   </tr>
@@ -986,7 +1075,12 @@ function Analytics({ page }: { page: PageEnvelope }) {
                         </Link>
                       </td>
                       <td>
-                        {cap(word(entry.stage, "—"))}
+                        {stageOffice[word(entry.stage)] ?? cap(word(entry.stage, "—"))}
+                      </td>
+                      <td>
+                        {analyticsSeverityTone[word(entry.severity)] ? (
+                          <StatusChip tone={analyticsSeverityTone[word(entry.severity)]}>{cap(word(entry.severity))}</StatusChip>
+                        ) : "—"}
                       </td>
                       <td>
                         <StatusChip tone={toneFor(word(entry.status))}>
@@ -1023,7 +1117,10 @@ function RecordList({ page }: { page: PageEnvelope }) {
   const [standing, setStanding] = useState("All");
   const [restricted, setRestricted] = useState(false);
   const session = useQuery(sessionQuery());
-  const role = session.data?.user.roles[0];
+  // The role that decides the scope, whatever order the roles are stored in (QA 17 November: a Chair stored as
+  // professor first was shown "Students under OSAS authority" and every program).
+  const roles = session.data?.user.roles ?? [];
+  const role = ["chair", "dean", "guidance", "osas"].find((candidate) => roles.includes(candidate as never));
   const scope =
     role === "chair"
       ? `${word(session.data?.user.program)} program`
@@ -1032,9 +1129,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         : role === "guidance"
           ? "Students in Guidance cases"
           : "Students under OSAS authority";
-  const programs = [
-    ...new Set(students.map((student) => word(student.program)).filter(Boolean)),
-  ].sort();
+  // Every CCS program for readers who see the whole college (BSIS was missing while no BSIS student was listed); a
+  // Program Chair sees only their program, so they get no program filter.
+  const programs = role === "chair"
+    ? []
+    : [...new Set(["BSIT", "BSCS", "BSIS", ...students.map((student) => word(student.program)).filter(Boolean)])];
+  const [sort, setSort] = useState("name");
   const needle = search.trim().toLowerCase();
   const matching = students.filter(
     (student) =>
@@ -1047,6 +1147,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
           ? isPaused(student.standing)
           : !isPaused(student.standing))) &&
       (!restricted || hasRestrictions(student)),
+  ).sort((a, b) =>
+    sort === "id" ? word(a.studentId).localeCompare(word(b.studentId))
+      : sort === "program" ? `${word(a.program)} ${word(a.section)}`.localeCompare(`${word(b.program)} ${word(b.section)}`) || word(a.name).localeCompare(word(b.name))
+        : sort === "restricted" ? Number(hasRestrictions(b)) - Number(hasRestrictions(a)) || word(a.name).localeCompare(word(b.name))
+          : word(a.name).localeCompare(word(b.name)),
   );
   const filtered = Boolean(needle) || program !== "All" || standing !== "All" || restricted;
   const reset = () => {
@@ -1112,6 +1217,12 @@ function RecordList({ page }: { page: PageEnvelope }) {
         >
           Has restriction
         </button>
+        <Select label="Sort by" selectedKey={sort} onSelectionChange={(key) => setSort(String(key))}>
+          <SelectOption id="name">Name, A to Z</SelectOption>
+          <SelectOption id="id">Student ID</SelectOption>
+          <SelectOption id="program">Program and section</SelectOption>
+          <SelectOption id="restricted">Restricted first</SelectOption>
+        </Select>
       </div>
       <p className="rc-count" aria-live="polite">
         {matching.length} of {students.length}{" "}
@@ -1165,7 +1276,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
                         <td>
                           <span className="rc-tags">
                             <span className="accs-tag">{word(student.program, "—")}</span>
-                            <span className="rc-muted">Section {word(student.section, "—")}</span>
+                            <span className="rc-muted">{word(student.sectionName, "Section " + word(student.section, "—"))}</span>
                           </span>
                         </td>
                         <td>
@@ -1464,7 +1575,7 @@ function StudentRecord({
             <span className="accs-meta">
               <span className="accs-mono">{word(record.studentId, "—")}</span>
               <span className="accs-tag">{word(record.program, "—")}</span>
-              <span>Section {word(record.section, "—")}</span>
+              <span>{word(record.sectionName, "Section " + word(record.section, "—"))}</span>
               <span>Year {word(record.year, "—")}</span>
             </span>
           }
@@ -1504,7 +1615,7 @@ function StudentRecord({
                 <Facts
                   rows={[
                     ["Program", word(record.program, "—")],
-                    ["Section", word(record.section, "—")],
+                    ["Section", word(record.sectionName, word(record.section, "—"))],
                     ["Year", word(record.year, "—")],
                     ["Standing", <StandingBadge standing={record.standing} />],
                   ]}
@@ -1553,41 +1664,89 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const panelId = useId();
   const userRoles = session.data?.user.roles ?? [];
   const admin = userRoles.includes("administrator");
+  const canRefer = userRoles.includes("guidance") || userRoles.includes("osas");
   const action = useAction("P35");
   const students = items(page.data.students);
   const restrictions = items(page.data.restrictions);
-  const referrals = items(page.data.referrals);
+  // Waiting requests first; a request is done once the administrator acts on it or on that student's restrictions.
+  const isDone = (request: Record<string, unknown>) => word(request.status) !== "Awaiting administrator review";
+  const referrals = items(page.data.referrals).sort((a, b) => Number(isDone(a)) - Number(isDone(b)));
+  const waitingRequests = referrals.filter((request) => !isDone(request)).length;
   const [tab, setTab] = useState("active");
+  const [filters, setFilters] = useState<RestrictionFilters>({ q: "", feature: "", program: "" });
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [studentQuery, setStudentQuery] = useState("");
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [decisionReference, setDecisionReference] = useState("");
   const [basis, setBasis] = useState("");
   const [until, setUntil] = useState("");
+  const [notifyStudent, setNotifyStudent] = useState(true);
   const [reason, setReason] = useState("");
   const [applyOpen, setApplyOpen] = useState(false);
   const [confirmId, setConfirmId] = useState("");
+  // The side panels: one restriction, or one change request.
+  const [openId, setOpenId] = useState("");
+  const [openRequestId, setOpenRequestId] = useState("");
+  const [newEnd, setNewEnd] = useState("");
+  const [changeReason, setChangeReason] = useState("");
+  const [declineReason, setDeclineReason] = useState("");
+  const [requesting, setRequesting] = useState(false);
+  const opened = restrictions.find((restriction) => word(restriction.id) === openId);
+  const openedRequest = referrals.find((request) => word(request.id) === openRequestId);
   const active = restrictions.filter((restriction) => restriction.active === true);
   const ended = restrictions.filter((restriction) => restriction.active !== true);
+  const shown = filterRestrictions(tab === "ended" ? ended : active, filters);
+  const shownRequests = filterRestrictions(referrals, { ...filters, feature: "" });
+  // Each new restriction starts from an empty form (QA 17 November: it was filled with the last one).
+  const resetApply = () => {
+    setSelectedStudent("");
+    setSelectedFeatures([]);
+    setStudentQuery("");
+    setDecisionReference("");
+    setBasis("");
+    setUntil("");
+    setNotifyStudent(true);
+    setReason("");
+  };
+  const openApply = () => {
+    resetApply();
+    action.reset();
+    setApplyOpen(true);
+  };
+  const openRestriction = (id: string) => {
+    setNewEnd("");
+    setChangeReason("");
+    setRequesting(false);
+    action.reset();
+    setOpenRequestId("");
+    setOpenId(id);
+  };
+  const studentLink = (student: Item) =>
+    admin ? `/admin/users/${encodeURIComponent(word(student.id))}` : `/records?q=${encodeURIComponent(word(student.name))}`;
   const submitApply = () =>
     action.mutate(
       {
         action: "applyRestriction",
-        payload: {
-          studentId: selectedStudent,
-          features: selectedFeatures,
-          decisionReference,
-          basis,
-          until,
-        },
+        payload: { studentId: selectedStudent, features: selectedFeatures, decisionReference, basis, until, notifyStudent },
         reason: reason || basis,
       },
       {
         onSuccess: () => {
           setApplyOpen(false);
-          setReason("");
+          resetApply();
         },
       },
     );
+  // Apply what a change request asked for: lift the student's active restriction, or open it to change its end date.
+  const applyRequested = (request: Item) => {
+    const target = active.find((restriction) => word(object(restriction.student).id) === word(request.studentId));
+    if (!target) return;
+    setOpenRequestId("");
+    if (word(request.change) === "Lift") {
+      setReason(word(request.reason));
+      setConfirmId(word(target.id));
+    } else openRestriction(word(target.id));
+  };
   return (
     <Screen
       header={
@@ -1601,11 +1760,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                 ? "Students in Guidance cases"
                 : "Students under OSAS authority"
           }
-          actions={
-            admin ? (
-              <Button onPress={() => setApplyOpen(true)}>Apply restriction</Button>
-            ) : undefined
-          }
+          actions={admin ? <Button onPress={openApply}>Apply restriction</Button> : undefined}
         />
       }
     >
@@ -1614,6 +1769,17 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
         academic information, the assistant, and permitted professor messages
         stay available.
       </Note>
+      <div className="rc-filters">
+        <TypedSearch label="Search students" placeholder="Search name or ID" size="sm" value={filters.q} onChange={(q) => setFilters((current) => ({ ...current, q }))} />
+        <Select label="Feature" selectedKey={filters.feature || "all"} onSelectionChange={(key) => setFilters((current) => ({ ...current, feature: key === "all" ? "" : String(key) }))}>
+          <SelectOption id="all">All features</SelectOption>
+          {Object.entries(featureLabels).map(([code, label]) => <SelectOption key={code} id={code}>{label}</SelectOption>)}
+        </Select>
+        <Select label="Program" selectedKey={filters.program || "all"} onSelectionChange={(key) => setFilters((current) => ({ ...current, program: key === "all" ? "" : String(key) }))}>
+          <SelectOption id="all">All programs</SelectOption>
+          {["BSIT", "BSCS", "BSIS"].map((program) => <SelectOption key={program} id={program}>{program}</SelectOption>)}
+        </Select>
+      </div>
       <div className="accs-stack accs-stack--tight">
         <TabBar
           label="Restriction views"
@@ -1622,146 +1788,212 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
           onChange={setTab}
           tabs={[
             { id: "active", label: "Active", count: active.length },
-            { id: "requests", label: "Change requests", count: referrals.length },
+            { id: "requests", label: "Change requests", count: waitingRequests },
             { id: "ended", label: "Ended", count: ended.length },
           ]}
         />
         <TabBody panelId={panelId} value={tab}>
           {tab === "requests" ? (
-            referrals.length ? (
-              <>
-                <div className="accs-table-wrap rc-table-wrap">
-                  <table className="accs-table rc-table">
-                    <caption className="rc-sr">Change requests</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Student</th>
-                        <th scope="col">Request</th>
-                        <th scope="col">Reason</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Requested</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {referrals.map((request, index) => (
-                        <tr key={word(request.id, String(index))}>
-                          <td>
-                            <PersonCell
-                              name={word(object(request.student).name, "—")}
-                            />
-                          </td>
-                          <td>
-                            {word(request.change, "—")}
-                          </td>
-                          <td className="rc-wrap">{word(request.reason, "—")}</td>
-                          <td>
-                            <StatusChip tone={toneFor(word(request.status))}>
-                              {word(request.status, "—")}
-                            </StatusChip>
-                          </td>
-                          <td>
-                            <span className="accs-mono">
-                              {formatDate(request.at)}
-                            </span>
-                            <p className="rc-person__sub">
-                              {word(object(request.actor).name)}
-                            </p>
-                          </td>
+            shownRequests.length ? (
+              <PagedList items={shownRequests} noun="requests">
+                {(rows) => (
+                  <div className="accs-table-wrap rc-table-wrap">
+                    <table className="accs-table rc-table">
+                      <caption className="rc-sr">Change requests</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Student</th>
+                          <th scope="col">Request</th>
+                          <th scope="col">Reason</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Requested</th>
+                          <th scope="col"><span className="rc-sr">Details</span></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {admin && (
-                  <p className="rc-policy">
-                    End-date changes and declined requests are handled outside ACCS.
-                  </p>
+                      </thead>
+                      <tbody>
+                        {rows.map((request, index) => (
+                          <tr key={word(request.id, String(index))} className="rc-row" onClick={() => setOpenRequestId(word(request.id))}>
+                            <td><PersonCell name={word(object(request.student).name, "—")} href={studentLink(object(request.student))} /></td>
+                            <td>{word(request.change, "—")}</td>
+                            <td className="rc-wrap">{word(request.reason, "—")}</td>
+                            <td>
+                              <StatusChip tone={isDone(request) ? (word(request.status) === "Declined" ? "neutral" : "ok") : toneFor(word(request.status))}>
+                                {word(request.status, "—")}
+                              </StatusChip>
+                            </td>
+                            <td>
+                              <span className="accs-mono">{formatDate(request.at)}</span>
+                              <p className="rc-person__sub">{word(object(request.actor).name)}</p>
+                            </td>
+                            <td className="rc-actions">
+                              <Button variant="tertiary" size="sm" onPress={() => setOpenRequestId(word(request.id))}>Details</Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-              </>
+              </PagedList>
             ) : (
               <Panel>
-                <Empty title="No change requests">
-                  Guidance and OSAS requests to change a restriction show up here.
+                <Empty title={referrals.length ? "No requests match" : "No change requests"}>
+                  {referrals.length ? "Clear the search or choose another program." : "Guidance and OSAS requests to change a restriction show up here."}
                 </Empty>
               </Panel>
             )
           ) : (
+            <>
+            {/* Where the dates are changed, said up front (QA 17 November, V3: the way to change a restriction's dates was hard to find). */}
+            {admin && tab === "active" && shown.length > 0 && (
+              <p className="rc-muted">To extend, shorten or lift a restriction, open its Details.</p>
+            )}
             <RestrictionRows
-              rows={tab === "ended" ? ended : active}
-              onLift={setConfirmId}
+              rows={shown}
+              filtered={Boolean(filters.q || filters.feature || filters.program)}
+              studentLink={studentLink}
+              onOpen={openRestriction}
+              onApply={admin && tab === "active" ? openApply : undefined}
             />
+            </>
           )}
         </TabBody>
       </div>
-      {action.error && (
-        <Alert tone="danger" title="The change wasn't saved">
-          {action.error.message}
-        </Alert>
-      )}
-      <Modal
-        title="Apply restriction"
-        isOpen={applyOpen}
-        onOpenChange={setApplyOpen}
-      >
+      <Drawer title="Restriction" isOpen={Boolean(opened)} onOpenChange={(open) => { if (!open) setOpenId(""); }}>
+        {opened && (
+          <div className="accs-stack">
+            <Facts
+              stacked
+              rows={[
+                ["Student", <Link key="s" variant="quiet" href={studentLink(object(opened.student))}>{word(object(opened.student).name, "—")}</Link>],
+                ["Paused", features(opened).join(", ") || "—"],
+                ["Basis", word(opened.basis, "—")],
+                ["Decision reference", <span key="d" className="accs-mono">{word(opened.decisionReference, "—")}</span>],
+                ["Period", `${formatDate(opened.starts)} to ${formatDate(opened.until)}`],
+                ["Status", <StatusChip key="st" tone={opened.active ? "warn" : "neutral"}>{opened.active ? "Active" : "Ended"}</StatusChip>],
+                ["Applied by", word(object(opened.authorizer).name, "—")],
+              ]}
+            />
+            {opened.active === true && admin && (
+              <Panel title="Change the end date">
+                <div className="accs-stack">
+                  <DatePicker label="New end date" minValue={campusToday().add({ days: 1 })} description={`It ends ${formatDate(opened.until)}. Pick a later date to extend it or an earlier one to shorten it, tomorrow or later.`} onChange={(value) => setNewEnd(value?.toString() ?? "")} />
+                  <TextArea label="Reason" isRequired value={changeReason} onChange={setChangeReason} maxLength={500} />
+                  {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                  <div className="rc-form__actions">
+                    <Button
+                      loading={action.isPending}
+                      isDisabled={!newEnd || newEnd === word(opened.until) || !changeReason.trim()}
+                      onPress={() => action.mutate({ action: "changeRestrictionEnd", recordId: word(opened.id), payload: { until: newEnd }, reason: changeReason }, { onSuccess: () => setOpenId("") })}
+                    >
+                      {newEnd && newEnd < word(opened.until) ? "Shorten" : "Extend"}
+                    </Button>
+                    <Button variant="secondary" onPress={() => { setReason(""); setConfirmId(word(opened.id)); }}>Lift restriction</Button>
+                  </div>
+                </div>
+              </Panel>
+            )}
+            {opened.active === true && canRefer && (
+              requesting
+                ? <RestrictionRequestForm restriction={{ ...opened, studentId: object(opened.student).id }} onClose={() => setRequesting(false)} />
+                : <div><Button variant="secondary" onPress={() => setRequesting(true)}>Request change</Button></div>
+            )}
+          </div>
+        )}
+      </Drawer>
+      <Drawer title="Change request" isOpen={Boolean(openedRequest)} onOpenChange={(open) => { if (!open) setOpenRequestId(""); }}>
+        {openedRequest && (
+          <div className="accs-stack">
+            <Facts
+              stacked
+              rows={[
+                ["Student", <Link key="s" variant="quiet" href={studentLink(object(openedRequest.student))}>{word(object(openedRequest.student).name, "—")}</Link>],
+                ["Requested change", word(openedRequest.change, "—")],
+                ["Reason", word(openedRequest.reason, "—")],
+                ["Requested by", word(object(openedRequest.actor).name, "—")],
+                ["Requested", formatDate(openedRequest.at)],
+                ["Status", word(openedRequest.status, "—")],
+              ]}
+            />
+            {admin && !isDone(openedRequest) && (
+              <div className="accs-stack">
+                {active.some((restriction) => word(object(restriction.student).id) === word(openedRequest.studentId)) ? (
+                  <div><Button onPress={() => applyRequested(openedRequest)}>Apply requested change</Button></div>
+                ) : (
+                  <Note>This student has no active restriction now.</Note>
+                )}
+                <TextArea label="Reason for declining" value={declineReason} onChange={setDeclineReason} maxLength={500} />
+                {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                <div>
+                  <Button
+                    variant="secondary"
+                    loading={action.isPending}
+                    isDisabled={!declineReason.trim()}
+                    onPress={() => action.mutate({ action: "declineReferral", recordId: word(openedRequest.id), payload: {}, reason: declineReason }, { onSuccess: () => { setOpenRequestId(""); setDeclineReason(""); } })}
+                  >
+                    Decline request
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
+      <Modal title="Apply restriction" isOpen={applyOpen} onOpenChange={setApplyOpen}>
         <ModalBody>
-          <Select
+          {/* Type a name or student ID (QA 17 November: it was a dropdown that said "Select an item"). */}
+          <ComboBox
             label="Student"
+            placeholder="Select a student"
             selectedKey={selectedStudent || null}
-            onSelectionChange={(key) => setSelectedStudent(String(key))}
+            onSelectionChange={(key) => {
+              setSelectedStudent(key ? String(key) : "");
+              // The field shows the chosen name; with the text controlled here, React Aria leaves that to us.
+              const chosen = students.find((student) => word(student.id) === String(key));
+              if (chosen) setStudentQuery(word(chosen.name));
+            }}
+            inputValue={studentQuery}
+            onInputChange={setStudentQuery}
+            defaultFilter={() => true}
+            emptyMessage="No student with that name or student number"
+            isRequired
           >
-            {students.map((student) => (
-              <SelectOption key={word(student.id)} id={word(student.id)}>
-                {word(student.name)} · {word(student.studentId)}
-              </SelectOption>
-            ))}
-          </Select>
-          <CheckboxGroup
-            label="Features"
-            value={selectedFeatures}
-            onChange={setSelectedFeatures}
-          >
+            {students
+              .filter((student) => word(student.id) === selectedStudent || personMatches(studentQuery, word(student.name), word(student.studentId)))
+              .map((student) => (
+                <SelectOption key={word(student.id)} id={word(student.id)} textValue={word(student.name)}>
+                  {word(student.name)}{word(student.studentId) ? ` · ${word(student.studentId)}` : ""}
+                </SelectOption>
+              ))}
+          </ComboBox>
+          <CheckboxGroup label="Features" value={selectedFeatures} onChange={setSelectedFeatures}>
             <Checkbox value="post.create">Posting</Checkbox>
             <Checkbox value="post.comment">Commenting</Checkbox>
             <Checkbox value="report.anonymous">Anonymous reporting</Checkbox>
           </CheckboxGroup>
-          <TextField
-            label="Decision reference"
-            isRequired
-            value={decisionReference}
-            onChange={setDecisionReference}
-          />
-          <TextArea
-            label="Basis"
-            isRequired
-            value={basis}
-            onChange={setBasis}
-            maxLength={500}
-          />
-          <TextField
-            type="date"
+          <TextField label="Decision reference" isRequired value={decisionReference} onChange={setDecisionReference} />
+          <TextArea label="Basis" isRequired value={basis} onChange={setBasis} maxLength={500} />
+          {/* Tomorrow or later (decided 19 November 2026). The design-system picker shows its own message; the browser's
+              date bubble appeared behind this dialog (QA 17 November). */}
+          <DatePicker
             label="End date"
             isRequired
-            value={until}
-            onChange={setUntil}
+            minValue={campusToday().add({ days: 1 })}
+            description="Tomorrow or later."
+            onChange={(value) => setUntil(value?.toString() ?? "")}
           />
+          <Checkbox isSelected={notifyStudent} onChange={setNotifyStudent}>Notify the student</Checkbox>
           <p className="rc-policy">
             Only the selected features are paused. The restriction starts today.
             {basis ? "" : " Describe the basis for this restriction."}
           </p>
+          {action.error && <Alert tone="danger" title="The restriction wasn't applied">{action.error.message}</Alert>}
         </ModalBody>
         <ModalActions>
-          <Button variant="secondary" onPress={() => setApplyOpen(false)}>
-            Cancel
-          </Button>
+          <Button variant="secondary" onPress={() => setApplyOpen(false)}>Cancel</Button>
           <Button
             loading={action.isPending}
-            isDisabled={
-              !selectedStudent ||
-              !selectedFeatures.length ||
-              !decisionReference.trim() ||
-              !basis.trim() ||
-              !until
-            }
+            isDisabled={!selectedStudent || !selectedFeatures.length || !decisionReference.trim() || !basis.trim() || !until}
             onPress={submitApply}
           >
             Apply
@@ -1781,32 +2013,21 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             The student can use the listed features again. This step is logged,
             and a new restriction can be applied later.
           </p>
-          <TextArea
-            label="Reason"
-            isRequired
-            value={reason}
-            onChange={setReason}
-            maxLength={500}
-          />
+          <TextArea label="Reason" isRequired value={reason} onChange={setReason} maxLength={500} />
+          {action.error && <Alert tone="danger" title="The restriction wasn't lifted">{action.error.message}</Alert>}
         </ModalBody>
         <ModalActions>
-          <Button variant="secondary" onPress={() => setConfirmId("")}>
-            Cancel
-          </Button>
+          <Button variant="secondary" onPress={() => setConfirmId("")}>Cancel</Button>
           <Button
             loading={action.isPending}
             isDisabled={!reason.trim()}
             onPress={() =>
               action.mutate(
-                {
-                  action: "liftRestriction",
-                  recordId: confirmId,
-                  payload: {},
-                  reason,
-                },
+                { action: "liftRestriction", recordId: confirmId, payload: {}, reason },
                 {
                   onSuccess: () => {
                     setConfirmId("");
+                    setOpenId("");
                     setReason("");
                   },
                 },
@@ -1821,22 +2042,29 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   );
 }
 
+/** Restriction rows. Every row, active or ended, opens its details; the student's name opens their record. */
 function RestrictionRows({
   rows,
-  onLift,
+  filtered,
+  studentLink,
+  onOpen,
+  onApply,
 }: {
   rows: Item[];
-  onLift: (id: string) => void;
+  filtered: boolean;
+  studentLink: (student: Item) => string;
+  onOpen: (id: string) => void;
+  onApply?: () => void;
 }) {
-  const session = useQuery(sessionQuery());
-  const roles = session.data?.user.roles ?? [];
-  const canRefer = roles.includes("guidance") || roles.includes("osas");
-  const [requestId, setRequestId] = useState("");
   if (!rows.length)
     return (
       <Panel>
-        <Empty title="No restrictions in this view">
-          Nothing to show under this tab.
+        <Empty title={filtered ? "No restrictions match" : "No restrictions in this view"}>
+          {filtered
+            ? "Clear the search or choose another feature or program."
+            : onApply
+              ? <>No student has paused features right now. <Button variant="tertiary" size="sm" onPress={onApply}>Apply a restriction</Button></>
+              : "Restrictions show here when they apply."}
         </Empty>
       </Panel>
     );
@@ -1853,9 +2081,7 @@ function RestrictionRows({
               <th scope="col">Basis</th>
               <th scope="col">Period</th>
               <th scope="col">Status</th>
-              <th scope="col">
-                <span className="rc-sr">Actions</span>
-              </th>
+              <th scope="col"><span className="rc-sr">Details</span></th>
             </tr>
           </thead>
           <tbody>
@@ -1863,69 +2089,29 @@ function RestrictionRows({
               const id = word(restriction.id, String(index));
               const isActive = Boolean(restriction.active);
               return (
-                <Fragment key={id}>
-                  <tr>
-                    <td>
-                      <PersonCell
-                        name={word(object(restriction.student).name, "—")}
-                        sub={firstRole(object(restriction.authorizer).roles)}
-                      />
-                    </td>
-                    <td>{features(restriction).join(", ") || "—"}</td>
-                    <td className="rc-wrap">
-                      {word(restriction.basis, "—")}
-                      <p className="rc-person__sub accs-mono">
-                        {word(restriction.decisionReference, "—")}
-                      </p>
-                    </td>
-                    <td className="accs-mono">
-                      {formatDate(restriction.starts)} to{" "}
-                      {formatDate(restriction.until)}
-                    </td>
-                    <td>
-                      <StatusChip tone={isActive ? "warn" : "neutral"}>
-                        {isActive ? "Active" : "Ended"}
-                      </StatusChip>
-                    </td>
-                    <td className="rc-actions">
-                      {isActive && roles.includes("administrator") && (
-                        <Button
-                          variant="secondary"
-                          onPress={() => onLift(word(restriction.id))}
-                        >
-                          Lift restriction
-                        </Button>
-                      )}
-                      {isActive && canRefer && (
-                        <Button
-                          variant="secondary"
-                          onPress={() =>
-                            setRequestId(requestId === id ? "" : id)
-                          }
-                        >
-                          Request change
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                  {requestId === id && (
-                    <tr className="rc-form-row">
-                      <td colSpan={6}>
-                        <motion.div
-                          className="rc-expand"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          transition={{ duration: 0.32, ease }}
-                        >
-                          <RestrictionRequestForm
-                            restriction={restriction}
-                            onClose={() => setRequestId("")}
-                          />
-                        </motion.div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                <tr key={id} className="rc-row" onClick={() => onOpen(id)}>
+                  <td>
+                    <PersonCell
+                      name={word(object(restriction.student).name, "—")}
+                      sub={word(object(restriction.student).program) || firstRole(object(restriction.authorizer).roles)}
+                      href={studentLink(object(restriction.student))}
+                    />
+                  </td>
+                  <td>{features(restriction).join(", ") || "—"}</td>
+                  <td className="rc-wrap">
+                    {word(restriction.basis, "—")}
+                    <p className="rc-person__sub accs-mono">{word(restriction.decisionReference, "—")}</p>
+                  </td>
+                  <td className="accs-mono">
+                    {formatDate(restriction.starts)} to {formatDate(restriction.until)}
+                  </td>
+                  <td>
+                    <StatusChip tone={isActive ? "warn" : "neutral"}>{isActive ? "Active" : "Ended"}</StatusChip>
+                  </td>
+                  <td className="rc-actions">
+                    <Button variant="tertiary" size="sm" onPress={() => onOpen(id)}>Details</Button>
+                  </td>
+                </tr>
               );
             })}
           </tbody>
@@ -2212,7 +2398,7 @@ function ClearanceList({ page }: { page: PageEnvelope }) {
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    router.history.replace(location.pathname + (next.size ? "?" + next.toString() : ""));
+    replaceFilters(router, location.pathname, next);
   };
   const quick = params.get("clearance") === "on_hold" ? "hold" : params.get("status") === "pending,missing" ? "unfinished" : "all";
   const needle = search.trim().toLowerCase();
@@ -2308,7 +2494,9 @@ function ClearanceList({ page }: { page: PageEnvelope }) {
                         <td>{row.evaluation ? <StatusChip tone={evaluationTone[word(evaluation.status)] ?? "neutral"}>{evaluationText(evaluation)}</StatusChip> : "—"}</td>
                         <td>
                           <ClearanceChip clearance={clearance} />
-                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i}>{word(reason.message)}</li>)}</ul>}
+                          {/* The cycle is named above the table, so a row says only what holds it; the full reason is on hover and on
+                              the student's record (QA 17 November, V3: "Evaluations not finished for ye..." was cut off). */}
+                          {reasons.length > 0 && <ul className="rc-hold-reasons">{reasons.map((reason, i) => <li key={i} title={word(reason.message)}>{word(reason.kind) === "evaluation" ? "Evaluation not finished" : word(reason.message)}</li>)}</ul>}
                         </td>
                       </tr>
                     );
@@ -2336,13 +2524,14 @@ export function OversightScreen({ pageId }: { pageId: string }) {
       return search.toString();
     },
   });
-  const page = useQuery(
-    pageQuery(
-      pageId,
-      ["P24", "P34"].includes(pageId) ? recordId : undefined,
-      filters,
-    ),
-  );
+  const record = ["P24", "P34"].includes(pageId) ? recordId : undefined;
+  // A changed filter keeps the page on screen while the new figures load, as PageScreen does. It used to show the
+  // skeleton and rebuild the page, so a date field lost focus after one arrow key (QA 17 November, V3).
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) =>
+      keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  });
   if (page.isPending) return <Skeleton />;
   if (page.isError)
     return page.error instanceof ApiError &&

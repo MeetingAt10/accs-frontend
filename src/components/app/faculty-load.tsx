@@ -1,3 +1,4 @@
+import { keepFilteredPage } from '@/lib/queries'
 import { Alert, Button, DatePicker, Select, SelectOption, TextField, ViewState, toast } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useRouterState } from '@tanstack/react-router'
@@ -6,6 +7,7 @@ import { useState, type ChangeEvent } from 'react'
 import { ApiError, performPageAction, type PageAction, type PageEnvelope } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { pageQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import './faculty-load.css'
@@ -164,7 +166,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
   const faculty = items(page.data.faculty)
   const withClasses = faculty.filter((person) => items(person.classes).length)
   const conflicts = faculty.reduce((total, person) => total + items(person.conflicts).length, 0)
-  const showTerm = (value: string) => router.history.replace(location.pathname + (value ? '?period=' + encodeURIComponent(value) : ''))
+  const showTerm = (value: string) => replaceFilters(router, location.pathname, new URLSearchParams(value ? { period: value } : {}))
   return (
     <div className="accs-stack">
       <PageHeader
@@ -195,11 +197,14 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
                   return (
                     <li key={text(person.id)} className="accs-row fl-row">
                       <div className="fl-row__body">
-                        <p className="fl-row__name">
-                          {text(person.name)}
-                          {overlaps.length > 0 && <StatusChip tone="warn">{overlaps.length} {overlaps.length === 1 ? 'overlap' : 'overlaps'}</StatusChip>}
-                        </p>
-                        <p className="fl-hint">{text(person.email)} · {classes.length} {classes.length === 1 ? 'class' : 'classes'}</p>
+                        {/* One line per person: name, then email and class count (QA 19 November: too much white space). */}
+                        <div className="fl-row__head">
+                          <p className="fl-row__name">
+                            {text(person.name)}
+                            {overlaps.length > 0 && <StatusChip tone="warn">{overlaps.length} {overlaps.length === 1 ? 'overlap' : 'overlaps'}</StatusChip>}
+                          </p>
+                          <p className="fl-hint">{text(person.email)} · {classes.length} {classes.length === 1 ? 'class' : 'classes'}</p>
+                        </div>
                         {classes.length > 0 && (
                           <p className="fl-classes">
                             {classes.map((entry) => `${text(entry.day)} ${text(entry.start)}–${text(entry.end)} ${text(entry.subject)}${text(entry.section) ? ' (' + text(entry.section) + ')' : ''}`).join(' · ')}
@@ -225,7 +230,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
 
 export function FacultyLoadPage() {
   const filters = useRouterState({ select: (state) => state.location.searchStr.replace(/^\?/, '') })
-  const page = useQuery(pageQuery('P54', undefined, filters))
+  const page = useQuery({ ...pageQuery('P54', undefined, filters), placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, 'P54') ? previous : undefined })
   if (page.isPending) return <ViewState kind="loading" title="Loading faculty load" />
   if (page.isError) return <ViewState kind="error" title="Faculty load didn't load" description={page.error.message} actions={<Button variant="secondary" onPress={() => void page.refetch()}>Try again</Button>} />
   return <FacultyLoadScreen page={page.data} />

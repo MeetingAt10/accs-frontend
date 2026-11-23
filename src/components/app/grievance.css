@@ -114,8 +114,11 @@
 }
 
 /* ---------- My reports rows ---------- */
-.gv-row { grid-template-columns: 7.5rem minmax(0, 1fr) 13rem auto 6rem 1rem; gap: 16px; padding: 16px 20px; }
-.gv-row__ref { color: var(--accs-ink); font-weight: 600; }
+/* Every column but the title has a fixed width, so the progress bars line up from row to row; the status used to be
+   "auto", and each row's status label moved its bar (QA 17 November, V3). */
+.gv-row { grid-template-columns: 7.5rem minmax(0, 1fr) 13rem 12.5rem 6rem 1rem; gap: 16px; padding: 16px 20px; }
+.gv-row > .accs-status { justify-self: end; }
+.gv-row__ref { min-width: 0; overflow: hidden; color: var(--accs-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .gv-row__main { display: grid; min-width: 0; }
 .gv-row__progress { display: grid; gap: 6px; }
 .gv-row__stage { color: var(--accs-muted); font-size: 0.75rem; }
@@ -300,3 +303,12 @@
 /* New reports have long IDs: the reference stays on one line and is cut with an ellipsis (the full ID is in the tooltip). */
 .gv-row__ref, .gv-ref-link { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gv-c-ref { max-width: 14ch; }
+.gv-missing { margin: 4px 0 0; padding-inline-start: 18px; }
+/* Five equal steps of a student's report (Submitted, Read, Escalated, Resolved, Closed). */
+.gv-steps-wrap { display: grid; gap: 6px; min-width: 0; }
+.gv-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.gv-steps__seg { height: 6px; border-radius: 999px; background: var(--accs-border, color-mix(in srgb, currentColor 15%, transparent)); }
+.gv-steps__seg[data-done] { background: var(--accs-navy); }
+.gv-steps__names { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; font-size: 0.75rem; color: var(--accs-muted); }
+.gv-steps__names > span { overflow-wrap: anywhere; }
+.gv-steps__names > [data-current] { color: var(--accs-ink); font-weight: 600; }

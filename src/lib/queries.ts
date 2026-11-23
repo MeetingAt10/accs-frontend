@@ -2,6 +2,7 @@ import { rememberRoleLabels } from '@/lib/role-labels'
 import { queryOptions } from '@tanstack/react-query'
 
 import { ApiError, getPage, getSession, type PageEnvelope } from './api'
+import { retryDelay, shouldRetry } from './session-errors'
 
 export const sessionQuery = () =>
   queryOptions({
@@ -21,11 +22,17 @@ export const sessionQuery = () =>
  */
 export const sessionCheckSignedOut = (error: unknown) => error instanceof ApiError && error.status === 401
 
+/** True when the previous page data belongs to the same page and record, so only the filters differ. */
+export const keepFilteredPage = (previousKey: readonly unknown[] | undefined, pageId: string, recordId?: string) =>
+  !!previousKey && previousKey[0] === 'page' && previousKey[1] === pageId && previousKey[2] === recordId
+
 export const pageQuery = (pageId: string, recordId?: string, filters = '') =>
   queryOptions({
     queryKey: ['page', pageId, recordId, filters],
     queryFn: () => getPage(pageId, recordId, filters),
-    retry: false,
+    // A request turned away as one too many, or a server hiccup, is tried again before the page says it failed.
+    retry: shouldRetry,
+    retryDelay,
   })
 
 /**

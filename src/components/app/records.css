@@ -31,6 +31,7 @@
 .rc-toolbar { gap: 10px 20px; }
 .rc-toolbar--fields { align-items: flex-end; }
 .rc-toolbar--fields > .accs-grow { flex-basis: 14rem; }
+.rc-range { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px; }
 .rc-filter { display: inline-flex; align-items: center; gap: 10px; }
 .rc-filter__label { color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; }
 .rc-count { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
@@ -341,3 +342,13 @@
 .rc-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px 16px; align-items: end; }
 .rc-hold-reasons { margin: 6px 0 0; padding-inline-start: 18px; color: var(--accs-muted); font-size: 0.8125rem; }
 .rc-clearance { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; }
+/* Restrictions: search, feature and program filters on one row; every row opens its details. */
+.rc-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+@media (max-width: 720px) { .rc-filters { grid-template-columns: minmax(0, 1fr); } }
+.rc-table .rc-row { cursor: pointer; }
+.rc-table .rc-row:hover > td { background: color-mix(in srgb, var(--accs-navy) 4%, transparent); }
+
+/* Severity colors on a bar: High red, Medium yellow, Low green (QA 19 November). */
+.ch-bar[data-tone="danger"] .ch-bar__fill { background: var(--accs-danger); }
+.ch-bar[data-tone="warn"] .ch-bar__fill { background: var(--accs-warn); }
+.ch-bar[data-tone="ok"] .ch-bar__fill { background: var(--accs-ok); }

@@ -90,7 +90,7 @@ export const sites: Site[] = [
     icon: 'gear',
     lane: 'navy',
     prefixes: ['/admin', '/accounts', '/faculty-load'],
-    landings: ['/admin', '/accounts', '/faculty-load'],
+    landings: ['/admin', '/accounts', '/faculty-load', '/admin/moderation'],
     modules: ['ADM-01', 'ADM-02', 'ADM-04', 'ADM-05', 'ADM-06'],
   },
 ]
@@ -115,15 +115,19 @@ type Access = { allowedPages: string[]; permissions?: string[]; user: { roles: s
 export const siteRoles: Record<SiteId, Role[] | 'all'> = {
   portal: 'all',
   forums: 'all',
-  schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas'],
+  schedule: ['student', 'organization', 'professor', 'chair', 'dean', 'guidance', 'osas', 'secretary'],
   cases: ['student', 'professor', 'chair', 'dean', 'guidance', 'osas'],
   evaluations: ['student', 'professor', 'chair', 'dean'],
   records: ['chair', 'dean', 'guidance', 'osas', 'administrator', 'secretary'],
-  admin: ['administrator', 'dean', 'secretary'],
+  // OSAS opens Administration only for the flagged items the CCS Secretary sends it (decided 19 November 2026).
+  admin: ['administrator', 'dean', 'secretary', 'osas'],
 }
 
-/** Whether the session may open the page that owns `href`. */
-export const allowsPath = (session: Access, href: string) => pageAllowed(session, pageIdForPath(href))
+/**
+ * Whether the session may open the page that owns `href`. Search has no page of its own: everyone signed in may open it,
+ * and the API returns only what each person may open.
+ */
+export const allowsPath = (session: Access, href: string) => href.split(/[?#]/)[0] === '/search' || pageAllowed(session, pageIdForPath(href))
 
 /** A site is open when the role is listed for it and at least one of its landing pages is allowed. */
 export function canOpenSite(session: Access, site: SiteId) {

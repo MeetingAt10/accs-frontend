@@ -61,9 +61,15 @@ function Mark({ name, photo }: { name: string; photo?: string }) {
 export function ConversationList({
   conversations,
   currentId,
+  selfId,
+  linkSearch = "",
 }: {
   conversations: Item[];
   currentId?: string;
+  /** Kept on each link, like "?tab=group", so opening a conversation stays on the same tab (QA 17 November, V3). */
+  linkSearch?: string;
+  /** The signed-in person, whose own roles are left out of each row (QA 17 November: "Faculty · Student" for a student's chat with a professor). */
+  selfId?: string;
 }) {
   if (!conversations.length) {
     return (
@@ -77,7 +83,8 @@ export function ConversationList({
   return (
     <ul className="ds-next-conversation-list" aria-label="Conversations">
       {conversations.map((conversation) => (
-        <ConversationRow
+        <ConversationRow selfId={selfId}
+          linkSearch={linkSearch}
           conversation={conversation}
           currentId={currentId}
           key={words(conversation.id)}
@@ -90,13 +97,17 @@ export function ConversationList({
 function ConversationRow({
   conversation,
   currentId,
+  selfId,
+  linkSearch,
 }: {
   conversation: Item;
   currentId?: string;
+  selfId?: string;
+  linkSearch: string;
 }) {
   const memberRoles = [
     ...new Set(
-      items(conversation.members).flatMap((member) => roleNames(member.roles)),
+      items(conversation.members).filter((member) => !selfId || words(member.id) !== selfId).flatMap((member) => roleNames(member.roles)),
     ),
   ];
   const unread = Number(conversation.unread) || 0;
@@ -108,7 +119,7 @@ function ConversationRow({
       <Link
         variant="quiet"
         className="ds-next-conversation"
-        href={"/messages/" + encodeURIComponent(words(conversation.id))}
+        href={"/messages/" + encodeURIComponent(words(conversation.id)) + linkSearch}
         aria-current={currentId === conversation.id ? "page" : undefined}
       >
         <Mark name={title} />
@@ -143,7 +154,7 @@ function ConversationRow({
           </span>
           <span className="ds-next-conversation__tags">
             <span className="accs-tag">
-              {conversation.kind === "group" ? "Class group" : "Direct"}
+              {conversation.groupKind === "people" ? "Group" : conversation.kind === "group" ? "Class group" : "Direct"}
             </span>
             {memberRoles.length > 0 && (
               <span className="ds-next-conversation__roles">
@@ -376,6 +387,8 @@ export function MessageComposer({
                   const chosen = Array.from(event.target.files ?? []);
                   event.target.value = "";
                   if (chosen.length) onAddFiles(chosen);
+                  // Back to the message box, so Enter sends instead of pressing the paperclip again.
+                  event.currentTarget.form?.querySelector("textarea")?.focus();
                 }}
               />
               <IconButton

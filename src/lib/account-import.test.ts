@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { chunk, credentialsCsv, parseStudentRows, toStudent } from './account-import'
+import { chunk, credentialsCsv, parseStudentRows, studentProblems, toStudent } from './account-import'
 
 // A title and a blank row above the headings, loose heading names, and one row of each kind.
 const sheet: unknown[][] = [
@@ -23,7 +23,8 @@ describe('class list import', () => {
     expect(students[0]!.problems).toEqual({})
     expect(toStudent(students[0]!.draft)).toMatchObject({ program: 'BSIT', year: 3, section: 'A' })
     expect(students[1]!.draft).toMatchObject({ studentId: '24056', program: 'BSCS', year: '2' })
-    expect(students[1]!.problems).toEqual({})
+    // The server takes 00-0000 only, so a bare number is flagged before anything is sent.
+    expect(students[1]!.problems).toEqual({ studentId: 'Use the format 00-0000, with the enrollment year first, like 26-0001.' })
   })
 
   it('flags a repeated student ID and rows the server would refuse', () => {
@@ -54,5 +55,27 @@ describe('credentials file', () => {
   it('quotes list text that could run as a formula, but never alters the password', () => {
     expect(csv).toContain(`"'=cmd, ""x"""`)
     expect(csv).toContain('"-Ab3x,y"')
+  })
+})
+
+describe('sections (QA 17 November: section 200 was accepted)', () => {
+  it('takes letters only', () => {
+    const base = { name: 'Ana Reyes', email: 'ana@example.com', studentId: '26-7001', program: 'BSIT', year: '1', section: 'A' }
+    expect(studentProblems(base).section).toBeUndefined()
+    expect(studentProblems({ ...base, section: 'ab' }).section).toBeUndefined()
+    expect(studentProblems({ ...base, section: '200' }).section).toBe('Use the section letter, like A.')
+    expect(studentProblems({ ...base, section: 'A1' }).section).toBe('Use the section letter, like A.')
+  })
+})
+
+describe('student IDs (code review, 23 November 2026: the server takes 00-0000 only)', () => {
+  const base = { name: 'Ana Reyes', email: 'ana@example.com', studentId: '26-7001', program: 'BSIT', year: '1', section: 'A' }
+  it('takes 00-0000 with the enrollment year first, as the server does', () => {
+    expect(studentProblems(base).studentId).toBeUndefined()
+    expect(studentProblems({ ...base, studentId: 'QCU-2026-0001' }).studentId).toBe('Use the format 00-0000, with the enrollment year first, like 26-0001.')
+  })
+  it('refuses an enrollment year after this one', () => {
+    const next = String((new Date(Date.now() + 8 * 3_600_000).getUTCFullYear() + 1) % 100).padStart(2, '0')
+    expect(studentProblems({ ...base, studentId: `${next}-0001` }).studentId).toBe('The first two digits are the enrollment year; they cannot be a later year.')
   })
 })

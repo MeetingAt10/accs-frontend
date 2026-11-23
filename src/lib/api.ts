@@ -94,6 +94,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const getSession = () => request<Session>('/session')
 
+/** One search result: what it is called, a short line under it, and where it opens. */
+export type SearchHit = { id: string; title: string; sub?: string; href: string }
+/** The top search (MeetingAt10/accs-backend, decided 16 November 2026): only what the signed-in person may open. */
+export type SearchResults = { query: string; groups: Record<'posts' | 'spaces' | 'people' | 'cases' | 'records', SearchHit[]> }
+export const searchAll = (q: string) => request<SearchResults>('/search?q=' + encodeURIComponent(q))
+
 const post = <T>(path: string, body: unknown) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
@@ -237,6 +243,10 @@ export const createFaculty = (faculty: NewFaculty[]) => post<Recorded<BatchResul
 
 /** At most 25 students per request. */
 export const createStudents = (students: NewStudent[]) => post<Recorded<BatchResult>>('/accounts/students', { students })
+
+/** A new organization and its account; the student becomes its President (19 November 2026). */
+export const createOrganization = (input: { name: string; description: string; email: string; presidentId: string }) =>
+  post<Recorded<Provisioned & { organization: { id: string; name: string; president: { id: string; name: string } } }>>('/accounts/organizations', input)
 
 export const getAdvisors = () =>
   request<{ advisors: { yearLevel: number; faculty: AccountSummary[] }[] }>('/accounts/advisors')

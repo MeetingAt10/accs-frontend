@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  CheckboxGroup,
   FileUpload,
   IconButton,
   Modal,
@@ -30,7 +29,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 
 import { RequirePermission } from '@/components/app/guards'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
-import { PagedList } from '@/components/app/paging'
+import { PagedList, Pager, usePaged } from '@/components/app/paging'
 import {
   chunk,
   columnLabels,
@@ -81,11 +80,11 @@ import './accounts.css'
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 
-const errorText = (error: unknown) =>
+export const errorText = (error: unknown) =>
   error instanceof ApiError ? error.message : "Can't reach ACCS right now. Check your connection and try again."
 
 /** The messages the server attached to single fields, by field name. */
-const fieldErrors = (error: unknown): Record<string, string> =>
+export const fieldErrors = (error: unknown): Record<string, string> =>
   Object.fromEntries((error instanceof ApiError ? (error.fields ?? []) : []).map((field) => [field.path.split('.').pop() ?? field.path, field.message]))
 
 const typesQuery = queryOptions({ queryKey: ['accounts', 'types'], queryFn: getAccountTypes })
@@ -154,7 +153,7 @@ function Gate({ queries, what, children }: { queries: Loadable[]; what: string; 
 
 // --- sign-in details, shown once ---------------------------------------------------------------------------------------
 
-type Issued = { name: string; email: string; credentials: Credentials; invite: Invite }
+export type Issued = { name: string; email: string; credentials: Credentials; invite: Invite }
 
 const issuedFrom = ({ account, credentials, invite }: Provisioned): Issued => ({
   name: account.name,
@@ -188,7 +187,7 @@ function Secret({ label, value }: { label: string; value: string }) {
   )
 }
 
-function CredentialsDialog({ issued, onClose }: { issued?: Issued; onClose: () => void }) {
+export function CredentialsDialog({ issued, onClose }: { issued?: Issued; onClose: () => void }) {
   return (
     <Modal
       title={issued ? `Sign-in details for ${issued.name}` : 'Sign-in details'}
@@ -565,6 +564,8 @@ function FacultyTab() {
   const shown = members.filter(
     (member) => (program === 'all' || member.program === program) && `${member.name} ${member.email}`.toLowerCase().includes(needle),
   )
+  // Ten at a time (QA 17 November, V3: all 57 faculty in one long table). Select all still means every match.
+  const paged = usePaged(shown, 10, `${needle}|${program}`)
   const picked = shown.filter((member) => selected.has(member.id))
   const everyone = shown.length > 0 && picked.length === shown.length
   const toggle = (id: string, on: boolean) =>
@@ -663,7 +664,7 @@ function FacultyTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((member) => {
+                  {paged.shown.map((member) => {
                     const tags = roleTags(member)
                     return (
                       <tr key={member.id}>
@@ -703,6 +704,7 @@ function FacultyTab() {
                 </tbody>
               </table>
             </div>
+            <Pager paged={paged} noun="faculty" />
           </Panel>
         ) : (
           <Panel>
@@ -780,8 +782,8 @@ function AdvisorsTab() {
   return (
     <div className="accs-stack">
       <p className="acct-lead">
-        A student's advisor follows from their program and year level. Choose who advises each year; one person can advise several
-        years. You can change this every year.
+        Each year level has one advisor, and every student in that year has them as advisor. One person can advise several
+        years, for example one advisor for 1st and 2nd year and another for 3rd and 4th. You can change this every year.
       </p>
       <SegmentedControl aria-label="Year level" selectedKey={String(year)} onSelectionChange={(key) => setYear(Number(key))}>
         {yearLevels.map((level) => (
@@ -791,18 +793,20 @@ function AdvisorsTab() {
         ))}
       </SegmentedControl>
       <Gate queries={[faculty, advisors]} what="advisors">
-        <Panel title={`Year ${year} advisors`} action={<span className="acct-muted">{chosen.length} chosen</span>}>
+        <Panel title={`Year ${year} advisor`} action={<span className="acct-muted">{chosen.length ? members.find((member) => member.id === chosen[0])?.name ?? '1 chosen' : 'None yet'}</span>}>
           {members.length ? (
             <>
               <Search label="Search faculty" placeholder="Search faculty" size="sm" value={filter} onChange={setFilter} />
               <div className="acct-pick">
-                <CheckboxGroup
-                  label={`Faculty who advise year ${year}`}
-                  value={chosen}
-                  onChange={(ids) => setDraft((previous) => ({ ...previous, [year]: ids }))}
+                {/* One advisor per year level (decided 19 November 2026): a single choice, not checkboxes. */}
+                <RadioGroup
+                  label={`Who advises year ${year}`}
+                  value={chosen[0] ?? ''}
+                  onChange={(id) => setDraft((previous) => ({ ...previous, [year]: id ? [id] : [] }))}
                 >
+                  <Radio value="">No advisor yet</Radio>
                   {visible.map((member) => (
-                    <Checkbox
+                    <Radio
                       key={member.id}
                       value={member.id}
                       description={[member.program, member.active ? '' : 'Not active', member.advisorYears.length ? `Advises year ${member.advisorYears.join(', ')}` : '']
@@ -810,9 +814,9 @@ function AdvisorsTab() {
                         .join(' · ')}
                     >
                       {member.name}
-                    </Checkbox>
+                    </Radio>
                   ))}
-                </CheckboxGroup>
+                </RadioGroup>
                 {!visible.length && <p className="acct-muted">No faculty match.</p>}
               </div>
               {save.error && (
@@ -826,7 +830,7 @@ function AdvisorsTab() {
                   loading={save.isPending}
                   onPress={() => save.mutate({ yearLevel: year, facultyIds: chosen })}
                 >
-                  Save year {year} advisors
+                  Save year {year} advisor
                 </Button>
               </div>
             </>
@@ -900,6 +904,8 @@ function ChairsTab() {
           )}
           {members.length ? (
             <>
+              {/* A scrolling list, so Set as chair stays in view (QA 17 November: it was at the very bottom). */}
+              <div className="acct-pick">
               <RadioGroup
                 label={`${program} faculty`}
                 value={chosen}
@@ -911,6 +917,7 @@ function ChairsTab() {
                   </Radio>
                 ))}
               </RadioGroup>
+              </div>
               {save.error && (
                 <Alert tone="danger" title="The program chair couldn't be saved">
                   {errorText(save.error)}
@@ -988,6 +995,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
   return (
     <Panel title="Add one student">
       <form className="acct-form" onSubmit={submit} noValidate>
+        {/* Hints are placeholders, so every box lines up (a hint above a box pushed it down). */}
         <div className="acct-form__grid">
           <TextField
             label="Full name"
@@ -1011,7 +1019,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
             value={draft.studentId}
             onChange={set('studentId')}
             autoComplete="off"
-            description="Like 24-1234."
+            placeholder="24-1234"
             isInvalid={Boolean(errors.studentId)}
             errorMessage={errors.studentId}
           />
@@ -1048,7 +1056,7 @@ function AddStudent({ onIssued }: { onIssued: (issued: Issued) => void }) {
             value={draft.section}
             onChange={set('section')}
             autoComplete="off"
-            description="The section letter, like A."
+            placeholder="A"
             isInvalid={Boolean(errors.section)}
             errorMessage={errors.section}
           />
@@ -1119,6 +1127,9 @@ function StudentList() {
         )}
         {list.length ? (
           <>
+            {/* Ten students a page (QA 19 November: the list was one long scroll). */}
+            <PagedList items={list} size={10} noun="students" resetKey={q}>
+              {(shown) => (
             <div className="acct-scroll" aria-busy={students.isPlaceholderData}>
               <table className="accs-table acct-table acct-stack" aria-label="Student accounts">
                 <thead>
@@ -1135,7 +1146,7 @@ function StudentList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((student) => (
+                  {shown.map((student) => (
                     <tr key={student.id}>
                       <td className="acct-main">
                         <span className="acct-person">
@@ -1160,6 +1171,8 @@ function StudentList() {
                 </tbody>
               </table>
             </div>
+              )}
+            </PagedList>
             {total > list.length && (
               <p className="acct-foot">
                 Showing the first {list.length} of {total} students, in name order. Search to find the others.

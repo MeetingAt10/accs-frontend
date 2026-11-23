@@ -1,3 +1,5 @@
+import { campusToday } from '@/lib/campus-date'
+import { parseDate as parseCalendarDate } from '@internationalized/date'
 import {
   Alert,
   Button,
@@ -64,6 +66,7 @@ import {
   relativeTime,
 } from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
 import './schedule.css'
 
 interface Person {
@@ -261,8 +264,12 @@ function useCalendarLocation() {
   const params = new URLSearchParams(location.searchStr)
   function update(values: Record<string, string>) {
     const next = new URLSearchParams(location.searchStr)
-    for (const [key, value] of Object.entries(values)) next.set(key, value)
-    router.history.push(`${location.pathname}?${next.toString()}`)
+    // An empty value removes the parameter (no `layers` means every layer).
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
+    replaceFilters(router, location.pathname, next)
   }
   return { params, update }
 }
@@ -352,6 +359,14 @@ function CalendarPage({
   const small = useSmallScreen()
   const action = useScheduleAction('P13')
   const [selectedEntry, setSelectedEntry] = useState<CalendarEntry>()
+  // Esc closes the event panel even when focus stayed on the calendar after the click (the drawer only hears Esc
+  // from inside itself; QA 17 November).
+  useEffect(() => {
+    if (!selectedEntry) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedEntry(undefined) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedEntry])
   const [todoOpen, setTodoOpen] = useState(false)
   const [todoTitle, setTodoTitle] = useState('')
   const [todoDate, setTodoDate] = useState('')
@@ -386,6 +401,7 @@ function CalendarPage({
   const selectedLayers = params.has('layers')
     ? (params.get('layers') ?? '').split(',')
     : layers.map((layer) => layer.id)
+  const allLayersShown = layers.every((layer) => selectedLayers.includes(layer.id))
   const todos = [...list<Todo>(page.data.todos)].sort(
     (a, b) => Number(a.done) - Number(b.done) || a.date.localeCompare(b.date),
   )
@@ -543,6 +559,10 @@ function CalendarPage({
         <span className="ec-badge" data-etone={entry.tone}>
           {entry.type}
         </span>
+        {/* Whether it is still ahead (testing sheet: the event had no status). */}
+        <StatusChip tone={entry.date === today() ? 'warn' : entry.date > today() ? 'ok' : 'neutral'}>
+          {entry.date === today() ? 'Today' : entry.date > today() ? 'Upcoming' : 'Past'}
+        </StatusChip>
         <dl className="sc-facts sc-facts--stack">
           <div>
             <dt>Date</dt>
@@ -562,7 +582,7 @@ function CalendarPage({
           )}
           {entry.contact && (
             <div>
-              <dt>Contact</dt>
+              <dt>Contact person</dt>
               <dd>{entry.contact}</dd>
             </div>
           )}
@@ -649,6 +669,16 @@ function CalendarPage({
         description="All times are campus time."
         actions={
           <>
+            {/* Events are announcements with a date: this opens one with the chosen day filled in (a past day becomes today). */}
+            {session.permissions.includes('announcement.publish') && (
+              <Button
+                icon="calendar"
+                variant={canTodo ? 'secondary' : 'primary'}
+                href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate < today() ? today() : selectedDate)}`}
+              >
+                Add event
+              </Button>
+            )}
             {canTodo && (
               <Button icon="plus" onPress={() => setTodoOpen(true)}>
                 Add to-do
@@ -702,9 +732,10 @@ function CalendarPage({
         <div className="accs-split">
           <div className="accs-stack">
             <Panel flush aria-label="Calendar">
+              {/* On a phone, Month is a list grouped by day (testing sheet, P13: the grid was too cramped). */}
               <EventCalendar
                 date={selectedDate}
-                view={view}
+                view={small && view === 'month' ? 'list' : view}
                 events={entries}
                 onDateChange={(date) => update({ date })}
                 onEventPress={(event) =>
@@ -714,10 +745,33 @@ function CalendarPage({
                 }
               />
             </Panel>
+            {/* The day picked on the calendar, with what can be added to it (QA 17 November: adding from a date). */}
+            {(canTodo || session.permissions.includes('announcement.publish')) && selectedDate >= today() && (
+              <div className="sc-dayadd">
+                <span>{formatDate(selectedDate)}</span>
+                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoOpen(true) }}>Add to-do</Button>}
+                {session.permissions.includes('announcement.publish') && (
+                  <Button size="sm" variant="tertiary" icon="calendar" href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate)}`}>Add event</Button>
+                )}
+              </div>
+            )}
             <ActionError error={action.error} />
           </div>
           <div className="accs-stack">
-            <Panel title="Show on calendar" className="sc-rail-layers">
+            <Panel
+              title="Show on calendar"
+              className="sc-rail-layers"
+              action={
+                // Every layer at once, or none: one press instead of one per layer.
+                <button
+                  type="button"
+                  className="accs-panel__link sc-layers-all"
+                  onClick={() => update({ layers: allLayersShown ? 'none' : '' })}
+                >
+                  {allLayersShown ? 'Hide all' : 'Show all'}
+                </button>
+              }
+            >
               {layerPills}
             </Panel>
             <Panel flush title="Upcoming">
@@ -846,6 +900,8 @@ function CalendarPage({
               <DatePicker
                 label="Due"
                 isRequired
+                minValue={campusToday()}
+                defaultValue={todoDate ? parseCalendarDate(todoDate) : undefined}
                 onChange={(value) => setTodoDate(value?.toString() ?? '')}
               />
               <PrivacyNotice title="Personal to-do">
@@ -1002,9 +1058,17 @@ function ConsultationsPage({
         ? consultation.facultyId === session.user.id
         : consultation.studentId === session.user.id,
   )
-  const faculty = list<Person>(page.data.faculty).filter((person) =>
-    person.name.toLowerCase().includes(query.toLowerCase()),
-  )
+  // Soonest open time first; professors with none posted come last (QA 17 November: the list was alphabetical).
+  // No open time goes last explicitly: localeCompare sorted a "~" stand-in before digits, so those professors came first.
+  const nextKey = (person: Person) => (person.nextSlot ? `${person.nextSlot.date}${person.nextSlot.start}` : '')
+  const byNext = (a: Person, b: Person) => {
+    const x = nextKey(a), y = nextKey(b)
+    if (!x || !y) return Number(!x) - Number(!y)
+    return x < y ? -1 : x > y ? 1 : 0
+  }
+  const faculty = list<Person>(page.data.faculty)
+    .filter((person) => person.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => byNext(a, b) || a.name.localeCompare(b.name))
   const visible =
     status === 'All'
       ? consultations
@@ -1159,7 +1223,9 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const firstOpen = slots
     .filter((slot) => slot.state === 'open' && slot.date >= today())
     .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))[0]
-  const [step, setStep] = useState({ n: 1, dir: 1 })
+  // The professor was picked to get here, so start at their times (QA 17 November: the list of every professor came
+  // again, with Continue at the bottom). Step 1 is still there to change professor.
+  const [step, setStep] = useState({ n: 2, dir: 1 })
   const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
   const [category, setCategory] = useState('')
@@ -1794,11 +1860,12 @@ function RequestPage({
                 <li key={role}>
                   <div className="accs-row accs-row--people">
                     <Avatar name={person.name} />
-                    <span>
+                    {/* Name above role; they ran together ("Demo Student GolfStudent · CCS student"). */}
+                    <span className="sc-person-text">
                       <span className="accs-row__title">{person.name}</span>
                       <span className="accs-row__sub">
                         {role}
-                        {person.title ? ` · ${person.title}` : ''}
+                        {person.title && !person.title.toLowerCase().includes(role.toLowerCase()) ? ` · ${person.title}` : ''}
                       </span>
                     </span>
                   </div>
@@ -2191,6 +2258,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               <DatePicker
                 label="Date"
                 isRequired
+                minValue={campusToday()}
                 onChange={(value) => setDate(value?.toString() ?? '')}
               />
               <div className="sc-timepair">

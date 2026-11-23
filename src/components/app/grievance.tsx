@@ -1,3 +1,4 @@
+import { campusToday } from '@/lib/campus-date'
 import {
   Alert, Button, DatePicker, Drawer, Grid, Icon, Link, MenuButton, MenuItem, Modal,
   ModalActions, ModalBody, Pagination, PrivacyNotice, Radio, RadioGroup, Search, Select,
@@ -14,6 +15,8 @@ import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format
 import { RestrictedView } from '@/components/app/guards'
 import { AccessPanel, ConsentDialog, HandlerTalk, ReadersChoice, TalkChoice, alsoReadableBy, modeLabel, readAccess, readTalk, readWording } from '@/components/app/concern-talk'
 import { categoryDetailMax, categoryText, choicePayload, choiceProblems, cleanChoice, readCategoryOptions } from '@/lib/concern-categories'
+import { tidyDraft } from '@/lib/draft-tidy'
+import { progressOf } from '@/lib/report-progress'
 import { Empty, PageHeader, Panel, StatusChip, toneFor, type Tone } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
 import { CaseStrikes } from '@/components/app/strikes'
@@ -46,12 +49,29 @@ const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.i
 
 // Pipeline: the five handling stages (Adviser to OSAS, which is the last) plus Submitted and Resolved.
 const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
-const stageOf = (report: Item): string => isClosed(report) ? 'resolved'
-  : report.stage === 'adviser' && words(report.status).toLowerCase() === 'submitted' ? 'submitted'
-    : words(report.stage, 'adviser')
+// The stage is always the office handling it: the status is now a step ("Submitted"), which must not turn the Adviser's
+// stage into "Submitted" (20 November 2026).
+const stageOf = (report: Item): string => isClosed(report) ? 'resolved' : words(report.stage, 'adviser')
 const stageIndex = (report: Item) => Math.max(0, stages.findIndex(([key]) => key === stageOf(report)))
-const stageStep = (report: Item) => Math.max(1, stageIndex(report))
 const stageLabel = (report: Item) => stages[stageIndex(report)][1]
+
+/**
+ * The student's progress (decided 19 November 2026): Submitted, Read, Escalated, Resolved, Closed, five equal steps,
+ * from the API's `progress`. It replaced "Stage 2 of 6 · Adviser", which said which office had it, in uneven steps.
+ */
+function ProgressSteps({ report, showLabels = false }: { report: Item; showLabels?: boolean }) {
+  const { steps, step, label } = progressOf(report)
+  return (
+    <span className="gv-steps-wrap">
+      <span className="gv-steps" role="img" aria-label={`Step ${step + 1} of ${steps.length}: ${label}`}>
+        {steps.map((name, index) => <span key={name} className="gv-steps__seg" data-done={index <= step || undefined} />)}
+      </span>
+      {showLabels
+        ? <span className="gv-steps__names" aria-hidden>{steps.map((name, index) => <span key={name} data-current={index === step || undefined}>{name}</span>)}</span>
+        : <span className="gv-row__stage">Step {step + 1} of {steps.length} · {label}</span>}
+    </span>
+  )
+}
 
 function useAction(pageId: string) {
   const queryClient = useQueryClient()
@@ -191,18 +211,33 @@ export function DiscloseIdentityDialog({ report, isOpen, onOpenChange }: { repor
   )
 }
 
-function DraftHelp({ narrative, isOpen, onOpenChange, onUse }: { narrative: string; isOpen: boolean; onOpenChange: (open: boolean) => void; onUse: (text: string) => void }) {
-  const [candidate, setCandidate] = useState(narrative)
+function DraftHelp({ draft, isOpen, onOpenChange, onUse }: { draft: Draft; isOpen: boolean; onOpenChange: (open: boolean) => void; onUse: (text: string) => void }) {
+  const [candidate, setCandidate] = useState(draft.narrative)
+  const [missing, setMissing] = useState<string[] | null>(null)
   const action = useAction('P19')
   const reply = words(object(action.data?.record).reply)
+  // Rewrites the student's own words in the browser: nothing is sent, nothing is invented (lib/draft-tidy.ts).
+  const tidy = () => {
+    const result = tidyDraft({ narrative: candidate, occurredOn: draft.occurredOn, location: draft.location, category: draft.category })
+    if (result.text) setCandidate(result.text)
+    setMissing(result.missing)
+  }
   return (
     <Drawer title="Help with your draft" isOpen={isOpen} onOpenChange={onOpenChange}>
       <div className="gv-stack">
-        <Alert tone="neutral" title="The assistant helps you write">It doesn't decide what happened or what happens next. It gives approved writing tips only.</Alert>
-        <Button variant="secondary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Show writing guidance</Button>
+        <Alert tone="neutral" title="The assistant helps you write">It tidies your own words and lays them out for the office. It doesn't decide what happened or add anything you didn't write.</Alert>
+        <TextArea label="Your draft" value={candidate} onChange={(value) => { setCandidate(value); setMissing(null) }} maxLength={4000} showCount description="Edit it here, then use it in your report." />
+        <div className="gv-actions">
+          <Button variant="secondary" icon="pencil" isDisabled={!candidate.trim()} onPress={tidy}>Tidy up my draft</Button>
+          <Button variant="tertiary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Writing tips</Button>
+        </div>
+        {missing && (missing.length
+          ? <Alert tone="info" title="You could also add">
+              <ul className="gv-missing">{missing.map((item) => <li key={item}>{item}</li>)}</ul>
+            </Alert>
+          : <Alert tone="success" title="Your draft covers what the office needs" />)}
         <ActionError error={action.error} />
         {reply && <p className="ds-prose">{reply}</p>}
-        <TextArea label="Text to review" value={candidate} onChange={setCandidate} maxLength={4000} showCount description="Review and edit your wording before using it." />
         <Button onPress={() => { onUse(candidate); onOpenChange(false) }}>Use this text</Button>
       </div>
     </Drawer>
@@ -353,7 +388,7 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                 {step === 0 && <>
                   <TextArea label="What happened" isRequired showCount maxLength={4000} value={draft.narrative} onChange={(value) => update('narrative', value)} description="Say what happened, when, and where. Leave out names you don't need to share." isInvalid={Boolean(error && !draft.narrative.trim())} errorMessage={error && !draft.narrative.trim() ? error : undefined} />
                   <Grid columns={2}>
-                    <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + formatDate(draft.occurredOn) : 'Optional'} />
+                    <DatePicker label="When" maxValue={campusToday()} onChange={(value) => update('occurredOn', value?.toString() ?? '')} description={draft.occurredOn ? 'Saved date: ' + formatDate(draft.occurredOn) : 'Optional'} />
                     <TextField label="Where" value={draft.location} onChange={(value) => update('location', value)} maxLength={200} description="Optional" />
                   </Grid>
                   {/* TBD(D-08): attachment access and retention policy is not approved. */}
@@ -406,8 +441,9 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
             {step < 3 ? <Button onPress={() => { if (validate(step)) go(step + 1) }}>Next</Button> : <Button loading={send.isPending} onPress={review}>Review consent and submit</Button>}
           </div>
         </div>
-        <ConsentDialog key={consentOpen ? 'open' : 'closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
-        <DraftHelp key={helpOpen ? 'open' : 'closed'} narrative={draft.narrative} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
+        {/* Each dialog's key names it: both used "open"/"closed", so two closed dialogs shared the key "closed". */}
+        <ConsentDialog key={consentOpen ? 'consent-open' : 'consent-closed'} isOpen={consentOpen} onOpenChange={setConsentOpen} sharing={draft} adviser={adviser} wording={readWording(page.data.consentWording)} pending={send.isPending} onConfirm={submit} />
+        <DraftHelp key={helpOpen ? 'help-open' : 'help-closed'} draft={draft} isOpen={helpOpen} onOpenChange={setHelpOpen} onUse={(value) => update('narrative', value)} />
         <Modal role="alertdialog" title="Discard this draft?" isOpen={discardOpen} onOpenChange={setDiscardOpen}>
           <ModalBody><p>The description and choices in this draft will be cleared.</p></ModalBody>
           <ModalActions><Button variant="secondary" onPress={() => setDiscardOpen(false)}>Keep draft</Button><Button variant="destructive" onPress={() => { setDraft({ ...blankDraft }); setStep(0); setError(''); setDiscardOpen(false); action.mutate({ action: 'saveDraft', payload: { narrative: '' } }); try { localStorage.removeItem(storageKey) } catch { /* No stored draft to remove. */ } }}>Discard draft</Button></ModalActions>
@@ -499,7 +535,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
         <div className="gv-page accs-stagger">
           <div className="gv-listbar">
             <PillGroup id="view" label="Report view" value={view} onChange={setView} options={[{ id: 'active', label: 'Active ' + (all.length - closedCount) }, { id: 'closed', label: 'Closed ' + closedCount }]} />
-            <Note>Only you and the office handling each report can open it.</Note>
+            <Note>Only you and the office handling each report can open it. Reporting under your name or anonymously is your choice on each report.</Note>
           </div>
           {records.length ? (
             <Panel flush>
@@ -507,7 +543,6 @@ function ReportList({ page }: { page: PageEnvelope }) {
                 {(records) => (
                 <ul className="accs-rows gv-rows">
                   {records.map((report) => {
-                    const step = stageStep(report)
                     return (
                       <li key={words(report.id)}>
                         <a className="accs-row gv-row" href={reportPath(report)}>
@@ -516,10 +551,7 @@ function ReportList({ page }: { page: PageEnvelope }) {
                             <span className="accs-row__title">{categoryText(report)}</span>
                             <span className="accs-row__sub">{words(report.office, '—')}</span>
                           </span>
-                          <span className="gv-row__progress">
-                            <span className="accs-progress" role="progressbar" aria-label={'Stage ' + step + ' of 6'} aria-valuemin={1} aria-valuemax={6} aria-valuenow={step}><span style={{ width: (step / 6) * 100 + '%' }} /></span>
-                            <span className="gv-row__stage">Stage {step} of 6 · {stageLabel(report)}</span>
-                          </span>
+                          <span className="gv-row__progress"><ProgressSteps report={report} /></span>
                           <StatusChip tone={toneFor(words(report.status, 'Submitted'))}>{words(report.status, 'Submitted')}</StatusChip>
                           <span className="gv-row__time">{relativeTime(report.updatedAt) || '—'}</span>
                           <span className="gv-row__go" aria-hidden><Icon name="caret-right" size={16} /></span>
@@ -585,12 +617,15 @@ function ReportDetail({ page }: { page: PageEnvelope }) {
             {words(report.narrative) && <Narrative report={report} title="What you reported" />}
             <TalkChoice report={report} wording={readWording(page.data.consentWording)} action={talkAction} />
             <Panel title="Messages"><Conversation report={report} pageId="P20" /></Panel>
-            <Panel title="Progress"><Timeline report={report} /></Panel>
+            <Panel title="Progress">
+              <ProgressSteps report={report} showLabels />
+              <Timeline report={report} />
+            </Panel>
           </div>
           <aside className="accs-stack accs-stagger" aria-label="Report details">
             <Panel title="Details">
               <Facts values={[
-                ['Stage', stageLabel(report) + (report.office ? ' · ' + report.office : '')], ['Category', categoryText(report)], ['Program', words(report.program, '—')],
+                ['Progress', progressOf(report).label], ['With', words(report.office, '—')], ['Category', categoryText(report)], ['Program', words(report.program, '—')],
                 ['Filed', formatDate(report.createdAt)], ['Updated', relativeTime(report.updatedAt) || '—'],
                 ['Identity', report.identity === 'anonymous' ? disclosed ? 'Name shared with this office' : 'Alias to this office' : 'Named'],
               ]} />
@@ -668,6 +703,8 @@ export function CaseActionBar({ report }: { report: Report }) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
   const allowedAll = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
   const [selected, setSelected] = useState('')
+  // The opened action names the popup, also while it closes (it read "Record action" during the closing animation).
+  const [opened, setOpened] = useState('')
   const [reason, setReason] = useState('')
   const [update, setUpdate] = useState('')
   const [error, setError] = useState('')
@@ -678,18 +715,20 @@ export function CaseActionBar({ report }: { report: Report }) {
   const next = nextOffices[report.stage]
   const label = (type: string) => type === 'recordAction' && ['chair', 'dean'].includes(report.stage) ? 'Record decision' : actionLabels[type] ?? type
   if (!allowed.length) return <Panel title="Next action"><p className="gv-hint">No actions available. You can only read this report at its current stage.</p></Panel>
-  const open = (type: string) => { setSelected(type); setReason(''); setUpdate(''); setError(''); action.reset() }
+  const open = (type: string) => { setSelected(type); setOpened(type); setReason(''); setUpdate(''); setError(''); action.reset() }
   return (
     <Panel title="Next action">
       <div className="gv-actions">
         {allowed.slice(0, 2).map((type, index) => <Button key={type} variant={index ? 'secondary' : 'primary'} onPress={() => open(type)}>{label(type)}</Button>)}
         {allowed.length > 2 && <MenuButton label="More actions" onAction={(key) => open(String(key))}>{allowed.slice(2).map((type) => <MenuItem id={type} key={type}>{label(type)}</MenuItem>)}</MenuButton>}
       </div>
-      <Modal title={(label(selected) || 'Record action') + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(selected) ? 'alertdialog' : 'dialog'} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
+      {/* Every action closes on a click outside, unless something has been typed: a stray click never loses a reason. */}
+      <Modal title={label(opened) + '?'} role={['escalate', 'transfer', 'resolve', 'close', 'convert'].includes(opened) ? 'alertdialog' : 'dialog'} isDismissable={!reason.trim() && !update.trim()} isOpen={Boolean(selected)} onOpenChange={(openState) => !openState && setSelected('')}>
         <ModalBody>
           <div className="gv-stack">
             {transition && next && <Select label="Next office" selectedKey={next.stage} onSelectionChange={() => undefined} isRequired><SelectOption id={next.stage}>{next.label}</SelectOption></Select>}
-            <TextArea label="Reason" value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
+            {/* A milestone is named, not justified: "Counselling session held", not a reason. */}
+            <TextArea label={opened === 'milestone' ? 'Milestone' : 'Reason'} description={opened === 'milestone' ? 'What happened, for example "Counselling session held".' : undefined} value={reason} onChange={setReason} isRequired maxLength={2000} showCount />
             <TextArea label="Update shown to the reporter" value={update} onChange={setUpdate} isRequired maxLength={4000} showCount />
             <Note>The reason stays in the handler history. The reporter sees the update you write above.</Note>
             {error && <Alert tone="danger" title="Missing information">{error}</Alert>}
@@ -699,9 +738,9 @@ export function CaseActionBar({ report }: { report: Report }) {
         <ModalActions>
           <Button variant="secondary" isDisabled={action.isPending} onPress={() => setSelected('')}>Cancel</Button>
           <Button loading={action.isPending} onPress={() => {
-            if (!reason.trim() || !update.trim()) { setError('Add a reason and an update for the reporter.'); return }
+            if (!reason.trim() || !update.trim()) { setError(`Add ${opened === 'milestone' ? 'the milestone' : 'a reason'} and an update for the reporter.`); return }
             action.mutate({ action: 'caseAction', recordId: report.id, reason, payload: { type: selected, update, ...(transition && next ? { nextStage: next.stage } : {}) } }, { onSuccess: () => setSelected('') })
-          }}>{label(selected) || 'Save action'}</Button>
+          }}>{label(opened) || 'Save action'}</Button>
         </ModalActions>
       </Modal>
     </Panel>
@@ -913,10 +952,23 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
   const refused = (path: string) => (action.error as { fields?: Array<{ path: string; message: string }> } | null)?.fields?.find((field) => field.path === path)?.message
   const fieldError = (path: string, local?: string) => refused(path) ?? (tried ? local : undefined)
   const ready = Boolean(draft.studentId && draft.narrative.trim() && draft.severity) && Object.keys(missing).length === 0
+  // What is still missing, in the form's order, said next to the Send button: the fields' own messages can be off screen.
+  const missingNames = [
+    !draft.studentId && 'Student',
+    missing.category && 'Category',
+    missing.subcategory && 'Sub-category',
+    missing.categoryDetail && 'Description',
+    !draft.severity && 'How serious it is',
+    !draft.narrative.trim() && 'What happened',
+  ].filter(Boolean) as string[]
   const close = () => { setOpen(false); setTried(false); action.reset() }
-  const send = () => {
+  const send = (form?: HTMLFormElement | null) => {
     setTried(true)
-    if (!ready) return
+    if (!ready) {
+      // Take the reader to the first field that needs them.
+      requestAnimationFrame(() => (form?.querySelector('[aria-invalid="true"], [data-invalid] input, [data-invalid] button, [data-invalid] textarea') as HTMLElement | null)?.focus())
+      return
+    }
     action.mutate({
       action: 'reportStudent',
       payload: {
@@ -930,7 +982,8 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
     <>
       <Button icon="pencil" onPress={() => { action.reset(); setOpen(true) }}>Report a student</Button>
       <Drawer title="Report a student" isOpen={open} onOpenChange={(state) => !state && close()}>
-        <form className="gv-stack" onSubmit={(event) => { event.preventDefault(); send() }}>
+        {/* noValidate: the browser's own required-field check stopped the submit silently (custom lists show no bubble), so our message never appeared. */}
+        <form className="gv-stack" noValidate onSubmit={(event) => { event.preventDefault(); send(event.currentTarget) }}>
           <p className="gv-hint">Report a student from your classes. It goes to the Program Chair, or to the Dean if you are the chair. You can follow its status from your case queue.</p>
           <Select label="Student" placeholder="Choose a student" isRequired selectedKey={draft.studentId || null} onSelectionChange={(key) => update('studentId', String(key ?? ''))}
             isInvalid={Boolean(fieldError('studentId', draft.studentId ? undefined : 'Choose a student.'))} errorMessage={fieldError('studentId', draft.studentId ? undefined : 'Choose a student.')}
@@ -958,9 +1011,10 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
             isInvalid={Boolean(fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.'))} errorMessage={fieldError('narrative', draft.narrative.trim() ? undefined : 'Say what happened.')} />
           <Grid columns={2}>
             <TextField label="Where" maxLength={200} value={draft.location} onChange={(value) => update('location', value)} description="Optional" />
-            <DatePicker label="When" onChange={(value) => update('occurredOn', value?.toString() ?? '')} description="Optional" />
+            <DatePicker label="When" maxValue={campusToday()} onChange={(value) => update('occurredOn', value?.toString() ?? '')} description="Optional" />
           </Grid>
           {action.error && !(action.error as { fields?: unknown[] }).fields?.length && <Alert tone="danger" title="The report was not sent">{action.error.message}</Alert>}
+          {tried && missingNames.length > 0 && <Alert tone="danger" title="Fill in the required fields">{missingNames.join(', ')}.</Alert>}
           <div className="gv-foot">
             <Button variant="secondary" onPress={close} isDisabled={action.isPending}>Cancel</Button>
             <Button type="submit" loading={action.isPending}>Send report</Button>
@@ -979,6 +1033,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [query, setQuery] = useState(initial.get('q') ?? '')
   const [level, setLevel] = useState(initial.get('severity') ?? '')
   const [category, setCategory] = useState(initial.get('category') ?? '')
+  const [subcategory, setSubcategory] = useState(initial.get('subcategory') ?? '')
   const [status, setStatus] = useState(initial.get('status') ?? '')
   const [stage, setStage] = useState(initial.get('stage') ?? '')
   const [received, setReceived] = useState('term')
@@ -986,8 +1041,14 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [sort, setSort] = useState<SortDescriptor>({ column: 'updatedAt', direction: 'descending' })
   const records = items(page.data.cases)
-  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...(roles.includes('professor') ? [['teaching', 'Teaching assignments']] : []), ['history', 'Handled by me'], ['closed', 'Closed']]
-    : role === 'dean' ? [['open', 'At Dean stage'], ['history', 'Transferred'], ['closed', 'Closed']]
+  const categoryOptions = readCategoryOptions(page.data.categoryOptions)
+  const queueCategories = [...new Set([...categoryOptions.map((option) => option.label), ...records.map((report) => words(report.category))])].filter(Boolean)
+  const queueSubcategories = categoryOptions.find((option) => option.label === category)?.subcategories ?? []
+  // Someone who is also a professor (a Chair or the Dean who teaches) handles their advisees' reports too: their own tab,
+  // named for what it is (QA 17 November: a Chair could not find them under "Teaching assignments", and the Dean had none).
+  const adviserTab = role !== 'professor' && roles.includes('professor') ? [['teaching', 'As adviser']] : []
+  const tabDefs = role === 'chair' ? [['bypassed', 'Bypassed'], ['open', 'Escalated to me'], ...adviserTab, ['history', 'Handled by me'], ['closed', 'Closed']]
+    : role === 'dean' ? [['open', 'At Dean stage'], ...adviserTab, ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Intake'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
           : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
@@ -1005,9 +1066,9 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
               : selected === 'waiting' ? words(report.status).toLowerCase().includes('waiting')
                 : selected === 'intake' ? report.stage === 'guidance' && !report.caseFileId && !isClosed(report)
                   : selected === 'active' ? !isClosed(report) && items(report.history).length > 1
-                    : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId))
+                    : !isClosed(report) && (role !== 'chair' || !report.bypassed && report.stage === 'chair') && (role !== 'guidance' || Boolean(report.caseFileId)) && (!adviserTab.length || report.stage !== 'adviser')
   const inQueue = records.filter((report) => inTab(report, validTab))
-  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || words(report.id).toLowerCase().includes(query.toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
+  const filtered = inQueue.filter((report) => (!stage || stageOf(report) === stage) && (!query || [reportReference(report), words(report.id), studentName(report), words(report.category), words(report.subcategory), words(report.severity)].join(' ').toLowerCase().includes(query.trim().toLowerCase())) && (!level || report.severity === level) && (!category || report.category === category) && (!subcategory || report.subcategory === subcategory) && (!status || report.status === status) && (received === 'term' || new Date(words(report.createdAt)).getTime() >= Date.now() - Number(received) * 86400000))
     .sort((a, b) => (sort.column === 'waiting' ? waitingDays(a) - waitingDays(b) : sortValue(a).localeCompare(sortValue(b))) * (sort.direction === 'descending' ? -1 : 1))
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
@@ -1017,13 +1078,17 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="gv-page">
-        <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : <Note>{role === 'chair' || role === 'dean' ? 'You can read every concern in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>} />
+        <PageHeader title={title} description={page.scope} actions={page.data.canReportStudent === true ? <ReportStudent page={page} /> : undefined} />
+        {/* Always shown, also when Report a student takes the header's action slot (testing sheet: the Chair had none). */}
+        <Note>{role === 'chair' || role === 'dean' ? 'You see the concerns in your scope and act on those with you. Every action is recorded.' : 'You see only reports routed to you. Every action is recorded.'}</Note>
         <div className="gv-page accs-stagger">
           <QueueTabs validTab={validTab} onChange={(key) => reset(() => setTab(key))} defs={tabsShown} records={records} inTab={inTab} />
           <div className="accs-toolbar gv-toolbar">
-            <div className="accs-grow"><Search label="Search by reference" placeholder="RPT-0241" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
+            <div className="accs-grow"><Search label="Search reports" placeholder="Reference, student, category, or severity" size="sm" value={query} onChange={(value) => reset(() => setQuery(value))} /></div>
             <PillGroup id="severity" label="Severity" value={level} onChange={(value) => reset(() => setLevel(value))} options={[{ id: '', label: 'All' }, { id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]} />
-            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => setCategory(String(key ?? '')))}><SelectOption id="">All categories</SelectOption>{[...new Set(records.map((report) => words(report.category)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            {/* Every category, not only those in the list now, and its sub-categories once one is chosen. */}
+            <Select label="Category" selectedKey={category} onSelectionChange={(key) => reset(() => { setCategory(String(key ?? '')); setSubcategory('') })}><SelectOption id="">All categories</SelectOption>{queueCategories.map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
+            {queueSubcategories.length > 0 && <Select label="Sub-category" selectedKey={subcategory} onSelectionChange={(key) => reset(() => setSubcategory(String(key ?? '')))}><SelectOption id="">All sub-categories</SelectOption>{queueSubcategories.map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>}
             <Select label="Status" selectedKey={status} onSelectionChange={(key) => reset(() => setStatus(String(key ?? '')))}><SelectOption id="">All statuses</SelectOption>{[...new Set(records.map((report) => words(report.status)))].filter(Boolean).map((value) => <SelectOption id={value} key={value}>{value}</SelectOption>)}</Select>
             <Select label="Stage" selectedKey={stage} onSelectionChange={(key) => reset(() => setStage(String(key ?? '')))}><SelectOption id="">All stages</SelectOption>{stages.map(([key, name]) => <SelectOption id={key} key={key}>{name + ' (' + inQueue.filter((report) => stageOf(report) === key).length + ')'}</SelectOption>)}</Select>
             <Select label="Received" selectedKey={received} onSelectionChange={(key) => reset(() => setReceived(String(key)))}><SelectOption id="7">Last 7 days</SelectOption><SelectOption id="30">Last 30 days</SelectOption><SelectOption id="term">This term</SelectOption></Select>

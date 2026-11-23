@@ -1,3 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
+
+import { sessionQuery } from '@/lib/queries'
+import { roleLine } from '@/lib/role-scope'
 import type { ReactNode } from 'react'
 
 import { siteById, siteForPath } from '@/lib/sites'
@@ -20,6 +24,8 @@ export function PageHeader({
   crumbs?: Crumb[]
   actions?: ReactNode
 }) {
+  // Every page says which role it is shown for (testing sheet: only Home did).
+  const user = useQuery(sessionQuery()).data?.user
   return (
     <header className="accs-page-head">
       <div className="accs-page-head__main">
@@ -34,6 +40,7 @@ export function PageHeader({
             </nav>
           )}
           <h1 className="accs-page-title">{title}</h1>
+          {user && <p className="accs-page-role">{roleLine(user)}</p>}
           {description && <p className="accs-page-desc">{description}</p>}
         </div>
       </div>
@@ -86,9 +93,26 @@ export function Panel({
 export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'accent' | 'neutral'
 
 /** Dot + label status chip. Always text, never color alone. */
+/**
+ * The office a case status names ("Escalated to Program Chair", "Case File at Guidance"), so each office has its own color,
+ * the same as its role color in the Directory (QA 19 November: every escalation looked the same blue).
+ */
+export function officeOf(status: string) {
+  const s = status.toLowerCase()
+  if (!/(escalat|with |at guidance|at osas|case file|transfer|submitted to)/.test(s)) return undefined
+  if (s.includes('program chair') || /\bchair\b/.test(s)) return 'chair'
+  if (s.includes('dean')) return 'dean'
+  if (s.includes('guidance')) return 'guidance'
+  if (s.includes('osas')) return 'osas'
+  if (s.includes('adviser')) return 'adviser'
+  return undefined
+}
+
 export function StatusChip({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
+  const office = typeof children === 'string' ? officeOf(children) : undefined
+  const closed = typeof children === 'string' && /^closed\b/i.test(children.trim())
   return (
-    <span className="accs-status" data-tone={tone === 'neutral' ? undefined : tone}>
+    <span className="accs-status" data-tone={tone === 'neutral' ? undefined : tone} data-office={office} data-closed={closed || undefined}>
       {children}
     </span>
   )

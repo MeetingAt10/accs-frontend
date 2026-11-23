@@ -41,10 +41,28 @@ function signInMessage(error: unknown) {
 
 type View = 'sign-in' | 'forgot' | 'reset'
 
+// With Remember me ticked, the email or ID (never the password) is kept on this device and filled in next time.
+const rememberedKey = 'accs.sign-in.remembered'
+function rememberedId() {
+  try {
+    return localStorage.getItem(rememberedKey) ?? ''
+  } catch {
+    return ''
+  }
+}
+function keepId(emailOrId: string, remember: boolean) {
+  try {
+    if (remember) localStorage.setItem(rememberedKey, emailOrId)
+    else localStorage.removeItem(rememberedKey)
+  } catch {
+    // Storage can be blocked (private windows); signing in works without it.
+  }
+}
+
 function SignInPage() {
-  const { redirect: redirectTo } = Route.useSearch()
+  const { redirect: redirectTo, ended } = Route.useSearch()
   const [view, setView] = useState<View>('sign-in')
-  const [emailOrId, setEmailOrId] = useState('')
+  const [emailOrId, setEmailOrId] = useState(rememberedId)
   const [notice, setNotice] = useState('')
 
   return (
@@ -57,6 +75,7 @@ function SignInPage() {
               emailOrId={emailOrId}
               setEmailOrId={setEmailOrId}
               notice={notice}
+              ended={!!ended}
               onForgot={() => {
                 setNotice('')
                 setView('forgot')
@@ -92,20 +111,28 @@ function SignInForm({
   emailOrId,
   setEmailOrId,
   notice,
+  ended,
   onForgot,
 }: {
   redirectTo?: string
   emailOrId: string
   setEmailOrId: (value: string) => void
   notice: string
+  ended: boolean
   onForgot: () => void
 }) {
   const finish = useFinishAuth(redirectTo)
   const form = useRef<HTMLFormElement>(null)
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(false)
+  const [remember, setRemember] = useState(() => rememberedId() !== '')
   const [errors, setErrors] = useState<{ emailOrId?: string; password?: string }>({})
-  const mutation = useMutation({ mutationFn: signIn, onSuccess: finish })
+  const mutation = useMutation({
+    mutationFn: signIn,
+    onSuccess: (session, input) => {
+      keepId(input.emailOrId, !!input.remember)
+      finish(session)
+    },
+  })
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -121,8 +148,16 @@ function SignInForm({
   return (
     <>
       <Title>Sign in</Title>
+      <Sub>Use your QCU email, your student or employee ID, or the username you chose.</Sub>
       <Form formRef={form} onSubmit={submit}>
         {notice && <Rise><Alert tone="success" title={notice} /></Rise>}
+        {!notice && ended && !mutation.error && (
+          <Rise><Alert tone="info" title="Your session ended">Sign in again to go back to the page you were on.</Alert></Rise>
+        )}
+        {/* Above the fields, so a screen reader hears the problem before the fields again. */}
+        <Reveal show={!!(mutation.error)}>
+          <Alert tone="danger" title={mutation.error ? signInMessage(mutation.error) : ''} />
+        </Reveal>
         <TextInput
           label="Email, ID, or username"
           autoComplete="username"
@@ -148,11 +183,16 @@ function SignInForm({
             Forgot password?
           </button>
         </Rise>
-        <Reveal show={!!(mutation.error)}>
-          <Alert tone="danger" title={mutation.error ? signInMessage(mutation.error) : ''} />
-        </Reveal>
         <SubmitButton loading={mutation.isPending}>Sign in</SubmitButton>
       </Form>
+      <details className="au-help">
+        <summary>Can't sign in?</summary>
+        <p>
+          Students: ask the CCS secretary to check your account or to give you new sign-in details. Faculty and staff:
+          contact the CCS office. If you know the email on your account, use Forgot password? above.
+        </p>
+      </details>
+      <p className="au-privacy">ACCS uses simulated enrollment data. Don't enter real records.</p>
     </>
   )
 }

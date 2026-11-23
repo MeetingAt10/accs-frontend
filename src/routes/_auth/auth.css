@@ -126,6 +126,13 @@ html:has(.au) { scrollbar-gutter: auto; background: var(--accs-surface); }
 .au-foot a { color: var(--accs-navy); font-weight: 500; }
 .au-foot .au-link { min-height: 0; }
 
+/* "Can't sign in?" and the privacy note under the form. */
+.au-help { margin: 20px 0 0; font-size: 0.875rem; color: var(--accs-muted); }
+.au-help summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--accs-navy); font-weight: 500; cursor: pointer; }
+.au-help summary:focus-visible { outline: 2px solid var(--accs-navy); outline-offset: 2px; }
+.au-help p { margin: 4px 0 0; line-height: 1.55; }
+.au-privacy { margin: 16px 0 0; font-size: 0.8125rem; color: var(--accs-muted); }
+
 .au-submit {
   display: flex;
   align-items: center;

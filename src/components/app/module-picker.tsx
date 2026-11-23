@@ -54,14 +54,14 @@ const entries: Entry[] = [
   { id: 'import', label: 'Student import', about: 'Create student accounts from an Excel file.', icon: 'upload', roles: ['secretary'], to: ['/accounts'], query: '?tab=students' },
 
   { id: 'file-concern', label: 'File a concern', about: 'Tell your advisor or the college what happened.', icon: 'pencil', tone: 'neutral', roles: ['student'], to: ['/reports/new'] },
-  { id: 'my-concerns', label: 'My concerns', about: 'Concerns you filed and the replies to them.', icon: 'file', tone: 'neutral', roles: ['student'], to: ['/reports'] },
+  { id: 'my-concerns', label: 'My reports', about: 'Reports you filed and the replies to them.', icon: 'file', tone: 'neutral', roles: ['student'], to: ['/reports'] },
   { id: 'student-consultations', label: 'Appointments', about: 'Book a time with a faculty member.', icon: 'calendar', tone: 'consult', roles: ['student'], to: ['/consultations', '/calendar'] },
   { id: 'student-messages', label: 'Messages', about: 'Conversations with your advisor and faculty.', icon: 'envelope', tone: 'community', roles: ['student'], to: ['/messages'] },
   { id: 'student-evaluations', label: 'Evaluations', about: 'Evaluate your professors; it counts for clearance.', icon: 'list-checks', roles: ['student'], to: ['/evaluations'] },
   { id: 'student-standing', label: 'My standing', about: 'Your clearance and any paused features.', icon: 'info', roles: ['student'], to: ['/standing'] },
 
   { id: 'assigned-concerns', label: 'Assigned concerns', about: 'Concerns from the students you advise.', icon: 'file', tone: 'neutral', roles: ['professor'], to: ['/cases', '/reports'] },
-  { id: 'faculty-schedule', label: 'Appointment schedule', about: 'Appointment requests and your calendar.', icon: 'calendar', tone: 'consult', roles: ['professor'], to: ['/calendar', '/consultations'] },
+  { id: 'faculty-schedule', label: 'Appointment schedule', about: 'Appointment requests and your calendar.', icon: 'calendar', tone: 'consult', roles: ['professor'], to: ['/consultations', '/calendar'] },
   { id: 'availability', label: 'My availability', about: 'Set when students can book you.', icon: 'clock', tone: 'consult', roles: ['professor'], to: ['/consultations/availability'] },
   { id: 'faculty-messages', label: 'Messages', about: 'Conversations with students and faculty.', icon: 'envelope', tone: 'community', roles: ['professor'], to: ['/messages'] },
   { id: 'faculty-results', label: 'Evaluation results', about: 'What your students said about your classes.', icon: 'list', roles: ['professor'], to: ['/evaluations/results'] },
@@ -89,14 +89,20 @@ const entries: Entry[] = [
   { id: 'osas-directory', label: 'Directory', about: 'Find faculty and offices.', icon: 'users', roles: ['osas'], to: ['/directory'] },
 ]
 
-/** Tiles for this session, in catalog order. */
+/** The role whose modules Home shows, for people with two roles: the Dean before their professor duties, and so on. */
+const mainRoleOrder = ['dean', 'chair', 'guidance', 'osas', 'secretary', 'administrator', 'professor', 'organization', 'student']
+/** Home shows six main modules (QA 19 November: the Dean, who also teaches, had twelve); the menu still has the rest. */
+export const moduleLimit = 6
+
+/** Tiles for this session: its main role's modules, in catalog order, at most six. */
 export function moduleTiles(session: Parameters<typeof canOpenPath>[0]) {
+  const main = mainRoleOrder.find((role) => session.user.roles.includes(role))
   return entries.flatMap(({ roles, to, query = '', ...tile }): ModuleTile[] => {
-    if (!roles.some((role) => session.user.roles.includes(role))) return []
+    if (!roles.some((role) => (main ? role === main : session.user.roles.includes(role)))) return []
     if (!to) return [tile]
     const path = to.find((candidate) => canOpenPath(session, candidate))
     return path ? [{ ...tile, href: path + query }] : []
-  })
+  }).slice(0, moduleLimit)
 }
 
 export function ModulePicker({ session }: { session: Session }) {

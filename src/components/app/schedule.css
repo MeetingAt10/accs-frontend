@@ -294,7 +294,9 @@
 .bk-slot > span { position: relative; z-index: 1; }
 .bk-slot:hover:not(:disabled) { background: var(--site-accent-wash); }
 .bk-slot:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 3px; }
-.bk-slot[aria-pressed='true'] { color: var(--accs-on-accent); }
+/* The chosen time has its own fill, so its light text never sits on a light background (it looked empty when the
+   animated thumb was not drawn). */
+.bk-slot[aria-pressed='true'], .bk-slot[aria-pressed='true']:hover:not(:disabled) { background: var(--site-accent); border-color: var(--site-accent); color: var(--accs-on-accent); }
 .bk-slot__thumb {
   position: absolute;
   inset: -1.5px;
@@ -353,3 +355,13 @@
 
 /* Why a time is not available, for the professor's own view. */
 .sc-reason { margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }
+
+.sc-person-text { display: grid; gap: 2px; min-width: 0; }
+
+/* "Show all" / "Hide all" in the Show on calendar header. */
+.sc-layers-all { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+.sc-layers-all:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; border-radius: 4px; }
+/* The picked day, with what can be added to it. */
+.sc-dayadd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control, 10px); }
+.sc-dayadd > span { margin-inline-end: auto; font-weight: 600; }
+.sc-detail > .ds-status, .sc-detail > [class*="status"] { justify-self: start; }

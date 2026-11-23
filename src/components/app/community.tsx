@@ -1,3 +1,5 @@
+import { campusToday } from '@/lib/campus-date'
+import { parseDate } from '@internationalized/date'
 import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
 import type { MessageFile } from '@/lib/api'
 import { AvatarFill, photoSrc } from '@/components/app/photo'
@@ -40,6 +42,7 @@ import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/r
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { IdentityChoice } from '@/components/app/grievance'
+import { AddMember, MemberControls, NewOrganization, type StudentChoice } from '@/components/app/organization-admin'
 import { RestrictedView } from '@/components/app/guards'
 import { PagedList } from '@/components/app/paging'
 import {
@@ -62,6 +65,8 @@ import {
 } from '@/lib/api'
 import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { replaceFilters } from '@/lib/url-filters'
+import { TypedSearch } from '@/components/app/typed-search'
 import './community.css'
 
 interface Person {
@@ -71,6 +76,8 @@ interface Person {
   program?: string
   studentId?: string
   organizationRole?: string
+  /** A student's section name, like SBIT3A. */
+  section?: string
   role?: string
   title?: string
 }
@@ -82,6 +89,8 @@ interface PostComment {
   at: string
   /** Flagged and hidden from others until a moderator reviews it; only its author sees it. */
   underReview?: boolean
+  /** Written by you (anonymous or not): no "Report comment" for it. */
+  owned?: boolean
 }
 
 export interface CommunityPost {
@@ -174,6 +183,8 @@ interface ScopeOption {
 const postLabels = ['Discussion', 'Rant', 'Assistance', 'Support']
 /** The label as a key for its colour (Announcement, Discussion, Rant, Assistance, Support). */
 export const labelKey = (label: string) => label.toLowerCase().replace(/s$/, '').replace(/[^a-z]/g, '') || 'discussion'
+// Roles that post on the Feed. The CCS Secretary posts and publishes announcements (decided 16 November 2026); she was
+// missing here, so the Feed never offered her a way to post although the API allows it.
 const participatingRoles = [
   'student',
   'organization',
@@ -182,6 +193,7 @@ const participatingRoles = [
   'dean',
   'guidance',
   'osas',
+  'secretary',
 ]
 const roleNames: Record<string, string> = {
   student: 'Student',
@@ -241,8 +253,7 @@ function useFilters() {
       if (value) next.set(key, value)
       else next.delete(key)
     }
-    const search = next.toString()
-    router.history.push(location.pathname + (search ? `?${search}` : ''))
+    replaceFilters(router, location.pathname, next)
   }
 
   return { params, update }
@@ -288,6 +299,41 @@ function authorName(post: CommunityPost) {
 function priorityLabel(priority: string) {
   const value = priority || 'general'
   return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/** Comment on a post straight from the feed, without opening it. To comment anonymously, open the post. */
+function RowComment({ post }: { post: CommunityPost }) {
+  const [open, setOpen] = useState(false)
+  const [body, setBody] = useState('')
+  const queryClient = useQueryClient()
+  const send = useMutation({
+    mutationFn: () => performPageAction('P06', { action: 'comment', recordId: post.id, payload: { body: body.trim() } }),
+    onSuccess: async (result) => {
+      setBody('')
+      setOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ['page'] })
+      toast(result.message, { tone: 'success' })
+    },
+  })
+  return (
+    <div className="fx-row-comment">
+      {!open ? (
+        <button type="button" className="fx-row-comment__toggle" onClick={() => { send.reset(); setOpen(true) }}>
+          <Icon name="chat" size={16} />
+          Comment
+        </button>
+      ) : (
+        <form className="fx-row-comment__form" onSubmit={(event) => { event.preventDefault(); if (body.trim() && !send.isPending) send.mutate() }}>
+          <TextArea label={`Comment on ${post.title}`} value={body} onChange={setBody} maxLength={4000} autoFocus />
+          <div className="fx-row-comment__actions">
+            <Button type="submit" size="sm" loading={send.isPending} isDisabled={!body.trim()}>Post comment</Button>
+            <Button size="sm" variant="tertiary" onPress={() => { setOpen(false); setBody('') }}>Cancel</Button>
+          </div>
+          {send.error && <Alert tone="danger" title="The comment was not posted">{send.error.message}</Alert>}
+        </form>
+      )}
+    </div>
+  )
 }
 
 function ThreadList({
@@ -383,6 +429,7 @@ function ThreadList({
                       <span className="fx-sr">replies</span>
                     </span>
                   </p>
+                  {!post.removed && <RowComment post={post} />}
                 </div>
               </motion.li>
             )
@@ -557,7 +604,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
   ) {
     scopes.push({ id: `program:${session.user.program}`, label: 'My program' })
   }
-  if (roles.includes('dean')) {
+  // The Secretary reads the Faculty and program audiences like the Dean (QA 17 November, V3: her feed had CCS only).
+  if (roles.some((role) => ['dean', 'secretary'].includes(role))) {
     scopes.push(
       ...['BSIT', 'BSCS', 'BSIS'].map((program) => ({
         id: `program:${program}`,
@@ -576,7 +624,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
         .map((space) => ({ id: `space:${space.id}`, label: spaceName(space) })),
     )
   }
-  if (roles.some((role) => ['professor', 'chair', 'dean'].includes(role))) {
+  if (roles.some((role) => ['professor', 'chair', 'dean', 'secretary'].includes(role))) {
     scopes.push({ id: 'faculty', label: 'Faculty' })
   }
   scopes.push(
@@ -621,7 +669,9 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     const next = labels.includes(label)
       ? labels.filter((item) => item !== label)
       : [...labels, label]
-    update({ label: next.join(',') || undefined })
+    // Every label picked is the same as All, so it goes back to All (QA 17 November: two states that showed the same posts).
+    const everyLabel = ['Announcements', ...postLabels].every((item) => next.includes(item))
+    update({ label: everyLabel ? undefined : next.join(',') || undefined })
   }
 
   function clearFilters() {
@@ -633,8 +683,9 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
       <PageHeader
         title="Feed"
         description="Posts and announcements from the audiences you belong to."
+        // One "Start a discussion": the bar above the feed when it shows (QA 17 November: it was there twice).
         actions={
-          canParticipate && (
+          canParticipate && !canPost && (
             <Button
               icon="plus"
               href="/feed/new"
@@ -660,7 +711,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
           <div className="fx-toolbar">
             <div className="fx-toolbar__row">
               <div className="fx-toolbar__search">
-                <Search
+                <TypedSearch
                   label="Search posts"
                   size="sm"
                   value={query}
@@ -722,6 +773,7 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                     key={label}
                     className="accs-pill fx-cat"
                     data-label={labelKey(label)}
+                    data-included={!labels.length || undefined}
                     aria-pressed={labels.includes(label)}
                     onClick={() => toggleLabel(label)}
                   >
@@ -738,13 +790,15 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                 spaces={spaces}
                 organizations={organizations}
               />
-              {pageCount > 1 && (
+              {pageCount > 1 ? (
                 <Pagination
                   page={pageNumber}
                   pageCount={pageCount}
                   onPageChange={(next) => update({ page: String(next) })}
                   summary={`Showing ${(pageNumber - 1) * 10 + 1}–${Math.min(pageNumber * 10, posts.length)} of ${posts.length} posts`}
                 />
+              ) : (
+                <p className="accs-pager accs-pager--count">{`Showing ${posts.length === 1 ? '1' : `1–${posts.length}`} of ${posts.length} ${posts.length === 1 ? 'post' : 'posts'}`}</p>
               )}
             </>
           ) : (
@@ -833,7 +887,9 @@ export function PostComposer({
   const uploads = useFileUploads(10)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
-  const [eventDate, setEventDate] = useState('')
+  // "Add event" on the calendar opens this form with its date (YYYY-MM-DD, today or later).
+  const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') && (params.get('date') ?? '') >= campusToday().toString() ? params.get('date')! : ''
+  const [eventDate, setEventDate] = useState(requestedDate)
   const [eventTime, setEventTime] = useState('')
   const [eventPlace, setEventPlace] = useState('')
   const [eventContact, setEventContact] = useState('')
@@ -851,6 +907,9 @@ export function PostComposer({
   const eventRequired =
     kind === 'announcement' &&
     (audience.startsWith('organization:') || audience.startsWith('space:'))
+  // Any announcement can carry an event, which puts it on the calendar; only class and organization ones must.
+  const eventShown = kind === 'announcement'
+  const eventGiven = Boolean(eventDate || eventTime.trim() || eventPlace.trim() || eventContact.trim())
   const invalidRequestedAudience = Boolean(
     requested &&
     ![...audiences, ...announcementAudiences].includes(requestedAudience),
@@ -871,12 +930,15 @@ export function PostComposer({
     if (!body.trim() && !uploads.ready.length) nextErrors.body = 'Write your post or attach a file.'
     if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
-    if (eventRequired) {
+    if (eventRequired || (eventShown && eventGiven)) {
       if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
+      else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTime))
         nextErrors.eventTime = 'Enter a time as HH:MM.'
+    }
+    if (eventRequired) {
       if (!eventPlace.trim()) nextErrors.eventPlace = 'Enter the event place.'
-      if (!eventContact.trim()) nextErrors.eventContact = 'Enter a contact.'
+      if (!eventContact.trim()) nextErrors.eventContact = 'Enter who to contact.'
     }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
@@ -894,9 +956,12 @@ export function PostComposer({
           priority,
           private: audience.startsWith('organization:'),
           ...(uploads.ready.length ? { attachments: uploads.ready } : {}),
+          // Notify members only for class and organization events: a college-wide one would notify every account.
           ...(eventRequired
             ? { eventDate, eventTime, eventPlace, eventContact, notifyMembers }
-            : {}),
+            : eventShown && eventGiven
+              ? { eventDate, eventTime, ...(eventPlace.trim() ? { eventPlace } : {}), ...(eventContact.trim() ? { eventContact } : {}) }
+              : {}),
         },
       })
       const created = record<CommunityPost>(result.record)
@@ -1038,7 +1103,7 @@ export function PostComposer({
             </div>
           </section>
           <AnimatePresence initial={false}>
-            {eventRequired && (
+            {eventShown && (
               <motion.section
                 key="event"
                 className="fx-group fx-group--event"
@@ -1053,24 +1118,29 @@ export function PostComposer({
                     Event details
                   </h2>
                   <p className="fx-group__hint">
-                    Members see this on the post and in the calendar.
+                    {eventRequired
+                      ? 'Members see this on the post and in the calendar.'
+                      : 'Optional. Add a date and time to put this announcement on the calendar.'}
                   </p>
                 </div>
                 <div className="fx-group__body fx-group__body--grid">
                   <DatePicker
                     label="Event date"
-                    isRequired
+                    isRequired={eventRequired}
+                    defaultValue={requestedDate ? parseDate(requestedDate) : undefined}
+                    minValue={campusToday()}
                     onChange={(value) => setEventDate(value?.toString() ?? '')}
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
+                  {/* The browser's time picker (QA 17 November: typing the time by hand was hard); it gives HH:MM. No hint line, so the
+                      row lines up with Event date (QA 19 November). */}
                   <TextField
+                    type="time"
                     label="Time"
                     value={eventTime}
                     onChange={setEventTime}
-                    placeholder="14:00"
-                    description="Use 24-hour time, HH:MM."
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}
                   />
@@ -1078,23 +1148,26 @@ export function PostComposer({
                     label="Place"
                     value={eventPlace}
                     onChange={setEventPlace}
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventPlace)}
                     errorMessage={errors.eventPlace}
                   />
                   <TextField
-                    label="Contact"
+                    label="Contact person"
+                    placeholder="Prof. Robin Elm, 0917 123 4567"
                     value={eventContact}
                     onChange={setEventContact}
-                    isRequired
+                    isRequired={eventRequired}
                     isInvalid={Boolean(errors.eventContact)}
                     errorMessage={errors.eventContact}
                   />
-                  <div className="fx-group__wide">
-                    <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
-                      Notify members
-                    </Checkbox>
-                  </div>
+                  {eventRequired && (
+                    <div className="fx-group__wide">
+                      <Checkbox isSelected={notifyMembers} onChange={setNotifyMembers}>
+                        Notify members
+                      </Checkbox>
+                    </div>
+                  )}
                 </div>
               </motion.section>
             )}
@@ -1445,7 +1518,7 @@ function PostDetailPage({
               onAction={(key) => menuAction(String(key))}
             >
               <MenuItem id="copy">Copy link</MenuItem>
-              <MenuItem id="report">Report post</MenuItem>
+              {!post.owned && <MenuItem id="report">Report post</MenuItem>}
               {canConvert && <MenuItem id="convert">Start a report</MenuItem>}
               {post.owned && session.permissions.includes('post.create') && (
                 <MenuItem id="edit">Edit post</MenuItem>
@@ -1521,14 +1594,16 @@ function PostDetailPage({
                             Reply
                           </Button>
                         )}
-                        <MenuButton
-                          iconOnly
-                          icon="dots-three"
-                          label="Comment actions"
-                          onAction={() => openReport('comment', comment.id)}
-                        >
-                          <MenuItem id="report">Report comment</MenuItem>
-                        </MenuButton>
+                        {!comment.owned && (
+                          <MenuButton
+                            iconOnly
+                            icon="dots-three"
+                            label="Comment actions"
+                            onAction={() => openReport('comment', comment.id)}
+                          >
+                            <MenuItem id="report">Report comment</MenuItem>
+                          </MenuButton>
+                        )}
                       </>
                     }
                   >
@@ -1782,10 +1857,13 @@ function MemberList({
   members,
   academic = false,
   organization = false,
+  manage,
 }: {
   members: Person[]
   academic?: boolean
   organization?: boolean
+  /** The organization account manages its members and their positions (19 November 2026). */
+  manage?: { organizationId: string; accountId?: string; students: StudentChoice[] }
 }) {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -1814,6 +1892,7 @@ function MemberList({
         <span className="fx-count-label">
           <span className="accs-num">{filtered.length}</span> {noun}
         </span>
+        {manage && <AddMember organizationId={manage.organizationId} students={manage.students} />}
       </div>
       {filtered.length ? (
         <>
@@ -1827,7 +1906,10 @@ function MemberList({
                   <div className="accs-row fx-member">
                     <Initials name={member.name} />
                     <div className="fx-member__text">
-                      <p className="accs-row__title">{member.name}</p>
+                      {/* Opens their profile (QA 17 November: roster and member names did not). */}
+                      <p className="accs-row__title">
+                        {member.id ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
+                      </p>
                       {academic && (
                         <p className="accs-row__sub">
                           <span className="accs-mono">
@@ -1837,26 +1919,37 @@ function MemberList({
                           {member.program ?? '—'}
                         </p>
                       )}
+                      {/* An organization member's section under their name (QA 19 November). */}
+                      {organization && (member.section || member.program) && (
+                        <p className="accs-row__sub">{member.section ?? member.program}</p>
+                      )}
                     </div>
-                    <span className="accs-tag">
-                      {academic
-                        ? 'Enrolled'
-                        : organization
-                          ? (member.organizationRole ?? member.role ?? 'Member')
-                          : personRole(member)}
+                    <span className="org-member-end">
+                      <span className="accs-tag">
+                        {academic
+                          ? 'Enrolled'
+                          : organization
+                            ? (member.organizationRole ?? member.role ?? 'Member')
+                            : personRole(member)}
+                      </span>
+                      {manage && member.id && member.id !== manage.accountId && (
+                        <MemberControls organizationId={manage.organizationId} member={{ id: member.id, name: member.name, organizationRole: member.organizationRole }} />
+                      )}
                     </span>
                   </div>
                 </li>
               ))}
             </ul>
           </Panel>
-          {pageCount > 1 && (
+          {pageCount > 1 ? (
             <Pagination
               page={currentPage}
               pageCount={pageCount}
               onPageChange={setPage}
-              summary={`${filtered.length} ${noun}`}
+              summary={`Showing ${(currentPage - 1) * 20 + 1}–${Math.min(currentPage * 20, filtered.length)} of ${filtered.length} ${noun}`}
             />
+          ) : (
+            <p className="accs-pager accs-pager--count">{`Showing ${filtered.length === 1 ? '1' : `1–${filtered.length}`} of ${filtered.length} ${noun}`}</p>
           )}
         </>
       ) : (
@@ -1926,7 +2019,7 @@ function SpacesPage({
         <div className="fx-toolbar">
           <div className="fx-toolbar__row">
             <div className="fx-toolbar__search">
-              <Search
+              <TypedSearch
                 label="Find a section"
                 size="sm"
                 value={query}
@@ -2240,10 +2333,11 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         title="Organizations"
         description="Approved CCS student organizations."
+        actions={page.data.canCreate === true ? <NewOrganization students={list<StudentChoice>(page.data.studentOptions)} /> : undefined}
       />
       <div className="fx-toolbar fx-toolbar--slim">
         <div className="fx-toolbar__search">
-          <Search
+          <TypedSearch
             label="Find an organization"
             size="sm"
             value={query}
@@ -2327,6 +2421,8 @@ function OrganizationPage({
         description={organization.description}
         actions={
           <>
+            {/* Every listed organization is verified by CCS, with a verified representative (testing sheet, P10). */}
+            <StatusChip tone="ok">Verified organization</StatusChip>
             {representative && (
               <Button
                 icon="megaphone"
@@ -2431,7 +2527,11 @@ function OrganizationPage({
         {organization.member && (
           <TabPanel id="members">
             <div className="fx-tab">
-              <MemberList members={organization.members ?? []} organization />
+              <MemberList
+                members={organization.members ?? []}
+                organization
+                manage={page.data.canManageMembers === true ? { organizationId: organization.id, accountId: organization.representative?.id, students: list<StudentChoice>(page.data.studentOptions) } : undefined}
+              />
             </div>
           </TabPanel>
         )}

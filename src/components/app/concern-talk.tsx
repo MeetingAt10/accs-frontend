@@ -7,6 +7,7 @@ import type { UseMutationResult } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 
 import type { ActionResult, PageAction } from '@/lib/api'
+import { isPastLocal } from '@/lib/campus-date'
 import { formatDateTime } from '@/lib/format'
 import { Empty, Panel } from '@/components/app/page-shell'
 
@@ -183,6 +184,8 @@ function TalkDialog({ mode, isOpen, onOpenChange, reportId, wording, action }: {
   const [agreed, setAgreed] = useState(false)
   const [record, setRecord] = useState(false)
   const [preferredAt, setPreferredAt] = useState('')
+  // A preferred time is still to come (QA 17 November, V3: past dates could be picked).
+  const preferredPast = mode !== 'chat' && isPastLocal(preferredAt)
   // ponytail: a suggested time, not a list of open times. The report data has no handler id, and the consultation pages list only faculty a student shares a class with. Add a picker when the report data carries the handler's open times.
   const save = () => action.mutate({
     action: 'chooseTalkMode',
@@ -198,13 +201,13 @@ function TalkDialog({ mode, isOpen, onOpenChange, reportId, wording, action }: {
       <ModalBody>
         <blockquote className="gv-wording">{wording.talk[mode]}</blockquote>
         {isCall(mode) && <Checkbox isSelected={record} onChange={setRecord} description="Optional. If you leave this off, we record that you do not allow recording.">{wording.recording.allow.replace(/\.$/, '')}</Checkbox>}
-        {mode !== 'chat' && <TextField type="datetime-local" label="Date and time you prefer" description="Optional. Campus time (Philippines). The final time is confirmed with you." value={preferredAt} onChange={setPreferredAt} />}
+        {mode !== 'chat' && <TextField type="datetime-local" label="Date and time you prefer" description="Optional. Campus time (Philippines). The final time is confirmed with you." value={preferredAt} onChange={setPreferredAt} isInvalid={preferredPast} errorMessage="Choose a date and time that has not passed yet." />}
         <Checkbox isSelected={agreed} onChange={setAgreed}>I have read this and I agree</Checkbox>
         {action.error && <Alert tone="danger" title="Couldn't save your choice">{action.error.message}</Alert>}
       </ModalBody>
       <ModalActions>
         <Button variant="secondary" onPress={() => onOpenChange(false)} isDisabled={action.isPending}>Cancel</Button>
-        <Button loading={action.isPending} isDisabled={!agreed} onPress={save}>Save choice</Button>
+        <Button loading={action.isPending} isDisabled={!agreed || preferredPast} onPress={save}>Save choice</Button>
       </ModalActions>
     </Modal>
   )
@@ -264,7 +267,10 @@ export function TalkChoice({ report, wording, action }: { report: Item; wording:
 
 function TalkDetailsForm({ talk, reportId, action }: { talk: Talk; reportId: string; action: PageMutation }) {
   const call = isCall(talk.mode)
-  const [when, setWhen] = useState(campusLocal(talk.scheduledAt || talk.preferredAt))
+  const savedWhen = campusLocal(talk.scheduledAt || talk.preferredAt)
+  const [when, setWhen] = useState(savedWhen)
+  // A new time is still to come; the one already saved may stay when only the link or place changes.
+  const whenPast = when !== savedWhen && isPastLocal(when)
   const [link, setLink] = useState(talk.meetingLink)
   const [place, setPlace] = useState(talk.place)
   const [linkError, setLinkError] = useState('')
@@ -277,7 +283,7 @@ function TalkDetailsForm({ talk, reportId, action }: { talk: Talk; reportId: str
     const empty = !when && !(call ? url : where)
     setLinkError(badLink ? 'Use a link that starts with https://' : '')
     setError(empty ? (call ? 'Add a time or a meeting link to save.' : 'Add a time or a place to save.') : '')
-    if (badLink || empty) return
+    if (badLink || empty || whenPast) return
     action.mutate({
       action: 'setTalkDetails',
       recordId: reportId,
@@ -287,7 +293,7 @@ function TalkDetailsForm({ talk, reportId, action }: { talk: Talk; reportId: str
   return (
     <form className="gv-stack" onSubmit={submit} noValidate>
       <h3 className="gv-subhead">{call ? 'Add the time and meeting link' : 'Add the time and place'}</h3>
-      <TextField type="datetime-local" label="Date and time" description="Campus time (Philippines). The student sees this." value={when} onChange={setWhen} />
+      <TextField type="datetime-local" label="Date and time" description="Campus time (Philippines). The student sees this." value={when} onChange={setWhen} isInvalid={whenPast} errorMessage="Choose a date and time that has not passed yet." />
       {call
         ? <TextField type="url" label="Meeting link" description="The student sees this and opens it in a new tab." value={link} onChange={setLink} maxLength={500} isInvalid={Boolean(linkError)} errorMessage={linkError} />
         : <TextField label="Place" description="The student sees this." value={place} onChange={setPlace} maxLength={200} />}

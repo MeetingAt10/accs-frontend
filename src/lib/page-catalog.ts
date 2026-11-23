@@ -102,8 +102,8 @@ export const routePermission: Record<string, string | string[]> = {
   P47: 'role.manage',
   P48: 'role.manage',
   // The CCS Secretary decides items referred to them (D-04), as the API allows.
-  P49: ['moderation.review', 'moderation.referral'],
-  P50: ['moderation.review', 'moderation.referral'],
+  P49: ['moderation.review', 'moderation.referral', 'moderation.osas'],
+  P50: ['moderation.review', 'moderation.referral', 'moderation.osas'],
   P51: 'audit.view',
   P52: 'audit.view',
   P54: 'load.manage',
@@ -180,6 +180,7 @@ export function pageIdForPath(path: string) {
 }
 
 export function titleForPath(path: string) {
+  if (path === '/search') return 'Search'
   const pageId = pageIdForPath(path)
   return pageId ? pageTitles[pageId] : 'ACCS'
 }

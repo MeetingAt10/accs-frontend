@@ -1,21 +1,32 @@
+import { formatDate } from "@/lib/format";
+import { featureWords } from "@/lib/restrictions";
+import { AssistantIconButton, assistantIconName } from "@/components/app/assistant-icon";
+import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
 import {
   Alert,
   Badge,
   Button,
+  ComboBox,
   Drawer,
   IconButton,
   Link,
+  Modal,
+  ModalBody,
   Popover,
   Search,
+  SelectOption,
   Stack,
   toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { OverlayTriggerStateContext } from "react-aria-components";
 
 import {
   AssistantPanel,
+  NoticeDialog,
+  noticeHasPage,
   notificationHref,
 } from "@/components/app/communications";
 import {
@@ -487,6 +498,8 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       label: "Cases",
       entries: [
         { label: "OSAS cases", href: "/cases", pageId: "P21", icon: "tray" },
+        // Flagged posts and messages the CCS Secretary sends to OSAS for a decision.
+        { label: "Flagged content", href: "/admin/moderation", pageId: "P49", icon: "flag" },
       ],
     },
     {
@@ -541,7 +554,13 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
           pageId: "P49",
           icon: "flag",
         },
+        // The Secretary changes roles and approves permission requests (decided 20 November 2026).
+        { label: "Users and roles", href: "/admin/users", pageId: "P46", icon: "users" },
+        { label: "Permissions", href: "/admin/roles", pageId: "P48", icon: "lock" },
+        { label: "Calendar", href: "/calendar", pageId: "P13", icon: "calendar" },
         { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+        // The Secretary messages anyone (decided 20 November 2026).
+        { label: "Messages", href: "/messages", pageId: "P11", icon: "envelope" },
         {
           label: "Organizations",
           href: "/organizations",
@@ -564,12 +583,24 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
   ],
 };
 
+/** Hands the bell's close function to the shell: the design-system Popover keeps its open state to itself. */
+function BellCloser({ closeRef }: { closeRef: React.RefObject<(() => void) | undefined> }) {
+  const state = useContext(OverlayTriggerStateContext);
+  useEffect(() => {
+    closeRef.current = state ? () => state.close() : undefined;
+    return () => {
+      closeRef.current = undefined;
+    };
+  }, [closeRef, state]);
+  return null;
+}
+
 export const accountNavigation: RoleGroup[] = [
   {
     label: "Account",
     entries: [
       { label: "Notifications", href: "/notifications", pageId: "P40", icon: "bell" },
-      { label: "Assistant", href: "/assistant", pageId: "P41", icon: "chat" },
+      { label: "Assistant", href: "/assistant", pageId: "P41", icon: assistantIconName },
       { label: "My profile", href: "/profile", pageId: "P39", icon: "user" },
       { label: "Directory", href: "/directory", pageId: "P37", icon: "users" },
       { label: "Help", href: "/help", pageId: "P42", icon: "question" },
@@ -657,6 +688,7 @@ function Topbar({
   accountLinks,
   onMenu,
   onSignOut,
+  paused,
 }: {
   title: string;
   site: SiteId;
@@ -664,6 +696,7 @@ function Topbar({
   accountLinks: NavEntry[];
   onMenu: () => void;
   onSignOut: () => void;
+  paused?: { onShow: () => void };
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -680,8 +713,18 @@ function Topbar({
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["page", "P40"] }),
   });
+  // Also in the popover, not only on the Notifications page (QA 17 November).
+  const markAllRead = useMutation({
+    mutationFn: () => performPageAction("P40", { action: "markAllNotifications", payload: {} }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["page", "P40"] }),
+  });
 
+  const [shownNotice, setShownNotice] = useState<Record<string, unknown>>();
+  // Closes the bell. Opening a notification leaves it, so it must not stay open over the page or the message it opens
+  // (QA 17 November, V3: "Content review update" opened behind the bell).
+  const closeBell = useRef<() => void>(undefined);
   async function openNotification(notification: Record<string, unknown>) {
+    closeBell.current?.();
     try {
       const result = await performPageAction("P40", {
         action: "openNotification",
@@ -692,6 +735,8 @@ function Topbar({
         result.record && typeof result.record === "object"
           ? (result.record as Record<string, unknown>)
           : {};
+      // Nothing to open (it pointed at Notifications itself): show the message here instead of doing nothing.
+      if (!noticeHasPage(String(source.pageId ?? ""))) return setShownNotice(notification);
       router.history.push(
         notificationHref(
           String(source.pageId ?? ""),
@@ -755,24 +800,22 @@ function Topbar({
             role="search"
             onSubmit={(event) => {
               event.preventDefault();
+              // One search over posts, spaces, people, cases and records, limited to what this person may open.
               if (search.trim())
-                router.history.push("/feed?q=" + encodeURIComponent(search.trim()));
+                router.history.push("/search?q=" + encodeURIComponent(search.trim()));
             }}
           >
             <Search
-              label="Search posts and spaces"
-              placeholder="Search posts and spaces"
+              label="Search ACCS"
+              placeholder="Search posts, people, cases…"
               size="sm"
               value={search}
               onChange={setSearch}
             />
           </form>
           <ThemeToggle />
-          <IconButton
-            icon="chat"
-            label="Assistant"
-            onPress={() => setAssistantOpen(true)}
-          />
+          {/* A sparkle: a chat bubble read as Messages (17 November), a question mark as Help (19 November). */}
+          <AssistantIconButton onPress={() => setAssistantOpen(true)} />
           <Popover
             trigger={
               <IconButton
@@ -807,6 +850,7 @@ function Topbar({
               />
             ) : recentNotifications.length ? (
               <Stack gap={12}>
+                <BellCloser closeRef={closeBell} />
                 <NotificationList>
                   {recentNotifications.map((notification) => (
                     <NotificationItem
@@ -824,7 +868,14 @@ function Topbar({
                     />
                   ))}
                 </NotificationList>
-                <Link href="/notifications">View all notifications</Link>
+                <div className="shell-bell__foot">
+                  <Link href="/notifications">View all notifications</Link>
+                  {unreadCount > 0 && (
+                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
+                      Mark all as read
+                    </Button>
+                  )}
+                </div>
               </Stack>
             ) : (
               <Stack gap={12}>
@@ -833,9 +884,10 @@ function Topbar({
               </Stack>
             )}
           </Popover>
-          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} />
+          <AccountMenu session={session} links={accountLinks} onSignOut={onSignOut} paused={paused} />
         </div>
       </header>
+      <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
       <Drawer
         title="Assistant"
         side="end"
@@ -848,6 +900,39 @@ function Topbar({
         </Stack>
       </Drawer>
     </>
+  );
+}
+
+/** Search the pages and actions the role may open, and go there. Opened with Ctrl+K or Cmd+K. */
+function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen: boolean; onOpenChange: (open: boolean) => void }) {
+  const router = useRouter();
+  const items = jumpItems(visibleEntries(session).map((entry) => ({ label: entry.label, href: entry.href })), session.allowedPages);
+  return (
+    <Modal title="Go to" isOpen={isOpen} onOpenChange={onOpenChange}>
+      <ModalBody>
+        <ComboBox
+          label="Page or action"
+          placeholder="Type a page, like Calendar or New report"
+          description="Press Enter to go. Esc closes this."
+          autoFocus
+          menuTrigger="focus"
+          defaultFilter={(text, typed) => matchesJump({ id: "", label: text, href: "", kind: "Page" }, typed)}
+          onSelectionChange={(key) => {
+            const item = items.find((candidate) => candidate.id === key);
+            if (!item) return;
+            onOpenChange(false);
+            router.history.push(item.href);
+          }}
+          emptyMessage="No page or action with that name"
+        >
+          {items.map((item) => (
+            <SelectOption id={item.id} key={item.id} textValue={item.label} description={item.kind === "Action" ? "Action" : undefined}>
+              {item.label}
+            </SelectOption>
+          ))}
+        </ComboBox>
+      </ModalBody>
+    </Modal>
   );
 }
 
@@ -897,8 +982,11 @@ export function AppChrome({
     enabled: restricted,
   });
   const settings = appearance.data?.data.settings;
-  const theme =
-    settings && typeof settings === "object" && "theme" in settings
+  // Unknown until the saved settings load. Treating that as "system" cleared the theme theme-boot.js had already set,
+  // so a light page on a dark device flashed dark for a frame on every reload (QA 17 November, V3).
+  const theme = !appearance.isSuccess
+    ? undefined
+    : settings && typeof settings === "object" && "theme" in settings
       ? String(settings.theme)
       : "system";
   const savedDensity =
@@ -920,6 +1008,27 @@ export function AppChrome({
     standing.data?.data.record && typeof standing.data.data.record === "object"
       ? (standing.data.data.record as Record<string, unknown>).restrictions
       : undefined;
+  // The banner can be hidden on this device (decided 20 November 2026). It comes back by itself when the restrictions
+  // change, and the avatar keeps a small marker with a menu item that shows it again.
+  const restrictionKey = restricted ? JSON.stringify(session.user.restrictions) : "";
+  const [hiddenKey, setHiddenKey] = useState(() => {
+    try {
+      return window.localStorage.getItem("accs.pausedNoticeHidden") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const bannerHidden = restricted && hiddenKey === restrictionKey;
+  const hideBanner = (hide: boolean) => {
+    const next = hide ? restrictionKey : "";
+    setHiddenKey(next);
+    try {
+      if (next) window.localStorage.setItem("accs.pausedNoticeHidden", next);
+      else window.localStorage.removeItem("accs.pausedNoticeHidden");
+    } catch {
+      // Without storage the choice lasts until the page reloads.
+    }
+  };
 
   useEffect(() => {
     if (theme === "system")
@@ -930,6 +1039,18 @@ export function AppChrome({
 
   // The drawer is a mobile-only surface; any route change closes it.
   useEffect(() => setMenuOpen(false), [path]);
+
+  // Ctrl+K (Cmd+K on a Mac) opens the quick jump from anywhere in the portal.
+  const [jumpOpen, setJumpOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!isQuickJumpKey(event)) return;
+      event.preventDefault();
+      setJumpOpen(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div
@@ -944,7 +1065,8 @@ export function AppChrome({
       <a className="shell-skip" href="#main-content">
         Skip to main content
       </a>
-      {restricted && (
+      <QuickJump session={session} isOpen={jumpOpen} onOpenChange={setJumpOpen} />
+      {restricted && !bannerHidden && (
         <div className="shell-banner" role="status">
           <Badge tone="warning" form="pending">
             Some features paused
@@ -954,15 +1076,17 @@ export function AppChrome({
               ? pausedFeatures
                   .map((entry) => {
                     const restriction = entry as Record<string, unknown>;
-                    const features = Array.isArray(restriction.features)
-                      ? restriction.features.map(String).join(", ")
-                      : "Some features";
-                    return `${features} paused until ${String(restriction.until ?? "review")}`;
+                    const features = featureWords(restriction.features) || "Some features";
+                    // A readable date, not "2026-12-01" (QA 17 November, V3).
+                    return `${features} paused until ${restriction.until ? formatDate(String(restriction.until)) : "review"}`;
                   })
                   .join("; ")
               : "Some account features are paused."}
           </span>
           <NavLink href="/standing">View account standing</NavLink>
+          <Button variant="tertiary" size="sm" className="shell-banner__hide" onPress={() => hideBanner(true)}>
+            Hide
+          </Button>
         </div>
       )}
       {signOutAction.isError && (
@@ -997,6 +1121,7 @@ export function AppChrome({
             accountLinks={menuLinks}
             onMenu={() => setMenuOpen(true)}
             onSignOut={() => void onSignOut()}
+            paused={bannerHidden ? { onShow: () => hideBanner(false) } : undefined}
           />
           <main className="shell-content" id="main-content" tabIndex={-1}>
             <div className="shell-content__inner">

@@ -29,7 +29,8 @@ describe('module picker tiles', () => {
   it('gives a faculty account the advisor tiles', () => {
     expect(links(session(['professor'], [...own, '/cases', '/consultations', '/consultations/availability']))).toEqual([
       ['assigned-concerns', '/cases'],
-      ['faculty-schedule', '/calendar'],
+      // Appointments, not the calendar (QA 17 November, V3: the tile opened the calendar).
+      ['faculty-schedule', '/consultations'],
       ['availability', '/consultations/availability'],
       ['faculty-messages', '/messages'],
     ])
@@ -103,21 +104,11 @@ describe('module picker tiles', () => {
     expect(moduleTiles(session(['president'], [...own, '/cases', '/records']))).toEqual([])
   })
 
-  it('combines roles in catalog order', () => {
-    const both = session(['professor', 'chair', 'dean'], [...own, '/cases', '/consultations/availability', '/records'], accounts)
-    expect(moduleTiles(both).map((tile) => tile.id)).toEqual([
-      'dean-accounts',
-      'dean-cases',
-      'dean-records',
-      'assigned-concerns',
-      'faculty-schedule',
-      'availability',
-      'faculty-messages',
-      'chair-cases',
-      'chair-records',
-      'chair-messages',
-      'chair-calendar',
-    ])
+  it("shows the main role's modules only, at most six (QA 19 November: the Dean who teaches had twelve)", () => {
+    const both = session(['professor', 'chair', 'dean'], [...own, '/cases', '/consultations/availability', '/records', '/analytics', '/evaluations/cycles', '/evaluations/results'], accounts)
+    const ids = moduleTiles(both).map((tile) => tile.id)
+    expect(ids).toEqual(['dean-accounts', 'dean-cases', 'dean-records', 'dean-analytics', 'dean-cycles', 'dean-results'])
+    expect(ids.length).toBeLessThanOrEqual(6)
   })
 
   it('gives students and faculty six tiles when they may open every page, and no Notifications tile to anyone', () => {

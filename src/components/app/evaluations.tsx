@@ -1,3 +1,4 @@
+import { campusToday } from "@/lib/campus-date";
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
@@ -34,6 +35,7 @@ import {
   useTransform,
 } from "motion/react";
 import {
+  useRef,
   useEffect,
   useId,
   useState,
@@ -67,6 +69,7 @@ import {
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { replaceFilters } from "@/lib/url-filters";
 
 import "./evaluations.css";
 
@@ -160,9 +163,7 @@ function useFilters() {
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    router.history.replace(
-      location.pathname + (next.size ? "?" + next.toString() : ""),
-    );
+    replaceFilters(router, location.pathname, next);
   }
 
   return { params, update };
@@ -173,12 +174,19 @@ function useFilters() {
 const root = siteCrumb("/evaluations");
 
 function ActionError({ error }: { error: unknown }) {
+  // Brought into view when it appears (QA 17 November: the Dean only saw it after scrolling up).
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
   return error ? (
+    <div ref={box}>
     <Alert tone="danger" title="Couldn't save">
       {error instanceof Error
         ? error.message
         : "Try again. Your text is still here."}
     </Alert>
+    </div>
   ) : null;
 }
 
@@ -473,7 +481,10 @@ function AssignmentCard({ assignment }: { assignment: Item }) {
 function EvaluationHome({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
   const assignments = items(page.data.assignments);
-  const reviews = items(page.data.reviewCycles);
+  // To review, and already reviewed (QA 17 November: reviewed cycles stayed under "Questions to review").
+  const allReviewCycles = items(page.data.reviewCycles);
+  const reviews = allReviewCycles.filter((cycle) => cycle.reviewed !== true);
+  const reviewed = allReviewCycles.filter((cycle) => cycle.reviewed === true);
   const submitted = assignments.filter(
     (assignment) => assignment.status === "Submitted",
   ).length;
@@ -541,6 +552,28 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
     </Panel>
   );
 
+  const reviewedList = reviewed.length ? (
+    <Panel flush>
+      <ul className="accs-rows">
+        {reviewed.map((cycle) => (
+          <li key={words(cycle.id)}>
+            <div className="accs-row ev-row">
+              <div>
+                <p className="accs-row__title">{words(cycle.title)}</p>
+                <p className="accs-row__sub">{words(cycle.term)} · Review sent · {words(cycle.status)}</p>
+              </div>
+              <Link href={"/evaluations/cycles/" + encodeURIComponent(words(cycle.id)) + "/review"}>See my review</Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  ) : (
+    <Panel>
+      <Empty title="No reviews sent yet" />
+    </Panel>
+  );
+
   return (
     <div className="accs-stack accs-stagger">
       <PageHeader
@@ -575,6 +608,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
               count: reviews.length,
               content: review,
             },
+            { id: "reviewed", label: "Reviewed", count: reviewed.length, content: reviewedList },
           ]}
         />
       ) : (
@@ -1011,6 +1045,7 @@ function FacultyResults({
 
 function ResultsOverview({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery());
+  const router = useRouter();
   const { params, update } = useFilters();
   const [query, setQuery] = useState("");
   const results = items(page.data.results);
@@ -1062,7 +1097,8 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
         Individual answers aren't shown. Results appear after a cycle is
         published.
       </p>
-      {responses > 0 && (
+      {/* Always shown, 0 before any responses (testing sheet: the numbers were missing). */}
+      {(
         <Kpis label="Result summary">
           <Kpi
             label="Completion rate"
@@ -1137,6 +1173,19 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             ))}
           </Select>
         )}
+        {/* Opens one faculty member's results (testing sheet: there was no faculty choice). */}
+        <Select
+          label="Faculty"
+          placeholder="Select a faculty member"
+          selectedKey={null}
+          onSelectionChange={(key) => { if (key) router.history.push("/evaluations/results/" + encodeURIComponent(String(key))); }}
+        >
+          {results.map((result) => (
+            <SelectOption id={words(object(result.faculty).id, words(result.id))} key={words(result.id)}>
+              {words(object(result.faculty).name)}
+            </SelectOption>
+          ))}
+        </Select>
         <CycleSelect cycles={items(page.data.cycles)} />
       </div>
       {responses > 0 ? (
@@ -1389,11 +1438,13 @@ function CyclesPage({ page }: { page: PageEnvelope }) {
             />
             <DatePicker
               label="Opens"
+              minValue={campusToday()}
               onChange={(value) => setOpens(value?.toString() ?? "")}
               isRequired
             />
             <DatePicker
               label="Closes"
+              minValue={campusToday()}
               onChange={(value) => setCloses(value?.toString() ?? "")}
               isRequired
             />
@@ -1700,9 +1751,21 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     questions: formQuestions,
   };
 
+  // The Save button sits below the form and the list of missing fields above it: bring the first field that needs
+  // something into view and put the cursor there (QA 17 November, V3: the message showed only after scrolling up).
+  function showFirstProblem() {
+    requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>('main [aria-invalid="true"], main [data-invalid] input, main [data-invalid] textarea');
+      const target = field ?? document.querySelector<HTMLElement>('main [role="alert"]');
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      field?.focus({ preventScroll: true });
+    });
+  }
+
   async function save() {
     setValidation(true);
-    if (incomplete.length || action.isPending) return;
+    if (incomplete.length) return showFirstProblem();
+    if (action.isPending) return;
     try {
       await action.mutateAsync({
         action: "saveCycle",
@@ -1716,7 +1779,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
 
   async function advance(status: "In review" | "Published" | "Closed") {
     setValidation(true);
-    if (incomplete.length || action.isPending) return;
+    if (incomplete.length) return showFirstProblem();
+    if (action.isPending) return;
     try {
       if (editable)
         await action.mutateAsync({
@@ -1761,6 +1825,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             maxLength={160}
             isRequired
             isReadOnly={!editable}
+            isInvalid={validation && !title.trim()}
+            errorMessage="Enter a name for the cycle."
           />
           <TextArea
             label="Instructions"
@@ -1769,6 +1835,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             maxLength={4000}
             isRequired
             isReadOnly={!editable}
+            isInvalid={validation && !instructions.trim()}
+            errorMessage="Add the instructions students see."
           />
         </div>
       </Panel>
@@ -1776,6 +1844,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
         <div className="ev-fields ev-fields--2">
           <DatePicker
             label="Opens"
+            minValue={campusToday()}
             description={"Saved date: " + formatDate(opens, "Not set")}
             onChange={(value) => setOpens(value?.toString() ?? "")}
             isRequired
@@ -1783,6 +1852,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           />
           <DatePicker
             label="Closes"
+            minValue={campusToday()}
             description={"Saved date: " + formatDate(closes, "Not set")}
             onChange={(value) => setCloses(value?.toString() ?? "")}
             isRequired
@@ -2042,6 +2112,23 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
 
 /* ---------- P32 Faculty question review ---------- */
 
+const capitalized = (value: string) => value.trim().charAt(0).toUpperCase() + value.trim().slice(1);
+
+/**
+ * "Question 1" and its wording, capitalized. The criterion shows only when it says something the number does not
+ * (QA 17 November: "question 1" then "first question", both lowercase).
+ */
+function QuestionHead({ question, index }: { question: EvaluationQuestion; index: number }) {
+  const criterion = capitalized(question.criterion);
+  const extra = criterion && !/^question\s*\d+$/i.test(criterion) ? criterion : "";
+  return (
+    <div className="ev-q__head">
+      <h3>Question {index + 1}{extra ? ` · ${extra}` : ""}</h3>
+      <p>{capitalized(question.text)}</p>
+    </div>
+  );
+}
+
 function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const record = object(page.data.record);
   const formQuestions = questions(record.questions);
@@ -2051,9 +2138,22 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const [sent, setSent] = useState(false);
   const action = useEvaluationAction("P32");
   const readOnly = sent || page.data.canReview !== true;
+  // Send review waits until the last question has been on screen, as the note under the questions asks (QA 17 November, V3).
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const endMarker = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const marker = endMarker.current;
+    if (!marker || reachedEnd) return;
+    if (typeof IntersectionObserver === "undefined") return setReachedEnd(true);
+    const observer = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) setReachedEnd(true); });
+    observer.observe(marker);
+    return () => observer.disconnect();
+  }, [reachedEnd, formQuestions.length]);
+  // A "Needs change" says why (QA 17 November: it could be sent with no comment).
+  const missingWhy = formQuestions.filter((question) => decisions[question.id] === "changes" && !comments[question.id]?.trim()).map((question) => question.id);
 
   async function submit() {
-    if (readOnly || action.isPending) return;
+    if (readOnly || action.isPending || missingWhy.length) return;
     const note = formQuestions
       .map(
         (question) =>
@@ -2108,43 +2208,34 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         </div>
       )}
       {savedReview ? (
-        <>
-          <Panel flush title="Questions">
-            {formQuestions.map((question) => (
+        // Each question with the answer given to it, instead of a history-style list (QA 17 November, V3).
+        <Panel flush title="Your review">
+          {formQuestions.map((question, index) => {
+            const line = recorded[index] ?? "";
+            const answer = line.slice(line.indexOf(": ") + 2);
+            const changes = answer.startsWith("Needs change");
+            const comment = answer.includes(" · ") ? answer.slice(answer.indexOf(" · ") + 3) : "";
+            return (
               <div className="ev-review-q" key={question.id}>
-                <h3>{question.criterion}</h3>
-                <p>{question.text}</p>
+                <QuestionHead question={question} index={index} />
+                {line ? (
+                  <div className="ev-review-answer">
+                    <StatusChip tone={changes ? "warn" : "ok"}>{changes ? "Needs change" : "Fits my duties"}</StatusChip>
+                    {comment && <p className="ev-comment">{comment}</p>}
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </Panel>
-          <Panel title="Your recorded review">
-            <ol className="accs-timeline">
-              {recorded.map((line, index) => {
-                const split = line.indexOf(": ");
-                return (
-                  <li key={index}>
-                    {split > 0 ? (
-                      <>
-                        <strong>{line.slice(0, split)}</strong>
-                        <p className="ev-comment">{line.slice(split + 2)}</p>
-                      </>
-                    ) : (
-                      <p className="ev-comment">{line}</p>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          </Panel>
-        </>
+            );
+          })}
+          {recorded.length > formQuestions.length || (recorded.length === 1 && !recorded[0]!.includes(": ")) ? (
+            <div className="ev-review-q"><p className="ev-comment">{recorded.join(" ")}</p></div>
+          ) : null}
+        </Panel>
       ) : (
         <Panel flush title="Questions">
-          {formQuestions.map((question) => (
+          {formQuestions.map((question, index) => (
             <section className="ev-review-q" key={question.id}>
-              <div className="ev-q__head">
-                <h3>{question.criterion}</h3>
-                <p>{question.text}</p>
-              </div>
+              <QuestionHead question={question} index={index} />
               <RadioGroup
                 row
                 label="Fits my duties?"
@@ -2162,6 +2253,10 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
               </RadioGroup>
               <TextArea
                 label="Comment"
+                isRequired={decisions[question.id] === "changes"}
+                description={decisions[question.id] === "changes" ? "Say what should change." : "Optional."}
+                isInvalid={missingWhy.includes(question.id) && Boolean(comments[question.id] !== undefined)}
+                errorMessage="Say what should change."
                 value={comments[question.id] ?? ""}
                 onChange={(comment) =>
                   setComments((current) => ({
@@ -2177,13 +2272,14 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
               />
             </section>
           ))}
+          <div ref={endMarker} aria-hidden />
         </Panel>
       )}
       <ActionError error={action.error} />
       {!readOnly && !savedReview && (
         <div className="ev-submitbar">
-          <p>Go through every question, then send.</p>
-          <Button loading={action.isPending} onPress={() => void submit()}>
+          <p>{missingWhy.length ? `Add a comment to each "Needs change" (${missingWhy.length} left).` : reachedEnd ? "Check every question, then send." : "Go through every question to the last one, then send."}</p>
+          <Button loading={action.isPending} isDisabled={missingWhy.length > 0 || !reachedEnd} onPress={() => void submit()}>
             Send review
           </Button>
         </div>

@@ -25,9 +25,13 @@ export function usePaged<T>(items: T[], size = defaultPageSize, resetKey?: unkno
   return { ...pageOf(items, page, size), setPage }
 }
 
-/** "Showing 11–20 of 42 students" and the page links, under a paged list. Nothing when everything fits on one page. */
+/**
+ * "Showing 11–20 of 42 students" and the page links, under a paged list. When everything fits on one page it still says
+ * how many there are (testing sheet: lists had no count), without page links.
+ */
 export function Pager<T>({ paged, noun = 'items', label }: { paged: Paged<T>; noun?: string; label?: string }) {
-  if (paged.pageCount <= 1) return null
+  if (!paged.total) return null
+  if (paged.pageCount <= 1) return <p className="accs-pager accs-pager--count">{`Showing ${paged.total === 1 ? '1' : `1–${paged.total}`} of ${paged.total} ${noun}`}</p>
   return (
     <Pagination
       className="accs-pager"
