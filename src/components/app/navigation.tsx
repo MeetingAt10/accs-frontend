@@ -1,6 +1,6 @@
 import { formatDate } from "@/lib/format";
 import { featureWords } from "@/lib/restrictions";
-import { AssistantIconButton, assistantIconName } from "@/components/app/assistant-icon";
+import { AssistantCard, assistantIconName } from "@/components/app/assistant-icon";
 import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
 import {
   Alert,
@@ -8,6 +8,7 @@ import {
   Button,
   ComboBox,
   Drawer,
+  Icon,
   IconButton,
   Link,
   Modal,
@@ -32,7 +33,9 @@ import {
 import {
   AccountMenu,
   DrawerNav,
+  ShellBrand,
   SitePanel,
+  TabBar,
   type Destination,
   type NavEntry,
   type NavGroup,
@@ -57,6 +60,8 @@ import {
   sites,
   type SiteId,
 } from "@/lib/sites";
+
+import "./shell.css";
 
 type RoleEntry = NavEntry & { pageId?: string };
 type RoleGroup = { label: string; entries: RoleEntry[] };
@@ -701,7 +706,6 @@ function Topbar({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [assistantOpen, setAssistantOpen] = useState(false);
   // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
   const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
@@ -785,6 +789,9 @@ function Topbar({
           tooltip={false}
           onPress={onMenu}
         />
+        <span className="shell-top__brand">
+          <ShellBrand tone="page" size="sm" />
+        </span>
         <nav className="shell-top__crumb" aria-label="Breadcrumb">
           {title !== siteLabel && (
             <>
@@ -812,10 +819,25 @@ function Topbar({
               value={search}
               onChange={setSearch}
             />
+            {/* Ctrl+K (Cmd+K on a Mac) opens Go to; the hint hides while there is text, where the clear button sits. */}
+            {!search && (
+              <kbd className="shell-top__kbd" aria-hidden>
+                {isMac ? "⌘K" : "Ctrl K"}
+              </kbd>
+            )}
           </form>
-          <ThemeToggle />
-          {/* A sparkle: a chat bubble read as Messages (17 November), a question mark as Help (19 November). */}
-          <AssistantIconButton onPress={() => setAssistantOpen(true)} />
+          {/* Phones have no room for the field: the button opens the search page. */}
+          <NavLink href="/search" className="ds-icon-btn shell-top__icon shell-top__search-link" aria-label="Search" title="Search">
+            <Icon name="search" size={20} />
+          </NavLink>
+          <span className="shell-top__wide">
+            <ThemeToggle />
+          </span>
+          {session.allowedPages.includes("P11") && (
+            <NavLink href="/messages" className="ds-icon-btn shell-top__icon shell-top__wide" aria-label="Messages" title="Messages">
+              <Icon name="chat" size={20} />
+            </NavLink>
+          )}
           <Popover
             trigger={
               <IconButton
@@ -888,20 +910,11 @@ function Topbar({
         </div>
       </header>
       <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
-      <Drawer
-        title="Assistant"
-        side="end"
-        isOpen={assistantOpen}
-        onOpenChange={setAssistantOpen}
-      >
-        <Stack gap={16}>
-          <AssistantPanel />
-          <Link href="/assistant">Open the assistant page</Link>
-        </Stack>
-      </Drawer>
     </>
   );
 }
+
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 /** Search the pages and actions the role may open, and go there. Opened with Ctrl+K or Cmd+K. */
 function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen: boolean; onOpenChange: (open: boolean) => void }) {
@@ -950,6 +963,8 @@ export function AppChrome({
   const destinations = siteDestinations(session);
   const { groups, current } = siteNav(session, path, site);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The Assistant drawer opens from the panel's Assistant card (and the same card in the phone menu).
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const signOutAction = useSignOut();
   const onSignOut = () => signOutAction.mutate();
   const allowed = new Set(session.allowedPages);
@@ -1112,6 +1127,7 @@ export function AppChrome({
           current={site}
           groups={panelGroups}
           currentHref={panelCurrent}
+          onAssistant={() => setAssistantOpen(true)}
         />
         <div className="shell-main">
           <Topbar
@@ -1130,16 +1146,45 @@ export function AppChrome({
           </main>
         </div>
       </div>
-      <Drawer title="Menu" side="start" isOpen={menuOpen} onOpenChange={setMenuOpen}>
+      <TabBar destinations={destinations} current={site} onMore={() => setMenuOpen(true)} />
+      <Drawer
+        title={
+          <>
+            <span aria-hidden>
+              <ShellBrand />
+            </span>
+            <span className="ds-visually-hidden">Menu</span>
+          </>
+        }
+        side="start"
+        className="shell-nav-drawer"
+        isOpen={menuOpen}
+        onOpenChange={setMenuOpen}
+      >
         <DrawerNav
+          session={session}
           destinations={destinations}
           current={site}
-          groups={groups}
-          currentHref={current}
+          groups={panelGroups}
+          currentHref={panelCurrent}
           accountLinks={accountLinks}
           onNavigate={() => setMenuOpen(false)}
           onSignOut={() => void onSignOut()}
+          footer={
+            <AssistantCard
+              onPress={() => {
+                setMenuOpen(false);
+                setAssistantOpen(true);
+              }}
+            />
+          }
         />
+      </Drawer>
+      <Drawer title="Assistant" side="end" className="shell-assist-drawer" isOpen={assistantOpen} onOpenChange={setAssistantOpen}>
+        <Stack gap={16}>
+          <AssistantPanel />
+          <Link href="/assistant">Open the assistant page</Link>
+        </Stack>
       </Drawer>
     </div>
   );
