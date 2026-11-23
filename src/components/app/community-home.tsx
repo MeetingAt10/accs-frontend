@@ -1,6 +1,5 @@
 import { Button, Icon } from '@meetingat10/design-system/react'
 
-import { moduleTiles } from '@/components/app/module-picker'
 import { Panel } from '@/components/app/page-shell'
 import { NavLink } from '@/components/app/site-chrome'
 import type { Session } from '@/lib/api'
@@ -9,9 +8,9 @@ import { canOpenPath } from '@/lib/sites'
 
 import './community-home.css'
 
-// Home for students and faculty, laid out like a college discussion board: a community header, section tabs, a composer
-// and the feed on the left, an About panel on the right. It adds no data of its own. The feed, announcements and
-// events come from the Home page data, and every link goes to a page that already exists.
+// Home helpers for students and faculty: which roles count as community roles, their summary cards, the section tabs,
+// a composer and an About panel. The Home header itself is the shared hero in PageScreen. It adds no data of its own;
+// every link goes to a page that already exists.
 
 type Access = Parameters<typeof canOpenPath>[0]
 
@@ -35,31 +34,6 @@ const tabs: Tab[] = [
 /** The section tabs this session may open. Home is always first and is the current one. */
 export function communityTabs(session: Access): Tab[] {
   return tabs.filter((tab) => !tab.href || canOpenPath(session, tab.href))
-}
-
-export function CommunityHeader({ session, greeting, date }: { session: Session; greeting: string; date: string }) {
-  const faculty = session.user.roles.includes('professor')
-  // The module tiles are already the role's tasks in order: the first is the main one, the rest sit beside it.
-  const actions = moduleTiles(session).filter((tile) => tile.href).slice(0, 4)
-  return (
-    <header className="ch-head">
-      <div>
-        <h1 className="ch-head__title">{greeting}</h1>
-        <p className="ch-head__eyebrow">
-          {date} · {faculty ? 'CCS faculty' : 'College of Computer Studies'}
-        </p>
-      </div>
-      {actions.length > 0 && (
-        <div className="ch-actions" role="group" aria-label="Quick actions">
-          {actions.map((tile, index) => (
-            <Button key={tile.id} href={tile.href} icon={tile.icon} variant={index === 0 ? 'primary' : 'secondary'}>
-              {tile.label}
-            </Button>
-          ))}
-        </div>
-      )}
-    </header>
-  )
 }
 
 /** "Write something": the entry to the existing New post page. Posting itself stays there. */
