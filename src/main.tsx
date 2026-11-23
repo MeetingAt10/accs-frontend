@@ -9,10 +9,12 @@ import { authRedirectFor, sessionEndedHref, signedOutPaths } from '@/lib/session
 
 import '@meetingat10/design-system/tokens.css'
 import '@meetingat10/design-system/components.css'
+import '@fontsource-variable/inter'
 import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
 import '@fontsource/poppins/500.css'
 import '@fontsource/poppins/600.css'
+import '@fontsource/poppins/700.css'
 import './styles.css'
 import './theme.css'
 import './motion.css'
