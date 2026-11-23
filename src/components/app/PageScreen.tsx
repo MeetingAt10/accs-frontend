@@ -1,4 +1,4 @@
-import { Icon, ViewState, type IconName } from '@meetingat10/design-system/react'
+import { Icon, type IconName } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { useState, type ReactNode } from 'react'
@@ -18,6 +18,7 @@ import { SchedulePage } from '@/components/app/schedule'
 import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
 import { Counter, SlidePills, SwapView } from '@/components/app/portal-motion'
 import { NavLink as Go } from '@/components/app/site-chrome'
+import { PageSkeleton } from '@/components/app/skeleton-page'
 import { StageChip, StageProgress } from '@/components/app/stage-chip'
 import { roleLabelOf } from '@/lib/role-labels'
 
@@ -437,12 +438,12 @@ function summaryLine(stats: Item[]) {
   return line[0].toUpperCase() + line.slice(1) + '.'
 }
 
-type Shortcut = { label: string; short: string; href: string; icon: IconName; when?: string[] }
+type Shortcut = { label: string; short: string; href: string; icon: IconName; when?: string[]; permission?: string }
 
 const shortcuts: Shortcut[] = [
   { label: 'New report', short: 'Report', href: '/reports/new', icon: 'plus', when: ['student'] },
   { label: 'Book appointment', short: 'Book', href: '/consultations', icon: 'calendar', when: ['student'] },
-  { label: 'Post announcement', short: 'Announce', href: '/feed/new', icon: 'megaphone' },
+  { label: 'Post announcement', short: 'Announce', href: '/feed/new', icon: 'megaphone', permission: 'announcement.publish' },
   { label: 'Manage availability', short: 'Availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
   { label: 'Open case queue', short: 'Cases', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
 ]
@@ -491,7 +492,7 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
   const role = tabbed ? text(panel.role) : (roles[0] ?? 'student')
 
   const actions = shortcuts
-    .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href))
+    .filter((item) => (!item.when || item.when.some((entry) => roles.some((r) => r === entry))) && allow(item.href) && (!item.permission || session.data?.permissions.includes(item.permission) === true))
     .slice(0, 2)
   const name = firstName(session.data?.user.name ?? '')
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
@@ -582,7 +583,7 @@ export function PageScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <ViewState kind="loading" title="Loading page" />
+          <PageSkeleton pageId={pageId} />
         ) : page.isError ? (
           page.error instanceof ApiError && [403, 404].includes(page.error.status) ? (
             <RestrictedView record />

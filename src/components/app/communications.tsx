@@ -573,13 +573,14 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     .map((message, index, visibleMessages) => {
                       const sender = object(message.author);
                       const prior = visibleMessages[index - 1];
-                      const day = words(message.at).slice(0, 10);
+                      const day = campusDay(words(message.at));
                       return (
                         <Stack gap={16} key={words(message.id)}>
-                          {(!prior || day !== words(prior.at).slice(0, 10)) && (
+                          {(!prior || day !== campusDay(words(prior.at))) && (
                             <Divider
                               label={new Date(day).toLocaleDateString("en-PH", {
                                 dateStyle: "long",
+                                timeZone: "UTC",
                               })}
                             />
                           )}
@@ -1119,6 +1120,9 @@ type AssistantMessage = {
   own: boolean;
   sources?: Item[];
 };
+
+// The campus date (Manila) of a timestamp; the UTC date put late-night messages under the day before.
+const campusDay = (at: string) => new Date(new Date(at).getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 
 export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const session = useQuery(sessionQuery());
