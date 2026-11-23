@@ -339,3 +339,12 @@
 /* Skip link: brand navy with white text in both themes (the ink fill turned light in dark mode, under white text). */
 :root .shell .shell-skip { background: var(--accs-brand-800); color: var(--accs-on-brand); box-shadow: var(--accs-shadow-pop); }
 :root .shell .shell-skip:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -4px; }
+
+/* Route changes animate only the page content. The sidebar, top bar and phone tab bar get their own view-transition
+   names, so they stay put instead of fading and sliding up with the page on every navigation and redirect. */
+.shell-side { view-transition-name: accs-shell-side; }
+.shell-top { view-transition-name: accs-shell-top; }
+.shell-tabs { view-transition-name: accs-shell-tabs; }
+::view-transition-group(accs-shell-side), ::view-transition-group(accs-shell-top), ::view-transition-group(accs-shell-tabs),
+::view-transition-old(accs-shell-side), ::view-transition-old(accs-shell-top), ::view-transition-old(accs-shell-tabs),
+::view-transition-new(accs-shell-side), ::view-transition-new(accs-shell-top), ::view-transition-new(accs-shell-tabs) { animation: none; }
