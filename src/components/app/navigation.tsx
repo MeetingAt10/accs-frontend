@@ -61,6 +61,7 @@ import {
   type SiteId,
 } from "@/lib/sites";
 
+import { Onboarding } from "@/components/app/onboarding";
 import "./shell.css";
 
 type RoleEntry = NavEntry & { pageId?: string };
@@ -1180,6 +1181,7 @@ export function AppChrome({
           }
         />
       </Drawer>
+      <Onboarding session={session} destinations={destinations} />
       <Drawer title="Assistant" side="end" className="shell-assist-drawer" isOpen={assistantOpen} onOpenChange={setAssistantOpen}>
         <Stack gap={16}>
           <AssistantPanel />

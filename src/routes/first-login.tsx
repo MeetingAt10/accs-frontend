@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useRef, useState, type FormEvent } from 'react'
 
+import { markOnboardingPending } from '@/components/app/onboarding'
 import { ApiError, completeFirstLogin, signOut } from '@/lib/api'
 import { sessionQuery } from '@/lib/queries'
 import { landingFor } from '@/lib/sites'
@@ -68,7 +69,11 @@ function FirstLoginPage() {
   const [errors, setErrors] = useState<Errors>({})
   const mutation = useMutation({
     mutationFn: completeFirstLogin,
-    onSuccess: finish,
+    onSuccess: (next) => {
+      // The account is now active: the first-run tour opens on the page the person lands on.
+      markOnboardingPending(next.user.id)
+      finish(next)
+    },
     onError: (error) => {
       const next: Errors = {}
       if (error instanceof ApiError) {
