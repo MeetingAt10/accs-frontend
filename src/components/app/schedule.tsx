@@ -48,6 +48,7 @@ import {
 } from '@/components/app/page-shell'
 import {
   EventCalendar,
+  ToneDate,
   formatClock,
   type CalendarEvent,
 } from '@/components/ds-next/EventCalendar'
@@ -644,18 +645,29 @@ function CalendarPage({
     )
   }
 
-  const layerPills = (
-    <div className="sc-layers" role="group" aria-label="Calendar layers">
+  // Narrow screens get pills above the grid; the rail lists the same layers as check rows.
+  const layerButtons = (variant: 'pills' | 'checks') => (
+    <div
+      className={variant === 'pills' ? 'sc-layers' : 'sc-checks'}
+      role="group"
+      aria-label="Calendar layers"
+    >
       {layers.map((layer) => (
         <button
           type="button"
           key={layer.id}
-          className="sc-layer"
+          className={variant === 'pills' ? 'sc-layer' : 'sc-check'}
           data-etone={layerTone[layer.id]}
           aria-pressed={selectedLayers.includes(layer.id)}
           onClick={() => toggleLayer(layer.id)}
         >
-          <i aria-hidden />
+          {variant === 'pills' ? (
+            <i aria-hidden />
+          ) : (
+            <span className="sc-check__box" aria-hidden>
+              <Icon name="check" size={12} />
+            </span>
+          )}
           {layer.label}
         </button>
       ))}
@@ -666,9 +678,14 @@ function CalendarPage({
     <>
       <PageHeader
         title="Calendar"
-        description="All times are campus time."
+        description="All times are campus time (PHT)."
         actions={
           <>
+            {professor && (
+              <Button variant="secondary" icon="clock" href="/consultations/availability">
+                Manage availability
+              </Button>
+            )}
             {/* Events are announcements with a date: this opens one with the chosen day filled in (a past day becomes today). */}
             {session.permissions.includes('announcement.publish') && (
               <Button
@@ -684,54 +701,55 @@ function CalendarPage({
                 Add to-do
               </Button>
             )}
-            {professor && (
-              <Button variant="secondary" href="/consultations/availability">
-                Manage availability
-              </Button>
-            )}
           </>
         }
       />
       <div className="accs-stack accs-stagger">
-        <div className="sc-bar">
-          <div className="sc-bar__nav">
-            <IconButton
-              icon="caret-left"
-              label="Previous"
-              onPress={() => shift(-1)}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => update({ date: today() })}
-            >
-              Today
-            </Button>
-            <IconButton
-              icon="caret-right"
-              label="Next"
-              onPress={() => shift(1)}
-            />
-            <h2 className="sc-bar__label" aria-live="polite">
-              {periodLabel}
-            </h2>
-          </div>
-          <Segmented
-            id="calendar-view"
-            label="Calendar view"
-            value={view}
-            onChange={(id) => update({ view: id })}
-            items={[
-              { id: 'month', label: 'Month' },
-              { id: 'week', label: 'Week' },
-              { id: 'list', label: 'List' },
-            ]}
-          />
-          <div className="sc-bar__layers">{layerPills}</div>
-        </div>
         <div className="accs-split">
           <div className="accs-stack">
-            <Panel flush aria-label="Calendar">
+            <Panel className="sc-cal" aria-label="Calendar">
+              <div className="sc-bar">
+                <div className="sc-bar__nav">
+                  <button
+                    type="button"
+                    className="sc-navbtn"
+                    aria-label="Previous"
+                    onClick={() => shift(-1)}
+                  >
+                    <Icon name="caret-left" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="sc-navbtn"
+                    aria-label="Next"
+                    onClick={() => shift(1)}
+                  >
+                    <Icon name="caret-right" size={16} />
+                  </button>
+                  <h2 className="sc-bar__label" aria-live="polite">
+                    {periodLabel}
+                  </h2>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => update({ date: today() })}
+                  >
+                    Today
+                  </Button>
+                </div>
+                <Segmented
+                  id="calendar-view"
+                  label="Calendar view"
+                  value={view}
+                  onChange={(id) => update({ view: id })}
+                  items={[
+                    { id: 'month', label: 'Month' },
+                    { id: 'week', label: 'Week' },
+                    { id: 'list', label: 'List' },
+                  ]}
+                />
+                <div className="sc-bar__layers">{layerButtons('pills')}</div>
+              </div>
               {/* On a phone, Month is a list grouped by day (testing sheet, P13: the grid was too cramped). */}
               <EventCalendar
                 date={selectedDate}
@@ -772,32 +790,45 @@ function CalendarPage({
                 </button>
               }
             >
-              {layerPills}
+              {layerButtons('checks')}
             </Panel>
-            <Panel flush title="Upcoming">
+            <Panel
+              title="Coming up"
+              className="sc-coming"
+              action={
+                // Every upcoming event in the calendar's own list view.
+                view !== 'list' && upcoming.length > 0 ? (
+                  <button
+                    type="button"
+                    className="accs-panel__link sc-linkbtn sc-seeall"
+                    onClick={() => update({ view: 'list' })}
+                  >
+                    See all
+                    <Icon name="caret-right" size={14} />
+                  </button>
+                ) : undefined
+              }
+            >
               {upcoming.length ? (
                 <PagedList items={upcoming} noun="events">
                   {(upcoming) => (
-                  <ul className="accs-rows">
+                  <ul className="sc-uplist">
                     {upcoming.map((entry) => (
                       <li key={entry.id}>
                         <button
                           type="button"
-                          className="accs-row accs-row--link sc-up"
+                          className="sc-up"
                           onClick={() => setSelectedEntry(entry)}
                         >
-                          <DateTile value={entry.date} />
-                          <span>
-                            <span className="accs-row__title">{entry.title}</span>
-                            <span className="accs-row__sub">
-                              {entry.allDay ? 'All day' : entry.time}
+                          <ToneDate value={entry.date} tone={entry.tone} />
+                          <span className="sc-up__text">
+                            <span className="sc-up__title">{entry.title}</span>
+                            <span className="sc-up__sub">
+                              {[entry.allDay ? 'All day' : entry.time, entry.place ?? entry.type]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           </span>
-                          <i
-                            className="ec-dot"
-                            data-etone={entry.tone}
-                            aria-hidden
-                          />
                         </button>
                       </li>
                     ))}
@@ -2113,41 +2144,47 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
           This week: {count('open')} open, {count('requested', 'booked')}{' '}
           requested or booked, {count('unavailable')} unavailable.
         </p>
-        <div className="sc-bar">
-          <div className="sc-bar__nav">
-            <IconButton
-              icon="caret-left"
-              label="Previous week"
-              onPress={() => setWeek(addDays(week, -7))}
+        <Panel className="sc-cal" aria-label="Availability">
+          <div className="sc-bar">
+            <div className="sc-bar__nav">
+              <button
+                type="button"
+                className="sc-navbtn"
+                aria-label="Previous week"
+                onClick={() => setWeek(addDays(week, -7))}
+              >
+                <Icon name="caret-left" size={16} />
+              </button>
+              <button
+                type="button"
+                className="sc-navbtn"
+                aria-label="Next week"
+                onClick={() => setWeek(addDays(week, 7))}
+              >
+                <Icon name="caret-right" size={16} />
+              </button>
+              <h2 className="sc-bar__label" aria-live="polite">
+                {weekLabel(week)}
+              </h2>
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => setWeek(weekStart(today()))}
+              >
+                This week
+              </Button>
+            </div>
+            <Segmented
+              id="availability-view"
+              label="Availability view"
+              value={view}
+              onChange={setView}
+              items={[
+                { id: 'week', label: 'Week' },
+                { id: 'list', label: 'List' },
+              ]}
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => setWeek(weekStart(today()))}
-            >
-              This week
-            </Button>
-            <IconButton
-              icon="caret-right"
-              label="Next week"
-              onPress={() => setWeek(addDays(week, 7))}
-            />
-            <h2 className="sc-bar__label" aria-live="polite">
-              {weekLabel(week)}
-            </h2>
           </div>
-          <Segmented
-            id="availability-view"
-            label="Availability view"
-            value={view}
-            onChange={setView}
-            items={[
-              { id: 'week', label: 'Week' },
-              { id: 'list', label: 'List' },
-            ]}
-          />
-        </div>
-        <Panel flush aria-label="Availability">
           {view === 'week' ? (
             <>
               <EventCalendar

@@ -22,14 +22,14 @@
 .sc-seg--seg {
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--accs-line);
-  border-radius: 12px;
-  background: #eef1f6;
+  border-radius: 9px;
+  background: var(--accs-paper);
 }
-.sc-seg--seg .sc-seg__btn { min-height: 34px; padding: 0 14px; border-radius: 9px; color: var(--accs-muted); }
+.sc-seg--seg .sc-seg__btn { min-height: 28px; padding: 0 12px; border-radius: 7px; color: var(--accs-muted); font-size: 0.75rem; }
 .sc-seg--seg .sc-seg__btn:hover { color: var(--accs-ink); }
 .sc-seg--seg .sc-seg__btn[aria-pressed='true'] { color: var(--accs-ink); }
-.sc-seg--seg .sc-seg__thumb { background: var(--accs-surface); box-shadow: 0 1px 2px rgb(11 18 32 / 10%), 0 0 0 1px var(--accs-line); }
+.sc-seg--seg .sc-seg__thumb { background: var(--accs-surface); box-shadow: 0 1px 2px rgb(11 18 32 / 8%); }
+@media (pointer: coarse) { .sc-seg--seg .sc-seg__btn { min-height: 36px; } }
 
 .sc-seg--chip { gap: 6px; }
 .sc-seg--chip .sc-seg__btn {
@@ -41,45 +41,96 @@
   color: var(--accs-ink-2);
 }
 .sc-seg--chip .sc-seg__btn:hover { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
-.sc-seg--chip .sc-seg__btn[aria-pressed='true'] { border-color: var(--accs-ink); background: transparent; color: var(--accs-on-accent); }
+.sc-seg--chip .sc-seg__btn[aria-pressed='true'] { border-color: var(--accs-ink); background: transparent; color: var(--accs-surface); }
 .sc-seg--chip .sc-seg__thumb { background: var(--accs-ink); box-shadow: 0 6px 14px -6px rgb(11 18 32 / 55%); }
 .sc-seg--chip .sc-seg__count { font-size: 0.75rem; font-variant-numeric: tabular-nums; opacity: 0.6; }
 
 .sc-controls { display: flex; flex-wrap: wrap; gap: 12px; }
 .sc-controls:empty { display: none; }
 
-/* ---------- Toolbar ---------- */
+/* ---------- Calendar card and its toolbar ---------- */
+:root .accs-panel.sc-cal { gap: 16px; min-width: 0; }
 .sc-bar {
-  position: sticky;
-  top: calc(var(--shell-top-h, 56px) + 8px);
-  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px 16px;
-  padding: 8px 10px;
-  border: 1px solid var(--accs-line);
-  border-radius: var(--accs-radius-card);
-  background: color-mix(in srgb, var(--accs-surface) 78%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 4%), 0 10px 28px -14px rgb(11 18 32 / 16%);
 }
-.sc-bar__nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+/* The calendar card is the surface: the toolbar inside it has no band of its own. */
+:root .sc-cal .sc-bar { padding: 0; background: none; }
+.sc-bar__nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.sc-navbtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--accs-line);
+  border-radius: 8px;
+  background: var(--accs-surface);
+  color: var(--accs-ink);
+  cursor: pointer;
+  transition: background 160ms var(--accs-ease), border-color 160ms var(--accs-ease);
+}
+.sc-navbtn:hover { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
+.sc-navbtn:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 2px; }
+@media (pointer: coarse) { .sc-navbtn { width: 40px; height: 40px; } }
 .sc-bar__label {
-  margin: 0 0 0 10px;
-  font: 800 1.125rem var(--accs-font-display);
-  letter-spacing: -0.02em;
+  margin: 0 2px;
+  font: 600 1.25rem / 1.3 var(--accs-font-title);
   color: var(--accs-ink);
 }
-.sc-bar__layers { flex: 1 1 100%; padding-top: 8px; border-top: 1px solid var(--accs-line); }
+.sc-bar__layers { flex: 1 1 100%; }
 
 .sc-rail-layers { display: none; }
 @media (min-width: 1100px) {
   .sc-bar__layers { display: none; }
   .sc-rail-layers { display: grid; }
 }
+/* Phone: the period on its own line, then the arrows and Today, then a full-width view switch. */
+@media (max-width: 520px) {
+  :root .accs-panel.sc-cal { padding: 16px; }
+  .sc-bar__nav { display: contents; }
+  .sc-bar { justify-content: flex-start; }
+  .sc-bar__label { order: -1; flex: 1 1 100%; margin: 0; font-size: 1.0625rem; }
+  .sc-bar > .sc-seg { flex: 1 1 100%; }
+  .sc-bar > .sc-seg .sc-seg__btn { flex: 1; justify-content: center; }
+}
+
+/* ---------- Layer check rows (rail) ---------- */
+.sc-checks { display: grid; gap: 4px; }
+.sc-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 6px;
+  margin-inline: -6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--accs-ink);
+  font: 500 0.8125rem var(--accs-font-body);
+  text-align: start;
+  cursor: pointer;
+  transition: background 160ms var(--accs-ease), color 160ms var(--accs-ease);
+}
+.sc-check:hover { background: var(--accs-sunken); }
+.sc-check:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 0; }
+.sc-check__box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--t-dot);
+  color: var(--accs-surface);
+  transition: background 160ms var(--accs-ease), box-shadow 160ms var(--accs-ease);
+}
+.sc-check[aria-pressed='false'] { color: var(--accs-muted); }
+.sc-check[aria-pressed='false'] .sc-check__box { background: var(--accs-surface); box-shadow: inset 0 0 0 1.5px var(--t-dot); color: transparent; }
 
 /* ---------- Layer legend pills ---------- */
 .sc-layers { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -114,19 +165,30 @@
 }
 .sc-layer[aria-pressed='true'] i { background: var(--t-dot); transform: scale(1.1); }
 
-/* ---------- Rail: upcoming, to-dos ---------- */
+/* ---------- Rail: coming up, to-dos ---------- */
+.sc-uplist { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .sc-up {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
-  padding: 12px 16px;
-  border-top: 0;
-  border-inline: 0;
+  padding: 4px 6px;
+  margin-inline: -6px;
+  border: 0;
+  border-radius: 12px;
   background: none;
+  color: inherit;
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition: background 160ms var(--accs-ease);
 }
-.sc-up:focus-visible { outline: 2px solid var(--site-accent); outline-offset: -2px; }
-.sc-up .accs-row__title, .sc-up .accs-row__sub { display: block; }
+.sc-up:hover { background: var(--accs-sunken); }
+.sc-up:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 0; }
+.sc-up__text { display: grid; gap: 2px; min-width: 0; }
+.sc-up__title { color: var(--accs-ink); font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.sc-up__sub { color: var(--accs-muted); font-size: 0.75rem; }
+.sc-seeall { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; }
 
 .sc-linkbtn { border: 0; background: none; font-family: inherit; cursor: pointer; }
 .sc-todos { display: grid; margin: 0; padding: 0; list-style: none; }
@@ -365,3 +427,8 @@
 .sc-dayadd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control, 10px); }
 .sc-dayadd > span { margin-inline-end: auto; font-weight: 600; }
 .sc-detail > .ds-status, .sc-detail > [class*="status"] { justify-self: start; }
+.sc-detail > .ec-badge { justify-self: start; }
+.sc-todo__t { font-size: 0.8125rem; }
+.sc-todo .accs-meta { font-size: 0.75rem; white-space: nowrap; }
+/* On the page canvas (not inside a card) the view switch needs its own track color. */
+.sc-controls .sc-seg--seg { background: var(--accs-sunken); }
