@@ -117,6 +117,8 @@ function SiteList({
   )
 }
 
+const sideKey = 'accs.sidebar'
+
 /** The primary navigation panel: the sites the person may open, with the current site's own links nested under it,
  *  and the Assistant card at the foot. Account and utility links (profile, settings, help) live in the top bar. */
 export function SitePanel({
@@ -132,12 +134,39 @@ export function SitePanel({
   currentHref?: string
   onAssistant: () => void
 }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(sideKey) === 'collapsed'
+    } catch {
+      return false
+    }
+  })
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    try {
+      localStorage.setItem(sideKey, next ? 'collapsed' : 'open')
+    } catch {
+      // Private mode: the choice lasts until the page reloads.
+    }
+  }
   return (
-    <aside className="shell-side" aria-label="Main navigation">
+    <aside className="shell-side" aria-label="Main navigation" data-collapsed={collapsed || undefined}>
       <div className="shell-side__head">
-        <ShellBrand />
+        {/* The logo folds the panel to an icon rail and opens it again. */}
+        <button
+          type="button"
+          className="shell-side__toggle"
+          aria-expanded={!collapsed}
+          aria-controls="shell-side-nav"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={toggle}
+        >
+          <ShellBrand />
+        </button>
       </div>
-      <nav className="shell-side__nav" aria-labelledby="shell-side-label">
+      <nav className="shell-side__nav" id="shell-side-nav" aria-labelledby="shell-side-label">
         <p className="shell-side__label" id="shell-side-label">
           Workspace
         </p>

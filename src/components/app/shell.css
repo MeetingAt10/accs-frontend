@@ -348,3 +348,37 @@
 ::view-transition-group(accs-shell-side), ::view-transition-group(accs-shell-top), ::view-transition-group(accs-shell-tabs),
 ::view-transition-old(accs-shell-side), ::view-transition-old(accs-shell-top), ::view-transition-old(accs-shell-tabs),
 ::view-transition-new(accs-shell-side), ::view-transition-new(accs-shell-top), ::view-transition-new(accs-shell-tabs) { animation: none; }
+
+/* ---------- Collapsed sidebar ----------
+   Clicking the logo folds the panel to a 72px icon rail; clicking it again opens it. Labels hide, icons stay, and each
+   link keeps its title as a tooltip. The choice is saved in localStorage (accs.sidebar). */
+@media (min-width: 1024px) {
+  .shell-frame { transition: grid-template-columns 220ms var(--accs-ease-out, ease); }
+  .shell-frame:has(> .shell-side[data-collapsed]) { --shell-side-w: 72px; }
+}
+@media (prefers-reduced-motion: reduce) { .shell-frame { transition: none; } }
+:root .shell-side__toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+:root .shell-side__toggle:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 4px; }
+:root .shell-side__toggle:hover .shell-mark { filter: brightness(1.15); }
+:root .shell .shell-side { overflow: hidden; }
+:root .shell .shell-side[data-collapsed] { padding-inline: 18px; }
+:root .shell .shell-side[data-collapsed] :is(.shell-brand__text, .shell-side__label, .shell-sub, .shell-assist__text) { display: none; }
+:root .shell .shell-side[data-collapsed] .shell-nav-item { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+:root .shell .shell-side[data-collapsed] .shell-assist { justify-items: center; padding: 10px 0; }
+:root .shell .shell-side[data-collapsed] .shell-assist__head { gap: 0; font-size: 0; }
+:root .shell .shell-side[data-collapsed] .shell-assist__icon { width: 20px; height: 20px; }
+/* With the sub-links hidden, the current site carries the highlight itself. */
+:root .shell .shell-side[data-collapsed] .shell-nav-item[data-section] { background: rgb(255 255 255 / 12%); color: var(--accs-on-brand); }
