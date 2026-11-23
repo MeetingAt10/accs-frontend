@@ -1,3 +1,4 @@
+import { typedDateImpossible } from '@/lib/typed-date'
 import { campusToday } from '@/lib/campus-date'
 import { parseDate as parseCalendarDate } from '@internationalized/date'
 import {
@@ -371,6 +372,7 @@ function CalendarPage({
   const [todoOpen, setTodoOpen] = useState(false)
   const [todoTitle, setTodoTitle] = useState('')
   const [todoDate, setTodoDate] = useState('')
+  const [todoDateBad, setTodoDateBad] = useState(false)
   const [todoError, setTodoError] = useState('')
   const selectedDate = isoDate(parseDate(params.get('date') ?? today()))
   const view = ['month', 'week', 'list'].includes(params.get('view') ?? '')
@@ -529,6 +531,10 @@ function CalendarPage({
 
   async function saveTodo(event: FormEvent) {
     event.preventDefault()
+    if (todoDateBad) {
+      setTodoError("That date doesn't exist.")
+      return
+    }
     if (!todoTitle.trim() || !todoDate) {
       setTodoError('Enter a title and due date.')
       return
@@ -540,7 +546,7 @@ function CalendarPage({
       })
       setTodoOpen(false)
       setTodoTitle('')
-      setTodoDate('')
+      setTodoDate(''); setTodoDateBad(false)
       setTodoError('')
     } catch {
       // Keep the entered to-do for another attempt.
@@ -749,6 +755,15 @@ function CalendarPage({
                   ]}
                 />
                 <div className="sc-bar__layers">{layerButtons('pills')}</div>
+                {small && (
+                  <input
+                    type="date"
+                    className="sc-datejump"
+                    aria-label="Go to date"
+                    value={selectedDate}
+                    onChange={(event) => event.target.value && update({ date: event.target.value })}
+                  />
+                )}
               </div>
               {/* On a phone, Month is a list grouped by day (testing sheet, P13: the grid was too cramped). */}
               <EventCalendar
@@ -767,7 +782,7 @@ function CalendarPage({
             {(canTodo || session.permissions.includes('announcement.publish')) && selectedDate >= today() && (
               <div className="sc-dayadd">
                 <span>{formatDate(selectedDate)}</span>
-                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoOpen(true) }}>Add to-do</Button>}
+                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoDateBad(false); setTodoOpen(true) }}>Add to-do</Button>}
                 {session.permissions.includes('announcement.publish') && (
                   <Button size="sm" variant="tertiary" icon="calendar" href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate)}`}>Add event</Button>
                 )}
@@ -933,7 +948,11 @@ function CalendarPage({
                 isRequired
                 minValue={campusToday()}
                 defaultValue={todoDate ? parseCalendarDate(todoDate) : undefined}
-                onChange={(value) => setTodoDate(value?.toString() ?? '')}
+                onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setTodoDateBad(bad) }}
+                onChange={(value) => {
+                  setTodoDate(value?.toString() ?? '')
+                  if (document.activeElement?.closest('.ds-date-picker__popover')) setTodoDateBad(false)
+                }}
               />
               <PrivacyNotice title="Personal to-do">
                 Only you can see your to-dos.
@@ -1977,6 +1996,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const [state, setState] = useState<'open' | 'unavailable'>('open')
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const [dateBad, setDateBad] = useState(false)
   // A time being marked not available from the list waits here for its reason.
   const [reasonFor, setReasonFor] = useState<Slot>()
   const [quickReason, setQuickReason] = useState('')
@@ -2021,6 +2041,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 
   async function saveTimes(event: FormEvent) {
     event.preventDefault()
+    if (dateBad) {
+      setFieldError("That date doesn't exist.")
+      return
+    }
     if (!date || end <= start) {
       setFieldError('Choose a date and an end time after the start time.')
       return
@@ -2042,7 +2066,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
         payload: { date, start, end, state, ...(state === 'unavailable' ? { reason: reason.trim() } : {}) },
       })
       setAddOpen(false)
-      setDate('')
+      setDate(''); setDateBad(false)
       setReason('')
       setFieldError('')
     } catch {
@@ -2296,7 +2320,11 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 label="Date"
                 isRequired
                 minValue={campusToday()}
-                onChange={(value) => setDate(value?.toString() ?? '')}
+                onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setDateBad(bad) }}
+                onChange={(value) => {
+                  setDate(value?.toString() ?? '')
+                  if (document.activeElement?.closest('.ds-date-picker__popover')) setDateBad(false)
+                }}
               />
               <div className="sc-timepair">
                 <Select

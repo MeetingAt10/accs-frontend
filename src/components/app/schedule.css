@@ -432,3 +432,15 @@
 .sc-todo .accs-meta { font-size: 0.75rem; white-space: nowrap; }
 /* On the page canvas (not inside a card) the view switch needs its own track color. */
 .sc-controls .sc-seg--seg { background: var(--accs-sunken); }
+
+/* Phone: jump to any date without stepping month by month. */
+.sc-datejump {
+  flex: 1 1 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--accs-line);
+  border-radius: 8px;
+  background: var(--accs-surface);
+  color: var(--accs-ink);
+  font: inherit;
+}
