@@ -1,0 +1,207 @@
+/* Sign in, from the Figma "User Login" frame (1440 x 844). Builds on auth.css; every rule is scoped to .lg so
+   /first-login keeps the shared auth look. Desktop: navy panel left, form right. Below 960px: navy band above the form. */
+@import '@fontsource-variable/inter/wght.css';
+
+.lg {
+  --lg-navy: #032e87;
+  --lg-navy-deep: #010b21;
+  --lg-field: #bbc0c9;
+  --lg-muted: rgb(0 0 0 / 50%);
+  /* The shared auth rules (links, focus rings, submit) read --accs-navy; the design uses the brand navy here. */
+  --accs-navy: var(--lg-navy);
+  --accs-on-accent: #fff;
+  color-scheme: light;
+  background: #fff;
+  color: #000;
+  font-family: 'Inter Variable', 'Inter', var(--accs-font-body);
+}
+html:has(.lg) { background: #fff; }
+
+/* Brand panel */
+.lg-brand {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  background: linear-gradient(180deg, var(--lg-navy) 0%, var(--lg-navy-deep) 100%);
+}
+/* Faint building photo: 10% opacity, 134px from the top of an 844px panel, cropped as in the frame. */
+.lg-brand__photo {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 656 / 736;
+  overflow: hidden;
+  opacity: 0.1;
+  pointer-events: none;
+}
+.lg-brand__photo img { position: absolute; top: -0.1%; left: -39.57%; width: 192.99%; height: 105.64%; max-width: none; }
+/* Lion: 440.59 x 417.95 at 844px tall, rotated -10.55deg, centred 53px from the right and 163px from the bottom. */
+.lg-brand__lion {
+  --lion-w: 150px;
+  position: absolute;
+  z-index: -1;
+  right: calc(var(--lion-w) * -0.3793);
+  bottom: calc(var(--lion-w) * -0.1038);
+  width: var(--lion-w);
+  height: auto;
+  pointer-events: none;
+}
+
+/* Narrow screens: logo and headline on the left, the lion peeking in from the right. */
+.lg-brand__inner { display: flex; flex-direction: column; align-items: flex-start; padding: 24px 132px 28px 24px; }
+.lg-brand__logo { display: block; width: 172px; max-width: 100%; height: auto; }
+.lg-brand__headline {
+  margin: 12px 0 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.072;
+  letter-spacing: -0.02em;
+  text-align: left;
+  text-wrap: balance;
+  text-shadow: 0 3.5px 3.5px rgb(0 0 0 / 25%);
+}
+.lg-brand__facts { display: none; }
+
+/* Form column */
+.lg-main { padding: 32px 24px 40px; }
+.lg-col { max-width: 397px; }
+.lg .au-title {
+  margin: 0 0 13px;
+  color: var(--lg-navy);
+  font-family: inherit;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.072;
+  letter-spacing: -0.02em;
+}
+.lg .au-title:has(+ .au-form) { margin-bottom: 35px; }
+.lg .au-sub {
+  margin: 0 0 35px;
+  color: rgb(3 46 135 / 70%);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.072;
+  letter-spacing: -0.02em;
+}
+.lg .au-form { gap: 26px; }
+.lg .au-field { gap: 9px; }
+.lg .au-field > label,
+.lg .au-field:focus-within > label {
+  color: var(--lg-muted);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.072;
+  letter-spacing: -0.02em;
+}
+.lg .au-input {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lg-field);
+  color: #000;
+}
+.lg .au-input:hover { background: #b2b8c2; }
+/* Keep the grey field when the browser autofills it. */
+.lg .au-input:autofill { box-shadow: inset 0 0 0 100px var(--lg-field); -webkit-text-fill-color: #000; }
+.lg .au-input:autofill:focus-visible { box-shadow: inset 0 0 0 100px var(--lg-field), 0 0 0 2px var(--lg-navy), 0 0 0 5px rgb(3 46 135 / 18%); }
+.lg .au-input:focus-visible { box-shadow: 0 0 0 2px var(--lg-navy), 0 0 0 5px rgb(3 46 135 / 18%); }
+.lg .au-input[aria-invalid='true'] { box-shadow: inset 0 0 0 2px var(--accs-danger); }
+.lg .au-input[aria-invalid='true']:focus-visible { box-shadow: inset 0 0 0 2px var(--accs-danger), 0 0 0 3px color-mix(in srgb, var(--accs-danger) 22%, transparent); }
+.lg .au-hint { color: var(--lg-muted); }
+.lg .au-eye { color: rgb(0 0 0 / 55%); }
+.lg .au-eye:hover, .lg .au-eye[aria-pressed='true'] { color: #000; }
+
+/* Remember Me and Forgot Password? sit 36px under the password field; Sign In 35px under them. */
+.lg .au-row { margin: 10px 0 6px; }
+.lg .au-check {
+  gap: 11px;
+  min-height: 24px;
+  color: var(--lg-muted);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.lg .au-check input {
+  flex: none;
+  appearance: none;
+  width: 22px;
+  height: 20.5px;
+  margin: 0;
+  border-radius: 2.28px;
+  background: #b5b5b5;
+  box-shadow: inset 0 1.5px 1.5px rgb(0 0 0 / 25%);
+  cursor: pointer;
+  transition: background 150ms var(--accs-ease);
+}
+.lg .au-check input:checked {
+  background: var(--lg-navy) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E") center / 15px no-repeat;
+}
+.lg .au-link {
+  min-height: 24px;
+  color: var(--lg-navy);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.lg .au-submit {
+  min-height: 37px;
+  border-radius: 5px;
+  background: var(--lg-navy);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  box-shadow: none;
+}
+.lg .au-submit:hover:not(:disabled) { background: #0a3a9e; box-shadow: 0 8px 18px -8px rgb(3 46 135 / 60%); }
+.lg .au-foot { color: var(--lg-muted); }
+.lg-note {
+  margin: 40px 0 0;
+  color: var(--lg-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  line-height: 1.072;
+  letter-spacing: -0.02em;
+  text-align: justify;
+}
+
+@media (min-width: 960px) {
+  .lg { grid-template-columns: 45.56% 1fr; }
+  .lg-brand { min-height: 100dvh; }
+  .lg-brand__photo { top: 15.88%; }
+  .lg-brand__lion { --lion-w: min(440.59px, 52.2dvh); }
+  /* Logo 96px from the top at 844px tall; headline 47px under it; facts 29px under the headline. */
+  .lg-brand__inner {
+    position: sticky;
+    top: 0;
+    align-items: center;
+    /* The frame centres the brand content 4px left of the panel's middle. */
+    padding: clamp(32px, 11.4dvh, 96px) 40px 48px 32px;
+  }
+  .lg-brand__logo { width: 311px; }
+  .lg-brand__headline {
+    width: 100%;
+    max-width: 490px;
+    margin-top: clamp(24px, 5.6dvh, 47px);
+    font-size: clamp(1.75rem, 2.5vw, 2.25rem);
+    text-align: center;
+  }
+  .lg-brand__facts { display: grid; gap: 13.66px; width: 100%; max-width: 490px; margin: 29px 0 0; padding: 0; list-style: none; }
+  .lg-brand__facts li {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.072;
+    letter-spacing: -0.02em;
+    text-shadow: 0 3.5px 3.5px rgb(0 0 0 / 25%);
+  }
+  .lg-brand__icon { display: grid; flex: none; place-items: center; width: 36.89px; height: 36.89px; }
+  /* The form sits 17px above the vertical centre and 4px left of the horizontal centre, as in the frame. */
+  .lg-main { align-items: center; padding: 48px 40px 88px 32px; }
+  .lg .au-title { font-size: 2.5rem; }
+}

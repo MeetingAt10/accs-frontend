@@ -1,0 +1,176 @@
+/* Home for every role (Figma 02 Home — Program Chair, content node; 08 Mobile Home).
+   A navy hero, the summary cards, then two columns: cases and the main lists on the left, a 380px side column with
+   announcements and quick access on the right. One column below 1000px of content width. */
+
+.hm {
+  container: home / inline-size;
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.hm-body { display: grid; gap: 24px; min-width: 0; }
+.hm-views { display: grid; gap: 8px; justify-items: start; }
+
+/* ---------- Hero ---------- */
+.hm-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 32px;
+  border-radius: 20px;
+  background: var(--accs-hero);
+  color: var(--accs-on-brand);
+  overflow: hidden;
+}
+.hm-hero__text { display: grid; gap: 8px; flex: 1 1 auto; min-width: 0; justify-items: start; }
+.hm-hero__pill {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.33;
+}
+.hm-hero__title {
+  margin: 0;
+  font-family: var(--accs-font-title);
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 38px;
+  letter-spacing: -0.01em;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.hm-hero__line { margin: 0; font-size: 0.875rem; line-height: 1.45; opacity: 0.8; white-space: pre-wrap; }
+.hm-hero__actions { display: flex; flex-wrap: wrap; gap: 12px; flex: none; }
+.hm-hero__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 18px;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: var(--accs-radius-control);
+  background: rgb(255 255 255 / 12%);
+  color: var(--accs-on-brand);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 160ms var(--accs-ease), border-color 160ms var(--accs-ease);
+}
+.hm-hero__btn:hover { background: rgb(255 255 255 / 20%); border-color: rgb(255 255 255 / 45%); }
+.hm-hero__btn[data-primary] { border-color: #fff; background: #fff; color: var(--accs-brand-800); }
+.hm-hero__btn[data-primary]:hover { background: #eef0fd; border-color: #eef0fd; }
+.hm-hero__btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.hm-hero__btn-short { display: none; }
+
+/* ---------- Columns ---------- */
+.hm-cols { display: grid; gap: 24px; align-items: start; min-width: 0; }
+.hm-col { display: grid; gap: 24px; align-content: start; min-width: 0; }
+.hm-side:empty { display: none; }
+@container home (min-width: 1000px) {
+  .hm-cols { grid-template-columns: minmax(0, 1fr) 380px; }
+  .hm-cols:has(> .hm-side:empty) { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Panel header links: "Open queue ›", "View feed ›". */
+.hm-link { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; text-decoration: none; white-space: nowrap; }
+.hm-link > svg { width: 14px; height: 14px; }
+.hm-link:hover { text-decoration: underline; }
+
+/* ---------- Case queue ---------- */
+:root .hm-queue { gap: 4px; }
+:root .accs-panel.hm-queue > .accs-panel__head { padding-bottom: 0; }
+.hm-queue__lede { margin: 0 0 8px; color: var(--accs-muted); font-size: 0.8125rem; }
+.hm-cases { display: grid; margin: 0; padding: 0; list-style: none; }
+.hm-cases > li + li { border-top: 1px solid var(--accs-line); }
+.hm-case {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 150px 56px 16px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: var(--accs-radius-control);
+  color: inherit;
+  text-decoration: none;
+  transition: background 160ms var(--accs-ease);
+}
+.hm-case[data-mine], a.hm-case:hover { background: var(--accs-tint); }
+.hm-cases > li:has(> .hm-case[data-mine]) + li,
+.hm-cases > li:has(> a.hm-case:hover) + li { border-top-color: transparent; }
+.hm-case__main { display: grid; gap: 4px; min-width: 0; }
+.hm-case__title { color: var(--accs-ink); font-size: 0.875rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+a.hm-case:hover .hm-case__title { color: var(--accs-link); }
+.hm-case__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--accs-muted); font-size: 0.75rem; font-weight: 500; }
+.hm-case__priority[data-level='high'] { color: var(--accs-danger); }
+.hm-case__priority[data-level='medium'] { color: var(--accs-warn); }
+.hm-case__chip { display: flex; justify-content: flex-end; min-width: 0; }
+.hm-case__date { color: var(--accs-muted); font-size: 0.75rem; text-align: right; white-space: nowrap; }
+.hm-case__go { display: inline-flex; color: var(--accs-faint); transition: transform 200ms var(--accs-ease), color 200ms var(--accs-ease); }
+a.hm-case:hover .hm-case__go { color: var(--accs-link); transform: translateX(2px); }
+
+/* ---------- Announcements ---------- */
+:root .hm-news { gap: 14px; }
+.hm-news__list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.hm-news__row { display: flex; align-items: flex-start; gap: 12px; color: inherit; text-decoration: none; }
+.hm-news__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--accs-radius-control);
+  background: var(--accs-tint);
+  color: var(--accs-link);
+}
+.hm-news__body { display: grid; gap: 3px; min-width: 0; }
+.hm-news__title { color: var(--accs-ink); font-size: 0.8125rem; font-weight: 600; line-height: 18px; overflow-wrap: anywhere; }
+a.hm-news__row:hover .hm-news__title { color: var(--accs-link); text-decoration: underline; }
+.hm-news__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--accs-muted); font-size: 0.75rem; }
+
+/* ---------- Narrow content: tablet ---------- */
+@container home (max-width: 760px) {
+  .hm-case { grid-template-columns: minmax(0, 1fr) auto 16px; gap: 6px 10px; }
+  .hm-case__main { grid-column: 1; grid-row: 1; }
+  .hm-case__chip { grid-column: 1; grid-row: 2; justify-content: flex-start; }
+  .hm-case__progress { display: none; }
+  .hm-case__date { grid-column: 2; grid-row: 1 / span 2; }
+  .hm-case__go { grid-column: 3; grid-row: 1 / span 2; }
+}
+
+/* ---------- Phone (08 Mobile Home) ---------- */
+@container home (max-width: 520px) {
+  .hm { gap: 16px; }
+  .hm-body, .hm-cols, .hm-col { gap: 16px; }
+  .hm-hero { flex-direction: column; align-items: stretch; gap: 14px; padding: 20px; border-radius: 18px; }
+  .hm-hero__text { gap: 6px; }
+  .hm-hero__pill, .hm-hero__date { display: none; }
+  .hm-hero__title { font-size: 1.375rem; line-height: 1.3; }
+  .hm-hero__line { font-size: 0.8125rem; }
+  .hm-hero__actions { gap: 8px; }
+  .hm-hero__btn,
+  .hm-hero__btn[data-primary] {
+    gap: 6px;
+    min-height: 32px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: rgb(255 255 255 / 14%);
+    color: var(--accs-on-brand);
+    font-size: 0.75rem;
+  }
+  .hm-hero__btn > svg { width: 14px; height: 14px; }
+  .hm-hero__btn-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hm-hero__btn-short { display: inline; }
+  .hm-case { padding: 12px 0; }
+  .hm-case[data-mine] { padding-inline: 10px; margin-inline: -10px; }
+  .hm-case__date { display: none; }
+  .hm-case { grid-template-columns: minmax(0, 1fr) 16px; }
+  .hm-case__go { grid-column: 2; }
+  :root .hm-queue, :root .hm-news { padding: 16px 16px 8px; }
+  .hm-queue__lede { display: none; }
+}

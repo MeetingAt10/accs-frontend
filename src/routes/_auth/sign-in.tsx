@@ -7,7 +7,6 @@ import { useRef, useState, type FormEvent } from 'react'
 import { ApiError, forgotPassword, resetPassword, signIn } from '@/lib/api'
 
 import {
-  AuthShell,
   focusFirstInvalid,
   Foot,
   Form,
@@ -25,6 +24,7 @@ import {
   useFinishAuth,
   validateAuthSearch,
 } from './-auth-shell'
+import { LoginShell } from './-login-shell'
 
 export const Route = createFileRoute('/_auth/sign-in')({
   validateSearch: validateAuthSearch,
@@ -66,7 +66,7 @@ function SignInPage() {
   const [notice, setNotice] = useState('')
 
   return (
-    <AuthShell>
+    <LoginShell>
       <AnimatePresence mode="wait">
         <Stage key={view}>
           {view === 'sign-in' && (
@@ -102,7 +102,7 @@ function SignInPage() {
           )}
         </Stage>
       </AnimatePresence>
-    </AuthShell>
+    </LoginShell>
   )
 }
 
@@ -137,7 +137,7 @@ function SignInForm({
   function submit(event: FormEvent) {
     event.preventDefault()
     const next = {
-      emailOrId: emailOrId.trim() ? undefined : 'Enter your email, ID, or username.',
+      emailOrId: emailOrId.trim() ? undefined : 'Enter your username.',
       password: password ? undefined : 'Enter your password.',
     }
     setErrors(next)
@@ -147,8 +147,8 @@ function SignInForm({
 
   return (
     <>
-      <Title>Sign in</Title>
-      <Sub>Use your QCU email, your student or employee ID, or the username you chose.</Sub>
+      <Title>Sign In</Title>
+      <Sub>Enter the credentials provided by the CCS Secretary.</Sub>
       <Form formRef={form} onSubmit={submit}>
         {notice && <Rise><Alert tone="success" title={notice} /></Rise>}
         {!notice && ended && !mutation.error && (
@@ -159,7 +159,7 @@ function SignInForm({
           <Alert tone="danger" title={mutation.error ? signInMessage(mutation.error) : ''} />
         </Reveal>
         <TextInput
-          label="Email, ID, or username"
+          label="Username"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
@@ -177,22 +177,17 @@ function SignInForm({
         <Rise className="au-row">
           <label className="au-check">
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-            Remember me
+            Remember Me
           </label>
           <button type="button" className="au-link" onClick={onForgot}>
-            Forgot password?
+            Forgot Password?
           </button>
         </Rise>
-        <SubmitButton loading={mutation.isPending}>Sign in</SubmitButton>
+        <SubmitButton loading={mutation.isPending}>Sign In</SubmitButton>
       </Form>
-      <details className="au-help">
-        <summary>Can't sign in?</summary>
-        <p>
-          Students: ask the CCS secretary to check your account or to give you new sign-in details. Faculty and staff:
-          contact the CCS office. If you know the email on your account, use Forgot password? above.
-        </p>
-      </details>
-      <p className="au-privacy">ACCS uses simulated enrollment data. Don't enter real records.</p>
+      <Rise className="lg-note">
+        Note: If you haven’t received your account credentials, kindly contact your immediate program adviser.
+      </Rise>
     </>
   )
 }

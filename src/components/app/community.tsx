@@ -34,7 +34,6 @@ import {
   ViewState,
   toast,
   EmptyState,
-  type IconName,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker, useRouter, useRouterState } from '@tanstack/react-router'
@@ -284,12 +283,18 @@ function ActionError({ error }: { error: unknown }) {
 const ease = [0.16, 1, 0.3, 1] as const
 const priorityRank = ['urgent', 'important', 'general']
 
-function Initials({ name, small, photo }: { name: string; small?: boolean; photo?: unknown }) {
+function Initials({ name, small, photo, anonymous }: { name: string; small?: boolean; photo?: unknown; anonymous?: boolean }) {
   return (
-    <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} aria-hidden>
-      <AvatarFill photo={photo} fallback={initials(name) || '?'} />
+    <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} data-anonymous={anonymous || undefined} aria-hidden>
+      <AvatarFill photo={photo} fallback={anonymous ? 'A' : initials(name) || '?'} />
     </span>
   )
+}
+
+/** The first role of a person, for the small chip beside their name ("Dean"). */
+function mainRole(person?: Person) {
+  const role = person?.roles?.[0]
+  return role ? roleLabelOf(role) || roleNames[role] || role : ''
 }
 
 function authorName(post: CommunityPost) {
@@ -357,105 +362,111 @@ function ThreadList({
   ]
 
   return (
-    <Panel flush className="fx-threads-panel">
-      <ul className="fx-threads" aria-label="Posts">
-        <AnimatePresence initial mode="popLayout">
-          {ordered.map((post, index) => {
-            const name = authorName(post)
-            const announcement = post.kind === 'announcement'
-            return (
-              <motion.li
-                key={post.id}
-                className="fx-thread"
-                layout={!reduce}
-                initial={reduce ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? undefined : { opacity: 0, x: -16 }}
-                transition={{
-                  duration: 0.36,
-                  ease,
-                  delay: reduce ? 0 : Math.min(index, 8) * 0.04,
-                }}
-              >
-                <div className="fx-vote" title={`${readReactions(post as unknown as Record<string, unknown>).total} reactions`}>
-                  <span aria-hidden className="fx-vote__emoji">{topReactions(readReactions(post as unknown as Record<string, unknown>).counts, 1)[0]?.emoji ?? '👍'}</span>
-                  <span className="accs-num">{readReactions(post as unknown as Record<string, unknown>).total}</span>
-                  <span className="fx-sr">reactions</span>
-                </div>
-                <div className="fx-thread__body">
-                  <div className="fx-thread__tags">
-                    <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
-                      {announcement ? 'Announcement' : post.label}
-                    </span>
-                    <span className="accs-tag">
+    <ul className="fx-threads" aria-label="Posts">
+      <AnimatePresence initial mode="popLayout">
+        {ordered.map((post, index) => {
+          const name = authorName(post)
+          const announcement = post.kind === 'announcement'
+          const role = post.anonymous ? '' : mainRole(post.author)
+          const reactionsRead = readReactions(post as unknown as Record<string, unknown>)
+          const files = post.attachments?.length ?? 0
+          const general = !post.priority || post.priority === 'general'
+          return (
+            <motion.li
+              key={post.id}
+              className="fx-thread"
+              layout={!reduce}
+              initial={reduce ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduce ? undefined : { opacity: 0, x: -16 }}
+              transition={{
+                duration: 0.36,
+                ease,
+                delay: reduce ? 0 : Math.min(index, 8) * 0.04,
+              }}
+            >
+              <div className="fx-thread__head">
+                <Initials name={name} anonymous={post.anonymous} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
+                <div className="fx-thread__who">
+                  <p className="fx-thread__name">
+                    <span className="fx-thread__author">{name}</span>
+                    {role && <span className="fx-role">{role}</span>}
+                  </p>
+                  <p className="fx-thread__meta">
+                    <time dateTime={post.at} title={formatDateTime(post.at)}>
+                      {relativeTime(post.at)}
+                    </time>
+                    <span aria-hidden>·</span>
+                    <span>
                       {post.audience === 'college'
                         ? 'CCS'
                         : audienceName(post.audience, spaces, organizations)}
                     </span>
-                    {announcement && (
-                      <StatusChip tone={toneFor(post.priority || 'general')}>
-                        {priorityLabel(post.priority)}
-                      </StatusChip>
+                    {announcement && general && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>{priorityLabel(post.priority)}</span>
+                      </>
                     )}
-                  </div>
-                  <h3 className="fx-thread__title">
-                    <Link
-                      variant="quiet"
-                      className="fx-title-link"
-                      href={`/feed/${encodeURIComponent(post.id)}`}
-                    >
-                      {post.title}
-                    </Link>
-                  </h3>
-                  <p className="fx-thread__excerpt">{post.body}</p>
-                  {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
-                  <p className="fx-thread__meta">
-                    <Initials name={name} small photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
-                    <span className="fx-thread__author">{name}</span>
-                    <span aria-hidden>·</span>
-                    <time dateTime={post.at} title={formatDateTime(post.at)}>
-                      {relativeTime(post.at)}
-                    </time>
-                    {post.attachments?.length ? (
-                      <span className="fx-thread__replies" title={`${post.attachments.length} ${post.attachments.length === 1 ? 'file' : 'files'}`}>
-                        <Icon name="paperclip" size={16} />
-                        <span className="accs-num">{post.attachments.length}</span>
-                        <span className="fx-sr">{post.attachments.length === 1 ? 'file' : 'files'}</span>
-                      </span>
-                    ) : null}
-                    <span className="fx-thread__replies">
-                      <Icon name="chat" size={16} />
-                      <span className="accs-num">{post.commentCount}</span>
-                      <span className="fx-sr">replies</span>
-                    </span>
                   </p>
-                  {!post.removed && <RowComment post={post} />}
                 </div>
-              </motion.li>
-            )
-          })}
-        </AnimatePresence>
-      </ul>
-    </Panel>
+                <div className="fx-thread__tags">
+                  {announcement && !general && (
+                    <StatusChip tone={toneFor(post.priority)}>
+                      {priorityLabel(post.priority)}
+                    </StatusChip>
+                  )}
+                  <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
+                    {announcement ? 'Announcement' : post.label}
+                  </span>
+                </div>
+              </div>
+              <h3 className="fx-thread__title">
+                <Link
+                  variant="quiet"
+                  className="fx-title-link"
+                  href={`/feed/${encodeURIComponent(post.id)}`}
+                >
+                  {post.title}
+                </Link>
+              </h3>
+              {post.body && <p className="fx-thread__excerpt">{post.body}</p>}
+              {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
+              <div className="fx-thread__foot">
+                <span className="fx-stat" title={reactionsRead.total ? topReactions(reactionsRead.counts, 6).map((r) => `${r.label} ${reactionsRead.counts[r.id]}`).join(', ') : undefined}>
+                  <span aria-hidden className="fx-stat__emoji">
+                    {topReactions(reactionsRead.counts).map((r) => r.emoji).join('') || '👍'}
+                  </span>
+                  <span><span className="accs-num">{reactionsRead.total}</span>{reactionsRead.total === 1 ? ' reaction' : ' reactions'}</span>
+                </span>
+                <span className="fx-stat">
+                  <Icon name="chat" size={16} />
+                  <span><span className="accs-num">{post.commentCount}</span>{post.commentCount === 1 ? ' reply' : ' replies'}</span>
+                </span>
+                {files ? (
+                  <span className="fx-stat">
+                    <Icon name="paperclip" size={16} />
+                    <span><span className="accs-num">{files}</span>{files === 1 ? ' file' : ' files'}</span>
+                  </span>
+                ) : null}
+                {!post.removed && <RowComment post={post} />}
+              </div>
+            </motion.li>
+          )
+        })}
+      </AnimatePresence>
+    </ul>
   )
 }
 
-/** A rail section's heading: its icon, its name and how many items it lists. */
-function RailTitle({ icon, children, count }: { icon: IconName; children: string; count?: number }) {
-  return (
-    <span className="fx-rail-title">
-      <span className="fx-rail-mark" aria-hidden><Icon name={icon} size={16} /></span>
-      {children}
-      {count ? <span className="fx-rail-count" aria-label={`${count} shown`}>{count}</span> : null}
-    </span>
-  )
-}
+/** Colours for the rail's space marks, in turn, so neighbouring spaces read apart. */
+const markTones = ['adviser', 'chair', 'guidance', 'dean', 'osas'] as const
 
-/** One rail row: a tinted icon, then the title and a line under it. */
-function RailRow({ href, icon, title, sub }: { href: string; icon: IconName; title: ReactNode; sub: ReactNode }) {
+/** One rail row: a mark (initials or an icon), then the title and a line under it. */
+function RailRow({ href, mark, tone, round, title, sub }: { href: string; mark: ReactNode; tone?: string; round?: boolean; title: ReactNode; sub: ReactNode }) {
   return (
     <Link variant="quiet" className="fx-mini__row" href={href}>
-      <span className="fx-mini__mark" aria-hidden><Icon name={icon} size={16} /></span>
+      <span className="fx-mini__mark" data-tone={tone} data-round={round || undefined} aria-hidden>{mark}</span>
       <span className="fx-mini__text">
         <span className="fx-mini__title">{title}</span>
         <span className="fx-mini__sub">{sub}</span>
@@ -468,6 +479,7 @@ function RailLink({ href, children }: { href: string; children: string }) {
   return (
     <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
       {children}
+      <Icon name="caret-right" size={16} />
     </Link>
   )
 }
@@ -496,22 +508,6 @@ function FeedRail({
     .slice(0, 5)
   return (
     <aside className="fx-rail accs-stagger" aria-label="Forum sidebar">
-      {announcements.length > 0 && (
-        <Panel title={<RailTitle icon="megaphone" count={announcements.length}>Announcements</RailTitle>} flush className="fx-rail-sec" data-tone="warn">
-          <ul className="fx-mini">
-            {announcements.map((post) => (
-              <li key={post.id}>
-                <RailRow
-                  href={`/feed/${encodeURIComponent(post.id)}`}
-                  icon="megaphone"
-                  title={post.title}
-                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
-                />
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      )}
       {spacesLoad?.failed && (
         <Panel title="Your spaces">
           <QueryProblem what="your class spaces" onRetry={spacesLoad.retry} retrying={spacesLoad.retrying} />
@@ -524,23 +520,26 @@ function FeedRail({
       )}
       {spaces.length > 0 && (
         <Panel
-          title={<RailTitle icon="graduation-cap" count={Math.min(spaces.length, 5)}>Your spaces</RailTitle>}
+          title="Your spaces"
           flush
           className="fx-rail-sec"
-          data-tone="info"
           action={<RailLink href="/spaces">View all</RailLink>}
         >
           <ul className="fx-mini">
-            {spaces.slice(0, 5).map((space) => {
+            {spaces.slice(0, 5).map((space, index) => {
               // The section group is the whole class; a subject space is one subject of it, named by the subject.
               const group = isSectionGroup(space)
+              const students = studentTotal(space)
               return (
                 <li key={space.id}>
                   <RailRow
                     href={`/spaces/${encodeURIComponent(space.id)}`}
-                    icon={group ? 'chalkboard' : 'books'}
-                    title={spaceName(space)}
-                    sub={group ? 'Whole section' : 'Subject'}
+                    mark={(group ? sectionCode(space) : space.subject).replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
+                    tone={markTones[index % markTones.length]}
+                    title={group ? sectionCode(space) : space.subject}
+                    sub={group
+                      ? <>Whole section{students ? <> · <span className="accs-num">{students}</span> {students === 1 ? 'student' : 'students'}</> : null}</>
+                      : <>Subject · {sectionCode(space)}</>}
                   />
                 </li>
               )
@@ -550,10 +549,9 @@ function FeedRail({
       )}
       {orgs.length > 0 && (
         <Panel
-          title={<RailTitle icon="users" count={orgs.length}>Organizations</RailTitle>}
+          title="Organizations"
           flush
           className="fx-rail-sec"
-          data-tone="ok"
           action={<RailLink href="/organizations">Browse</RailLink>}
         >
           <ul className="fx-mini">
@@ -563,16 +561,34 @@ function FeedRail({
                 <li key={organization.id}>
                   <RailRow
                     href={`/organizations/${encodeURIComponent(organization.id)}`}
-                    icon="users"
+                    mark={initials(organization.name) || '?'}
+                    round
                     title={organization.name}
                     sub={<>
-                      {count} {count === 1 ? 'member' : 'members'}
+                      <span className="accs-num">{count}</span> {count === 1 ? 'member' : 'members'}
                       {organization.member && <span className="fx-mini__badge">Member</span>}
                     </>}
                   />
                 </li>
               )
             })}
+          </ul>
+        </Panel>
+      )}
+      {announcements.length > 0 && (
+        <Panel title="Announcements" flush className="fx-rail-sec">
+          <ul className="fx-mini">
+            {announcements.map((post) => (
+              <li key={post.id}>
+                <RailRow
+                  href={`/feed/${encodeURIComponent(post.id)}`}
+                  mark={<Icon name="megaphone" size={16} />}
+                  tone="announcement"
+                  title={post.title}
+                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
+                />
+              </li>
+            ))}
           </ul>
         </Panel>
       )}
@@ -682,106 +698,110 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     <div className="fx-page accs-stack accs-stagger">
       <PageHeader
         title="Feed"
-        description="Posts and announcements from the audiences you belong to."
-        // One "Start a discussion": the bar above the feed when it shows (QA 17 November: it was there twice).
+        description="Posts and announcements from the groups you belong to."
+        // The composer card below says "Share an update", so this is the one "Start a discussion" (QA 17 November: it
+        // was there twice). It shows disabled while posting is paused.
         actions={
-          canParticipate && !canPost && (
-            <Button
-              icon="plus"
-              href="/feed/new"
-              isDisabled={page.data.canPost !== true}
-            >
-              Start a discussion
-            </Button>
-          )
+          <div className="fx-head-actions">
+            <div className="fx-head-search">
+              <TypedSearch
+                label="Search posts"
+                placeholder="Search posts"
+                size="sm"
+                value={query}
+                onChange={(q) => update({ q })}
+              />
+            </div>
+            {canParticipate && (
+              <Button
+                icon="plus"
+                href={canPost ? composeHref : '/feed/new'}
+                isDisabled={!canPost}
+              >
+                Start a discussion
+              </Button>
+            )}
+          </div>
         }
       />
       <div className="accs-split fx-split">
         <div className="fx-main">
-          {canPost && (
-            <Link href={composeHref} className="fx-compose" variant="quiet">
-              <Initials name={session.user.name} />
-              <span className="fx-compose__hint">Start a discussion…</span>
-              <span className="fx-compose__cta">
-                <Icon name="pencil" size={16} />
-                Write
-              </span>
-            </Link>
-          )}
-          <div className="fx-toolbar">
-            <div className="fx-toolbar__row">
-              <div className="fx-toolbar__search">
-                <TypedSearch
-                  label="Search posts"
-                  size="sm"
-                  value={query}
-                  onChange={(q) => update({ q })}
-                />
-              </div>
+          {(canPost || uniqueScopes.length > 1) && (
+            <div className="fx-composer" data-post={canPost || undefined}>
+              {canPost && (
+                <>
+                  <Initials name={session.user.name} />
+                  <Link href={composeHref} className="fx-composer__field" variant="quiet">
+                    Share an update with {scope === 'college' ? 'CCS' : audienceName(scope, spaces, organizations)}…
+                  </Link>
+                </>
+              )}
               {uniqueScopes.length > 1 && (
-                <Select
-                  label="Audience"
-                  selectedKey={scope}
-                  onSelectionChange={(key) => update({ scope: String(key) })}
-                >
-                  {uniqueScopes.map((option) => (
-                    <SelectOption id={option.id} key={option.id}>
-                      {option.label}
-                    </SelectOption>
-                  ))}
-                </Select>
+                <div className="fx-composer__audience">
+                  <Select
+                    label="Audience"
+                    selectedKey={scope}
+                    onSelectionChange={(key) => update({ scope: String(key) })}
+                  >
+                    {uniqueScopes.map((option) => (
+                      <SelectOption id={option.id} key={option.id}>
+                        {option.label}
+                      </SelectOption>
+                    ))}
+                  </Select>
+                </div>
               )}
             </div>
-            <div className="fx-toolbar__row fx-toolbar__row--pills">
-              <LayoutGroup id="fx-sort">
-                <div className="fx-seg" role="group" aria-label="Sort posts">
-                  {[
-                    { id: 'newest', label: 'Latest' },
-                    { id: 'active', label: 'Most active' },
-                  ].map((option) => (
-                    <button
-                      type="button"
-                      key={option.id}
-                      className="fx-seg__item"
-                      aria-pressed={sort === option.id}
-                      onClick={() => update({ sort: option.id })}
-                    >
-                      {sort === option.id && (
-                        <motion.span
-                          layoutId="fx-sort-indicator"
-                          className="fx-seg__thumb"
-                          transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-                        />
-                      )}
-                      <span className="fx-seg__label">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </LayoutGroup>
-              <div className="accs-pills fx-cats" role="group" aria-label="Post labels">
+          )}
+          <div className="fx-toolbar fx-filters">
+            <div className="accs-pills fx-cats" role="group" aria-label="Post labels">
+              <button
+                type="button"
+                className="accs-pill fx-cat"
+                aria-pressed={!labels.length}
+                onClick={() => update({ label: undefined })}
+              >
+                All
+              </button>
+              {['Announcements', ...postLabels].map((label) => (
                 <button
                   type="button"
+                  key={label}
                   className="accs-pill fx-cat"
-                  aria-pressed={!labels.length}
-                  onClick={() => update({ label: undefined })}
+                  data-label={labelKey(label)}
+                  data-included={!labels.length || undefined}
+                  aria-pressed={labels.includes(label)}
+                  onClick={() => toggleLabel(label)}
                 >
-                  All
+                  {label}
                 </button>
-                {['Announcements', ...postLabels].map((label) => (
+              ))}
+            </div>
+            <LayoutGroup id="fx-sort">
+              <div className="fx-seg" role="group" aria-label="Sort posts">
+                {[
+                  { id: 'newest', label: 'Latest' },
+                  { id: 'active', label: 'Most active' },
+                ].map((option) => (
                   <button
                     type="button"
-                    key={label}
-                    className="accs-pill fx-cat"
-                    data-label={labelKey(label)}
-                    data-included={!labels.length || undefined}
-                    aria-pressed={labels.includes(label)}
-                    onClick={() => toggleLabel(label)}
+                    key={option.id}
+                    className="fx-seg__item"
+                    aria-pressed={sort === option.id}
+                    onClick={() => update({ sort: option.id })}
                   >
-                    {label}
+                    {sort === option.id && (
+                      <motion.span
+                        layoutId="fx-sort-indicator"
+                        className="fx-seg__thumb"
+                        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                      />
+                    )}
+                    <span className="fx-seg__label">{option.label}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            </LayoutGroup>
           </div>
           {posts.length ? (
             <>
@@ -1243,27 +1263,29 @@ export function PostView({
   const announcement = post.kind === 'announcement'
   return (
     <article className="fx-post">
-      <div className="fx-thread__tags">
-        <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
-          {announcement ? 'Announcement' : post.label}
-        </span>
-        <span className="accs-tag">
-          {audienceName(post.audience, spaces, organizations)}
-        </span>
-        {announcement && (
-          <StatusChip tone={toneFor(post.priority || 'general')}>
-            {priorityLabel(post.priority)}
-          </StatusChip>
-        )}
-        {post.private && <span className="accs-tag">Members only</span>}
-      </div>
-      <div className="fx-post__author">
-        <Initials name={name} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
-        <div className="fx-post__who">
-          <strong>{name}</strong>
-          <span>
-            {role && <>{role} · </>}
+      <div className="fx-thread__head fx-post__head">
+        <Initials name={name} anonymous={post.anonymous} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
+        <div className="fx-thread__who">
+          <p className="fx-thread__name">
+            <span className="fx-thread__author">{name}</span>
+            {!post.anonymous && role && <span className="fx-role">{role}</span>}
+          </p>
+          <p className="fx-thread__meta">
             <time dateTime={post.at}>{formatDateTime(post.at)}</time>
+          </p>
+        </div>
+        <div className="fx-thread__tags">
+          {announcement && (
+            <StatusChip tone={toneFor(post.priority || 'general')}>
+              {priorityLabel(post.priority)}
+            </StatusChip>
+          )}
+          {post.private && <span className="accs-tag">Members only</span>}
+          <span className="accs-tag">
+            {audienceName(post.audience, spaces, organizations)}
+          </span>
+          <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
+            {announcement ? 'Announcement' : post.label}
           </span>
         </div>
       </div>
@@ -2021,6 +2043,7 @@ function SpacesPage({
             <div className="fx-toolbar__search">
               <TypedSearch
                 label="Find a section"
+                placeholder="Find a section"
                 size="sm"
                 value={query}
                 onChange={(q) => update({ q })}
@@ -2339,6 +2362,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
         <div className="fx-toolbar__search">
           <TypedSearch
             label="Find an organization"
+            placeholder="Find an organization"
             size="sm"
             value={query}
             onChange={(q) => update({ q })}
@@ -2352,7 +2376,8 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
             <ul className="accs-rows" aria-label="Organizations">
               {organizations.map((organization) => (
                 <li key={organization.id}>
-                  <div className="accs-row fx-row">
+                  <div className="accs-row fx-row fx-row--mark">
+                    <span className="fx-mini__mark" data-round aria-hidden>{initials(organization.name) || '?'}</span>
                     <div>
                       <p className="accs-row__title">
                         <Link

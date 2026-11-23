@@ -1,17 +1,4 @@
-/* Community Home (students and faculty). Built from the existing tokens and panels; only the header, tabs and composer are new. */
-
-.ch-head {
-  display: grid;
-  gap: 16px;
-  padding: 20px 20px 0;
-  border: 1px solid var(--accs-line);
-  border-radius: var(--accs-radius-card);
-  background: var(--accs-surface);
-}
-.ch-head__eyebrow { margin: 0 0 4px; color: var(--accs-muted); font-size: 0.8125rem; }
-.ch-head__title { margin: 0; font-family: var(--accs-font-display); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; text-wrap: balance; overflow-wrap: anywhere; }
-.ch-head__about { margin: 6px 0 0; max-width: 46rem; color: var(--accs-ink-2); line-height: 1.5; text-wrap: pretty; }
-.ch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Community Home helpers (students and faculty): section tabs, composer and About panel. The Home hero lives in home.css. */
 
 /* Section tabs: a row of links with the current one underlined in the site accent. Scrolls sideways on a phone. */
 .ch-tabs {

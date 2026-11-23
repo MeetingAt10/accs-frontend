@@ -39,7 +39,8 @@ import {
   toneFor,
   type Tone,
 } from "@/components/app/page-shell";
-import { BarChart, CountUp, TrendChart } from "@/components/ds-next/charts";
+import { BarChart, ColumnChart, CountUp, TrendChart } from "@/components/ds-next/charts";
+import { StageChip } from "@/components/app/stage-chip";
 import {
   ApiError,
   performPageAction,
@@ -110,12 +111,14 @@ function useAction(pageId: string) {
 function Screen({
   header,
   children,
+  className,
 }: {
   header: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="accs-stack">
+    <div className={"accs-stack rc-screen" + (className ? " " + className : "")}>
       {header}
       <div className="accs-stack accs-stagger">{children}</div>
     </div>
@@ -790,6 +793,51 @@ const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 /** Severity colors in analytics: High red, Medium yellow, Low green (QA 19 November). */
 const analyticsSeverityTone: Record<string, "danger" | "warn" | "ok" | undefined> = { high: "danger", medium: "warn", low: "ok" };
 
+/** The stage key for an office name from the API ("Guidance Office" is guidance), else the stage at that position. */
+const stageOf = (label: string, index: number) =>
+  stages.find((stage) => stageOffice[stage] === label) ?? stages[index] ?? "";
+const stageColor = (stage: string) => (stages.includes(stage) ? `var(--accs-stage-${stage})` : undefined);
+const chartColors = ["var(--accs-chart-1)", "var(--accs-chart-2)", "var(--accs-chart-3)", "var(--accs-chart-4)"];
+const listWords = (words: string[]) =>
+  words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+
+/** Categories as one bar split by count, with a legend; categories with too few cases are named but not counted. */
+function CategoryStrip({ categories }: { categories: Item[] }) {
+  const shown = categories.filter((row) => row.suppressed !== true && typeof row.value === "number" && row.value > 0);
+  const hidden = categories.filter((row) => row.suppressed === true).map((row) => word(row.label));
+  if (!categories.length) return <p className="ch__empty">No data for these filters.</p>;
+  return (
+    <>
+      {shown.length > 0 && (
+        <>
+          <div className="an-strip" aria-hidden>
+            {shown.map((row, index) => (
+              <span
+                key={word(row.label)}
+                style={{ flexGrow: Number(row.value), background: chartColors[index % chartColors.length] }}
+              />
+            ))}
+          </div>
+          <ul className="an-legend" aria-label="Cases by category">
+            {shown.map((row, index) => (
+              <li key={word(row.label)}>
+                <span className="an-legend__swatch" style={{ background: chartColors[index % chartColors.length] }} />
+                {word(row.label)}
+                <span className="an-legend__value accs-num">{word(row.value)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="rc-policy">
+        {hidden.length
+          ? `${listWords(hidden)} ${hidden.length === 1 ? "has" : "have"} too few cases to show, so ${hidden.length === 1 ? "it is" : "they are"} hidden.`
+          : "Categories with too few cases are hidden to protect privacy."}
+      </p>
+    </>
+  );
+}
+
 function Analytics({ page }: { page: PageEnvelope }) {
   const router = useRouter();
   const location = useRouterState({ select: (state) => state.location });
@@ -813,6 +861,8 @@ function Analytics({ page }: { page: PageEnvelope }) {
   // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
   const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
   const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  const [stageTable, setStageTable] = useState(false);
+  const stageChartId = useId();
   // Arrow keys in a date field change it once per press: apply the range after a short pause, not on every press
   // (QA 17 November: each press loaded the page again).
   const rangeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -852,11 +902,12 @@ function Analytics({ page }: { page: PageEnvelope }) {
   };
   return (
     <Screen
+      className="an"
       header={
         <PageHeader
           crumbs={[siteCrumb("/analytics"), { label: "Case analytics" }]}
           title="Case analytics"
-          description="Case counts for the programs you can see."
+          description={`Concern volume and waiting times for ${page.scope ? "the " + page.scope : "the programs you can see"}. Small categories are hidden to protect privacy.`}
           actions={
             filtered ? (
               <Button
@@ -974,15 +1025,70 @@ function Analytics({ page }: { page: PageEnvelope }) {
           />
         ))}
       </Kpis>
-      <div className="rc-cols">
-        <Panel title="Cases by stage">
-          <BarChart
+      <div className="an-grid">
+        <Panel
+          title="Cases by stage"
+          action={
+            stageRows.length > 0 && (
+              <button
+                type="button"
+                className="an-link"
+                aria-controls={stageChartId}
+                onClick={() => setStageTable((value) => !value)}
+              >
+                {stageTable ? "View as chart" : "View as table"}
+                <Icon name="caret-right" size={16} />
+              </button>
+            )
+          }
+        >
+          <ColumnChart
+            id={stageChartId}
             title="Cases by stage"
             hideTitle
-            data={stageRows.map((row) => ({
+            asTable={stageTable}
+            rowLabel="Stage"
+            data={stageRows.map((row, index) => ({
               label: word(row.label),
               value: Number(row.value ?? 0),
+              color: stageColor(stageOf(word(row.label), index)),
             }))}
+          />
+        </Panel>
+        {waiting.length > 0 && (
+          <Panel title="Median days waiting">
+            <p className="an-sub">Days since each open case reached its current stage, as the median for that stage.</p>
+            <BarChart
+              title="Median days waiting by stage"
+              hideTitle
+              unit="days"
+              emptyLabel="None waiting"
+              data={waiting.map((row, index) => ({
+                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
+                value: Number(row.count ?? 0) > 0 ? Number(row.value ?? 0) : null,
+                color: stageColor(stageOf(word(row.label), index)),
+              }))}
+            />
+          </Panel>
+        )}
+      </div>
+      <Panel title="By category">
+        <CategoryStrip categories={categories} />
+      </Panel>
+      <div className="an-grid">
+        <Panel title="Opened and resolved reports">
+          <TrendChart
+            title="Opened and resolved reports"
+            hideTitle
+            data={trend.map((row) => ({
+              label: word(row.label),
+              opened: Number(row.opened ?? 0),
+              resolved: Number(row.resolved ?? 0),
+            }))}
+            series={[
+              { key: "opened", label: "Opened" },
+              { key: "resolved", label: "Resolved" },
+            ]}
           />
         </Panel>
         {severities.length > 0 && (
@@ -998,50 +1104,6 @@ function Analytics({ page }: { page: PageEnvelope }) {
             />
           </Panel>
         )}
-        <Panel title="Category counts">
-          <BarChart
-            title="Category counts"
-            hideTitle
-            data={categories.map((row) => ({
-              label: word(row.label),
-              value: typeof row.value === "number" ? row.value : null,
-              suppressed: row.suppressed === true,
-            }))}
-          />
-          <p className="rc-policy">
-            Categories with too few cases show as suppressed.
-          </p>
-        </Panel>
-        {waiting.length > 0 && (
-          <Panel title="Median days waiting by stage" className="rc-span">
-            <BarChart
-              title="Median days waiting by stage"
-              hideTitle
-              data={waiting.map((row) => ({
-                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
-                value: Number(row.value ?? 0),
-              }))}
-            />
-            <p className="rc-policy">
-              Days since each open concern reached its current stage, as the median for that stage.
-            </p>
-          </Panel>
-        )}
-        <Panel title="Opened and resolved reports" className="rc-span">
-          <TrendChart
-            title="Opened and resolved reports"
-            hideTitle
-            data={trend.map((row) => ({
-              label: word(row.label),
-              opened: Number(row.opened ?? 0),
-              resolved: Number(row.resolved ?? 0),
-            }))}
-            series={[
-              { key: "opened", label: "Opened" },
-              { key: "resolved", label: "Resolved" },
-            ]}
-          />
-        </Panel>
       </div>
       <Panel
         flush
@@ -1075,7 +1137,9 @@ function Analytics({ page }: { page: PageEnvelope }) {
                         </Link>
                       </td>
                       <td>
-                        {stageOffice[word(entry.stage)] ?? cap(word(entry.stage, "—"))}
+                        {word(entry.stage) ? (
+                          <StageChip stage={word(entry.stage)} label={stageOffice[word(entry.stage)]} />
+                        ) : "—"}
                       </td>
                       <td>
                         {analyticsSeverityTone[word(entry.severity)] ? (
