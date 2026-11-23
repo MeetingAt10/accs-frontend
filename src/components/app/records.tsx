@@ -1,5 +1,6 @@
 import { featureLabels, filterRestrictions, newestFirst, type RestrictionFilters } from "@/lib/restrictions";
 import { campusToday } from "@/lib/campus-date";
+import { useFocusDialogOnOpen } from "@/components/app/dialog-focus";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -123,6 +124,12 @@ function Screen({
       <div className="accs-stack accs-stagger">{children}</div>
     </div>
   );
+}
+
+/** The server's own field messages when it sends them (too long, missing), else its general message. */
+function errorText(error: Error) {
+  const fields = error instanceof ApiError ? error.fields?.map((field) => field.message) : undefined;
+  return fields?.length ? fields.join(" ") : error.message;
 }
 
 function Note({ children }: { children: ReactNode }) {
@@ -592,6 +599,11 @@ function ClusterList({ page }: { page: PageEnvelope }) {
         A person reviews every suggestion. The system never groups reports
         into a case by itself.
       </Note>
+      {page.data.threshold != null && (
+        <Alert tone="neutral" title="Draft grouping threshold">
+          Grouping uses a draft threshold ({word(page.data.threshold)}%) that hasn't been approved.
+        </Alert>
+      )}
       {clusters.length ? (
         <Panel flush>
           <PagedList items={clusters} noun="groups">
@@ -745,7 +757,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
               />
               {action.error && (
                 <Alert tone="danger" title="The review wasn't saved">
-                  {action.error.message}
+                  {errorText(action.error)}
                 </Alert>
               )}
               <div className="rc-actions-row">
@@ -1296,7 +1308,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
         <PagedList items={matching} noun="students">
           {(matching) => (
           <div className="accs-table-wrap rc-table-wrap">
-            <table className="accs-table rc-table">
+            <table className="accs-table rc-table rc-stack">
               <caption className="rc-sr">Student records</caption>
               <thead>
                 <tr>
@@ -1336,21 +1348,21 @@ function RecordList({ page }: { page: PageEnvelope }) {
                             href={"/records/" + encodeURIComponent(word(student.id))}
                           />
                         </td>
-                        <td className="accs-mono">{word(student.studentId, "—")}</td>
-                        <td>
+                        <td className="accs-mono" data-label="Student ID">{word(student.studentId, "—")}</td>
+                        <td data-label="Program">
                           <span className="rc-tags">
                             <span className="accs-tag">{word(student.program, "—")}</span>
                             <span className="rc-muted">{word(student.sectionName, "Section " + word(student.section, "—"))}</span>
                           </span>
                         </td>
-                        <td>
+                        <td data-label="Standing">
                           {isPaused(student.standing) ? (
                             <StandingBadge standing={student.standing} />
                           ) : (
                             <span className="rc-muted">Good standing</span>
                           )}
                         </td>
-                        <td className="accs-num">
+                        <td className="accs-num" data-label="Restrictions">
                           {count ? (
                             count
                           ) : hasRestrictions(student) ? (
@@ -1492,6 +1504,7 @@ function GoodMoralReview({
           isRequired
           value={source}
           onChange={setSource}
+          maxLength={200}
         />
         <TextArea
           label="Notes"
@@ -1501,7 +1514,7 @@ function GoodMoralReview({
         />
         {action.error && (
           <Alert tone="danger" title="The review wasn't saved">
-            {action.error.message}
+            {errorText(action.error)}
           </Alert>
         )}
         <div className="rc-actions-row">
@@ -1757,6 +1770,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const [requesting, setRequesting] = useState(false);
   const opened = restrictions.find((restriction) => word(restriction.id) === openId);
   const openedRequest = referrals.find((request) => word(request.id) === openRequestId);
+  useFocusDialogOnOpen(Boolean(opened) || Boolean(openedRequest) || applyOpen || Boolean(confirmId));
   const active = restrictions.filter((restriction) => restriction.active === true);
   const ended = restrictions.filter((restriction) => restriction.active !== true);
   const shown = filterRestrictions(tab === "ended" ? ended : active, filters);
@@ -1943,7 +1957,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                 <div className="accs-stack">
                   <DatePicker label="New end date" minValue={campusToday().add({ days: 1 })} description={`It ends ${formatDate(opened.until)}. Pick a later date to extend it or an earlier one to shorten it, tomorrow or later.`} onChange={(value) => setNewEnd(value?.toString() ?? "")} />
                   <TextArea label="Reason" isRequired value={changeReason} onChange={setChangeReason} maxLength={500} />
-                  {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                  {action.error && <Alert tone="danger" title="The change wasn't saved">{errorText(action.error)}</Alert>}
                   <div className="rc-form__actions">
                     <Button
                       loading={action.isPending}
@@ -1987,7 +2001,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                   <Note>This student has no active restriction now.</Note>
                 )}
                 <TextArea label="Reason for declining" value={declineReason} onChange={setDeclineReason} maxLength={500} />
-                {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                {action.error && <Alert tone="danger" title="The change wasn't saved">{errorText(action.error)}</Alert>}
                 <div>
                   <Button
                     variant="secondary"
@@ -2051,7 +2065,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             Only the selected features are paused. The restriction starts today.
             {basis ? "" : " Describe the basis for this restriction."}
           </p>
-          {action.error && <Alert tone="danger" title="The restriction wasn't applied">{action.error.message}</Alert>}
+          {action.error && <Alert tone="danger" title="The restriction wasn't applied">{errorText(action.error)}</Alert>}
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setApplyOpen(false)}>Cancel</Button>
@@ -2078,7 +2092,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             and a new restriction can be applied later.
           </p>
           <TextArea label="Reason" isRequired value={reason} onChange={setReason} maxLength={500} />
-          {action.error && <Alert tone="danger" title="The restriction wasn't lifted">{action.error.message}</Alert>}
+          {action.error && <Alert tone="danger" title="The restriction wasn't lifted">{errorText(action.error)}</Alert>}
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setConfirmId("")}>Cancel</Button>
@@ -2136,7 +2150,7 @@ function RestrictionRows({
     <PagedList items={rows} noun="restrictions">
       {(rows) => (
       <div className="accs-table-wrap rc-table-wrap">
-        <table className="accs-table rc-table">
+        <table className="accs-table rc-table rc-stack">
           <caption className="rc-sr">Restrictions</caption>
           <thead>
             <tr>
@@ -2161,15 +2175,15 @@ function RestrictionRows({
                       href={studentLink(object(restriction.student))}
                     />
                   </td>
-                  <td>{features(restriction).join(", ") || "—"}</td>
-                  <td className="rc-wrap">
+                  <td data-label="Paused">{features(restriction).join(", ") || "—"}</td>
+                  <td className="rc-wrap" data-label="Basis">
                     {word(restriction.basis, "—")}
                     <p className="rc-person__sub accs-mono">{word(restriction.decisionReference, "—")}</p>
                   </td>
-                  <td className="accs-mono">
+                  <td className="accs-mono" data-label="Period">
                     {formatDate(restriction.starts)} to {formatDate(restriction.until)}
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <StatusChip tone={isActive ? "warn" : "neutral"}>{isActive ? "Active" : "Ended"}</StatusChip>
                   </td>
                   <td className="rc-actions">
@@ -2221,10 +2235,10 @@ function RestrictionRequestForm({
           onChange={setDecisionReference}
         />
       )}
-      <TextArea label="Reason" isRequired value={reason} onChange={setReason} />
+      <TextArea label="Reason" isRequired value={reason} onChange={setReason} maxLength={2000} />
       {action.error && (
         <Alert tone="danger" title="The request wasn't saved">
-          {action.error.message}
+          {errorText(action.error)}
         </Alert>
       )}
       <div className="rc-form__actions">

@@ -26,9 +26,9 @@ export function newestFirst<T extends { starts?: unknown; at?: unknown; createdA
 export function filterRestrictions<T extends { features?: unknown; student?: unknown; starts?: unknown; at?: unknown; createdAt?: unknown }>(rows: T[], { q, feature, program }: RestrictionFilters) {
   const needle = q.trim().toLowerCase()
   return newestFirst(rows).filter((row) => {
-    const student = (row.student && typeof row.student === 'object' ? row.student : {}) as { id?: unknown; name?: unknown; program?: unknown }
+    const student = (row.student && typeof row.student === 'object' ? row.student : {}) as { id?: unknown; studentId?: unknown; name?: unknown; program?: unknown }
     const features = Array.isArray(row.features) ? row.features.map(String) : []
-    return (!needle || `${String(student.name ?? '')} ${String(student.id ?? '')}`.toLowerCase().includes(needle))
+    return (!needle || `${String(student.name ?? '')} ${String(student.id ?? '')} ${String(student.studentId ?? '')}`.toLowerCase().includes(needle))
       && (!feature || features.includes(feature))
       && (!program || student.program === program)
   })

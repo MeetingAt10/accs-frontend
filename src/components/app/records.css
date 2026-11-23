@@ -126,7 +126,28 @@
 .rc-table .rc-actions { text-align: end; white-space: nowrap; }
 .rc-table .rc-actions > * + * { margin-inline-start: 8px; }
 .rc-table .rc-wrap { white-space: normal; min-width: 14rem; }
-.rc-scroll .accs-table { min-width: 560px; }
+/* Phones: each row becomes a card with labelled values, so Standing and Status are visible without scrolling. */
+@media (max-width: 767px) {
+  .rc-table.rc-stack { min-width: 0; }
+  .accs-table.rc-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .accs-table.rc-stack, .accs-table.rc-stack tbody { display: block; }
+  .accs-table.rc-stack tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--accs-line); }
+  .accs-table.rc-stack tbody tr:last-child { border-bottom: 0; }
+  .accs-table.rc-stack td { display: block; padding: 0; border: 0; text-align: start; min-width: 0; }
+  .accs-table.rc-stack tbody tr:hover td { background: none; }
+  .accs-table.rc-stack td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 6rem;
+    margin-inline-end: 8px;
+    color: var(--accs-faint);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .rc-table.rc-stack .rc-wrap { min-width: 0; }
+  .rc-table.rc-stack .rc-actions { text-align: start; }
+}
+.rc-scroll .accs-table { min-width: min(560px, 100%); }
 .rc-scroll .accs-table td, .rc-scroll .accs-table th { padding-inline: 20px; }
 .rc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .rc-form-row > td { padding: 0; background: var(--accs-sunken); }
@@ -390,6 +411,7 @@
 .an.accs-stack, .an > .accs-stagger { gap: 24px; }
 /* Chart pairs: a wide chart beside a 440px one on wide screens, stacked below that. */
 .an-grid { display: grid; gap: 24px; align-items: start; }
+.an-grid > * { min-width: 0; }
 @media (min-width: 1100px) { .an-grid { grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); } }
 .an .accs-panel { min-width: 0; }
 .an-sub { margin: -6px 0 6px; color: var(--accs-muted); font-size: 0.75rem; }
