@@ -333,11 +333,16 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   }, [conversationId]);
   const draftFiles = pendingFiles.filter((file) => file.state === "ready").map((file) => file.file!);
   const draftKey = JSON.stringify({ body, attachments: draftFiles.map((file) => file.id) });
+  // A send waits for a draft save already on its way and stops new ones, so a save that lands after the send cannot put
+  // the sent words back as a draft (code review, 23 November 2026).
+  const draftSave = useRef<Promise<unknown>>(Promise.resolve());
+  const sending = useRef(false);
   useEffect(() => {
     if (!isThread || !conversationId || draftKey === savedDraft.current) return;
     const timer = window.setTimeout(() => {
+      if (sending.current) return;
       savedDraft.current = draftKey;
-      void performPageAction("P12", { action: "saveMessageDraft", recordId: conversationId, payload: { body, attachments: draftFiles } }).catch(() => {
+      draftSave.current = performPageAction("P12", { action: "saveMessageDraft", recordId: conversationId, payload: { body, attachments: draftFiles } }).catch(() => {
         savedDraft.current = "";
       });
     }, 1000);
@@ -376,8 +381,10 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
   }
 
   async function sendMessage() {
-    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending) return;
+    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending || sending.current) return;
+    sending.current = true;
     try {
+      await draftSave.current;
       await action.mutateAsync({
         action: "sendMessage",
         recordId: words(conversation.id),
@@ -389,6 +396,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
       setPendingFiles([]);
     } catch {
       // The composer keeps the entered text and files after an error.
+    } finally {
+      sending.current = false;
     }
   }
 
