@@ -479,7 +479,7 @@ function RailLink({ href, children }: { href: string; children: string }) {
   return (
     <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
       {children}
-      <Icon name="caret-right" size={14} />
+      <Icon name="caret-right" size={16} />
     </Link>
   )
 }

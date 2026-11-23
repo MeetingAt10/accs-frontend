@@ -665,7 +665,7 @@ function CalendarPage({
             <i aria-hidden />
           ) : (
             <span className="sc-check__box" aria-hidden>
-              <Icon name="check" size={12} />
+              <Icon name="check" size={16} />
             </span>
           )}
           {layer.label}
@@ -804,7 +804,7 @@ function CalendarPage({
                     onClick={() => update({ view: 'list' })}
                   >
                     See all
-                    <Icon name="caret-right" size={14} />
+                    <Icon name="caret-right" size={16} />
                   </button>
                 ) : undefined
               }

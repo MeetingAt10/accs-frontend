@@ -1037,7 +1037,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
                 onClick={() => setStageTable((value) => !value)}
               >
                 {stageTable ? "View as chart" : "View as table"}
-                <Icon name="caret-right" size={14} />
+                <Icon name="caret-right" size={16} />
               </button>
             )
           }
