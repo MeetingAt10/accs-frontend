@@ -1,6 +1,6 @@
 /* Cases site: confidential case tracker. Neutral surfaces; the wine accent marks only focus and "current". */
 
-.gv-page { display: grid; gap: 24px; align-content: start; min-width: 0; }
+.gv-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-content: start; min-width: 0; }
 .gv-stack { display: grid; gap: 18px; align-content: start; min-width: 0; }
 .gv-wizard { max-width: 680px; }
 .gv-cap { text-transform: capitalize; }
@@ -20,16 +20,17 @@
 }
 .gv-note svg { flex: none; margin-top: 2px; color: var(--accs-faint); }
 
-/* ---------- Pills and tabs ---------- */
-.gv-pills { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-sunken); }
+/* ---------- Pills (My reports view) ---------- */
+/* The same segmented bar as the case queue tabs: a white bar, the chosen option in brand navy. */
+.gv-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--accs-line); border-radius: 12px; background: var(--accs-surface); }
 .gv-pill {
   position: relative;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 14px;
   border: 0;
-  border-radius: var(--accs-radius-pill);
+  border-radius: 9px;
   background: none;
-  color: var(--accs-ink-2);
+  color: var(--accs-muted);
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -37,80 +38,182 @@
   transition: color 160ms var(--accs-ease-out);
 }
 .gv-pill:hover { color: var(--accs-ink); }
-.gv-pill[aria-pressed='true'] { color: var(--site-accent-ink); }
-.gv-pill__bg { position: absolute; inset: 0; border-radius: inherit; background: var(--accs-surface); box-shadow: 0 0 0 1px var(--accs-line-strong), 0 1px 3px rgb(11 18 32 / 8%); }
+.gv-pill[aria-pressed='true'] { color: var(--accs-on-brand); }
+.gv-pill__bg { position: absolute; inset: 0; border-radius: inherit; background: var(--accs-navy); }
 .gv-pill__text { position: relative; }
 
-.gv-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--accs-line); scrollbar-width: none; }
-.gv-tab {
+/* ---------- Case queue: tabs ---------- */
+.gv-qtabs {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--accs-line);
+  border-radius: 12px;
+  background: var(--accs-surface);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gv-qtab {
   position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 0 12px;
+  min-height: 37px;
+  padding: 0 14px;
   border: 0;
+  border-radius: 9px;
   background: none;
   color: var(--accs-muted);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: color 160ms var(--accs-ease-out);
 }
-.gv-tab:hover { color: var(--accs-ink); }
-.gv-tab[aria-current='page'] { color: var(--accs-ink); }
-.gv-tab__count { padding: 0 6px; border-radius: var(--accs-radius-pill); background: var(--accs-sunken); color: var(--accs-muted); line-height: 1.7; }
-.gv-tab[aria-current='page'] .gv-tab__count { background: var(--site-accent-wash); color: var(--site-accent-ink); }
-.gv-tab__ind { position: absolute; inset: auto 8px -1px; height: 2px; border-radius: 2px; background: var(--site-accent); }
-
-/* ---------- Toolbar ---------- */
-.gv-toolbar {
-  position: sticky;
-  top: 8px;
-  z-index: 4;
-  background: var(--accs-surface);
+.gv-qtab:hover { color: var(--accs-ink); }
+.gv-qtab:focus-visible { outline-offset: -2px; }
+.gv-qtab[aria-current='page'] { color: var(--accs-on-brand); }
+.gv-qtab__bg { position: absolute; inset: 0; border-radius: inherit; background: var(--accs-navy); }
+.gv-qtab__label, .gv-qtab__count { position: relative; }
+.gv-qtab__count {
+  min-width: 26px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accs-paper);
+  color: var(--accs-muted);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
 }
-.gv-sortbar { display: none; gap: 8px; flex: 1 1 100%; }
-.gv-sortbar > * { flex: 1; min-width: 0; }
-.gv-listbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+.gv-qtab[aria-current='page'] .gv-qtab__count { background: var(--accs-surface); color: var(--site-accent-ink); }
 
-/* ---------- Queue table ---------- */
-.gv-table th { background: var(--accs-sunken); }
-.gv-sort { display: inline-flex; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+/* ---------- Case queue: search, filters, sort ---------- */
+.gv-toolbar { position: sticky; top: 8px; z-index: 4; }
+:root .gv-qbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.gv-qbar__search { flex: 1 1 240px; max-width: 360px; min-width: 0; }
+.gv-qbar__sort { display: flex; gap: 8px; margin-inline-start: auto; }
+.gv-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  max-width: 100%;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-control);
+  background: var(--accs-surface);
+  color: var(--accs-ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 160ms var(--accs-ease-out);
+}
+.gv-filter:hover { border-color: var(--accs-line-strong); }
+.gv-filter:focus-within { outline: 2px solid var(--ds-focus, var(--accs-link)); outline-offset: 2px; }
+.gv-filter__label { white-space: nowrap; }
+.gv-filter select {
+  min-width: 0;
+  max-width: 13rem;
+  margin-inline-end: -20px;
+  field-sizing: content;
+  padding: 0 20px 0 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  appearance: none;
+  outline: none;
+}
+.gv-filter option { background: var(--accs-surface); color: var(--accs-ink); }
+.gv-filter svg { flex: none; color: var(--accs-muted); pointer-events: none; }
+.gv-filter--dir { justify-content: center; width: 40px; padding: 0; }
+.gv-filter--dir:focus-visible { outline: 2px solid var(--ds-focus, var(--accs-link)); outline-offset: 2px; }
+
+/* ---------- Case queue: table ---------- */
+.gv-qcard { min-width: 0; overflow: hidden; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); background: var(--accs-surface); box-shadow: var(--accs-shadow-card); }
+.gv-qscroll { overflow-x: auto; }
+.gv-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.gv-table th {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--accs-line);
+  background: var(--accs-paper);
+  color: var(--accs-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gv-table td { padding: 16px; border-bottom: 1px solid var(--accs-line); vertical-align: middle; }
+.gv-table :is(th, td):first-child { padding-inline-start: 24px; }
+.gv-table :is(th, td):last-child { padding-inline-end: 16px; }
+.gv-table tbody tr { transition: background 140ms var(--accs-ease-out); }
+.gv-table tbody tr:hover { background: var(--accs-tint); }
+.gv-table .gv-c-ref { width: 8.5rem; max-width: 14ch; }
+.gv-table .gv-c-stage { width: 11.5rem; }
+.gv-table .gv-c-sev { width: 6.5rem; }
+.gv-table .gv-c-wait { width: 7rem; }
+.gv-table .gv-c-time { width: 7.5rem; }
+.gv-table .gv-c-go { width: 2.5rem; }
+.gv-sort { display: inline-flex; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .gv-sort:hover { color: var(--accs-ink); }
-.gv-ref-link { color: var(--accs-ink); font-weight: 600; text-decoration: none; }
-.gv-ref-link:hover { color: var(--site-accent-ink); text-decoration: underline; }
-.gv-title { font-weight: 600; color: var(--accs-ink); overflow-wrap: anywhere; }
-.gv-bypass { margin-inline-start: 8px; }
-.gv-stage { display: block; color: var(--accs-ink-2); font-weight: 600; }
-.gv-stage-sub { display: block; color: var(--accs-muted); font-size: 0.75rem; }
+.gv-ref-link { color: var(--accs-link); font-size: 0.8125rem; font-weight: 600; text-decoration: none; }
+.gv-ref-link:hover { text-decoration: underline; }
+.gv-title { display: block; color: var(--accs-ink); font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
+.gv-title-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 3px; color: var(--accs-muted); font-size: 0.75rem; }
+.gv-flag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--accs-sunken); color: var(--accs-ink-2); font-size: 0.6875rem; font-weight: 600; white-space: nowrap; }
+.gv-flag svg { width: 12px; height: 12px; }
+.gv-stage-sub { display: block; margin-top: 4px; color: var(--accs-muted); font-size: 0.75rem; }
+.gv-c-wait { color: var(--accs-ink); font-weight: 500; white-space: nowrap; }
+.gv-c-wait[data-late] { color: var(--accs-danger); }
 .gv-c-time { color: var(--accs-muted); white-space: nowrap; }
-.gv-c-student { color: var(--accs-ink-2); overflow-wrap: anywhere; }
-.gv-c-talk { white-space: nowrap; }
 .gv-muted { color: var(--accs-muted); font-size: 0.8125rem; }
-.gv-open { display: inline-flex; align-items: center; gap: 2px; min-height: 32px; color: var(--accs-ink-2); font-weight: 600; text-decoration: none; }
-.gv-open svg { transition: transform 160ms var(--accs-ease-out); }
-.gv-table tr:hover .gv-open { color: var(--site-accent-ink); }
-.gv-table tr:hover .gv-open svg { transform: translateX(3px); }
+.gv-open { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--accs-faint); text-decoration: none; transition: color 160ms var(--accs-ease-out), transform 160ms var(--accs-ease-out); }
+.gv-table tr:hover .gv-open { color: var(--accs-link); transform: translateX(2px); }
 
-/* Below 1024px (docs/pages/07-cases.md): the 8-column queue table becomes the compact case queue. */
+.gv-qfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 24px; background: var(--accs-paper); }
+.gv-qfoot__text { flex: 1 1 16rem; margin: 0; color: var(--accs-muted); font-size: 0.8125rem; }
+.gv-qfoot__pager { display: flex; gap: 8px; }
+
+/* How a report moves: the five offices, in order. */
+.gv-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.gv-legend__label { color: var(--accs-muted); font-size: 0.8125rem; font-weight: 600; }
+.gv-legend ol { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0; padding: 0; list-style: none; }
+.gv-legend li { display: inline-flex; align-items: center; gap: 10px; color: var(--accs-faint); }
+.gv-legend li svg { width: 14px; height: 14px; }
+
+/* Below 1024px the table becomes a list of cards: reference and open link, the concern, the stage, then severity,
+   waiting and updated on one line. */
 @media (max-width: 1023.98px) {
-  .gv-sortbar { display: flex; }
   .gv-table thead { display: none; }
   .gv-table, .gv-table tbody { display: block; }
-  .gv-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 14px 16px; border-bottom: 1px solid var(--accs-line); }
-  .gv-table tbody tr:last-child { border-bottom: 0; }
-  .gv-table td, .gv-table tbody tr:hover td { padding: 0; border: 0; background: none; }
-  .gv-table .gv-c-ref { order: -2; }
-  .gv-table .gv-c-title { order: -1; flex: 1 0 100%; }
-  .gv-table .gv-c-student { order: -1; flex: 1 0 100%; }
-  .gv-table .gv-c-stage { flex: 1 1 auto; }
-  .gv-table .gv-stage { display: inline; }
-  .gv-table .gv-stage-sub { display: inline; margin-inline-start: 6px; }
+  .gv-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 16px; border-bottom: 1px solid var(--accs-line); }
+  .gv-table td, .gv-table :is(th, td):first-child, .gv-table :is(th, td):last-child { width: auto; max-width: none; padding: 0; border: 0; }
+  .gv-table .gv-c-ref { flex: 1 1 0; min-width: 0; }
   .gv-table .gv-c-go { margin-inline-start: auto; }
-  .gv-table td[data-label]::before { content: attr(data-label) ': '; color: var(--accs-faint); }
+  .gv-table .gv-c-title, .gv-table .gv-c-stage { flex: 1 0 100%; }
+  .gv-table .gv-c-title { order: 1; }
+  .gv-table .gv-c-stage { order: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .gv-table .gv-c-stage .gv-stage-sub { margin: 0; }
+  .gv-table :is(.gv-c-sev, .gv-c-wait, .gv-c-time) { order: 3; }
+  .gv-table :is(.gv-c-wait, .gv-c-time)::before { content: attr(data-label) ' '; color: var(--accs-muted); font-weight: 400; }
+  .gv-qfoot { padding: 14px 16px; }
+}
+@media (max-width: 639.98px) {
+  .gv-toolbar { position: static; }
+  .gv-qbar__search { flex: 1 1 100%; max-width: none; }
+  .gv-qbar__sort { margin-inline-start: 0; }
+  .gv-qfoot__hint { display: none; }
 }
 
 /* ---------- My reports rows ---------- */
@@ -150,20 +253,141 @@
 }
 
 /* ---------- Case header ---------- */
-.gv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.gv-lock { gap: 4px; padding-inline: 8px 10px; }
-.gv-lock svg { color: var(--accs-faint); }
+.gv-head__meta { display: block; color: var(--accs-muted); font-size: 0.8125rem; }
+.gv-head__ref { color: var(--accs-link); font-size: 0.8125rem; font-weight: 600; }
+.gv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.accs-page-actions .gv-chips { margin-top: 0; }
+.gv-lock { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--accs-sunken); color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; line-height: 1.33; white-space: nowrap; }
+.gv-lock svg { width: 12px; height: 12px; }
+
+/* Severity: a tinted pill on the case, a colored dot and word in the queue. */
+.gv-sev {
+  --sev: var(--accs-warn);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sev) 12%, transparent);
+  color: var(--sev);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.33;
+  white-space: nowrap;
+}
+.gv-sev[data-level='high'] { --sev: var(--accs-danger); }
+.gv-sev[data-level='low'] { --sev: var(--accs-muted); }
+.gv-sev--dot { padding: 0; background: none; color: var(--accs-ink); font-size: 0.8125rem; font-weight: 500; }
+.gv-sev--dot::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sev); }
+
+/* ---------- Case page layout ---------- */
+.gv-case { container: gv-case / inline-size; }
+.gv-case__grid { display: grid; gap: 24px; align-items: start; min-width: 0; }
+@container gv-case (min-width: 880px) {
+  .gv-case__grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+}
+:root .gv-case .accs-stack { gap: 24px; }
+.gv-anchor { min-width: 0; scroll-margin-top: 88px; border-radius: var(--accs-radius-card); }
+.gv-anchor:focus { outline: none; }
+
+/* Where this case is: one step per office, OSAS included, then Resolved. */
+.gv-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 6px 0 0; padding: 0; list-style: none; }
+.gv-track__step { display: grid; align-content: start; gap: 10px; min-width: 0; }
+.gv-track__rail { display: flex; align-items: center; }
+.gv-track__dot {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--accs-line);
+  border-radius: 50%;
+  background: var(--accs-surface);
+  color: var(--accs-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.gv-track__dot svg { width: 12px; height: 12px; }
+.gv-track__line { flex: 1; height: 2px; background: var(--accs-line); }
+.gv-track__line[data-on] { background: var(--accs-link); }
+.gv-track__name { color: var(--accs-muted); font-size: 0.875rem; font-weight: 600; }
+.gv-track__note { padding-inline-end: 12px; color: var(--accs-muted); font-size: 0.75rem; line-height: 16px; }
+.gv-track__step:not([data-state='todo']) .gv-track__name { color: var(--accs-ink); }
+.gv-track__step[data-state='done'] .gv-track__dot { border-color: var(--accs-link); background: color-mix(in srgb, var(--accs-link) 12%, var(--accs-surface)); color: var(--accs-link); }
+.gv-track__step[data-state='skipped'] .gv-track__dot { background: var(--accs-paper); }
+.gv-track__step[data-state='current'] .gv-track__dot {
+  border-color: var(--accs-link);
+  background: var(--accs-link);
+  color: var(--accs-on-brand);
+  font-weight: 700;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accs-link) 25%, transparent);
+}
+/* Narrow cards: the steps run down the card, the line joining each dot to the next. */
+@container gv-case (max-width: 719.98px) {
+  .gv-track { grid-template-columns: minmax(0, 1fr); }
+  .gv-track__step { grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; }
+  .gv-track__rail { grid-row: 1 / span 2; flex-direction: column; align-self: stretch; }
+  .gv-track__line { width: 2px; height: auto; min-height: 12px; margin: 4px 0; }
+  .gv-track__name { padding-top: 4px; }
+  .gv-track__note { padding-bottom: 14px; }
+  .gv-track__step:last-child .gv-track__note { padding-bottom: 0; }
+}
+
+/* What you can do: each action is a row that opens its dialog. */
+.gv-next { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.gv-next__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--accs-line);
+  border-radius: 12px;
+  background: var(--accs-surface);
+  color: var(--accs-muted);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 160ms var(--accs-ease-out), background 160ms var(--accs-ease-out), color 160ms var(--accs-ease-out);
+}
+.gv-next__item:hover { border-color: var(--accs-line-strong); background: var(--accs-tint); color: var(--accs-link); }
+.gv-next__item svg { flex: none; transition: transform 160ms var(--accs-ease-out); }
+.gv-next__item:hover svg { transform: translateX(2px); }
+.gv-next__text { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.gv-next__text strong { color: var(--accs-ink); font-size: 0.8125rem; font-weight: 600; }
+.gv-next__text span { color: var(--accs-muted); font-size: 0.75rem; line-height: 1.4; }
+
+/* Privacy line beside the details. */
+.gv-guard { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--accs-tint); color: var(--site-accent-ink); font-size: 0.75rem; line-height: 18px; }
+.gv-guard svg { flex: none; width: 18px; height: 18px; }
+
+/* Internal note composer. */
+.gv-composer { display: grid; gap: 10px; margin-top: 8px; padding: 12px 14px; border: 1px solid var(--accs-line); border-radius: 12px; background: var(--accs-paper); }
+.gv-composer__foot { display: flex; justify-content: flex-end; }
+
+/* Activity: who did what, and when. */
+.gv-activity { display: grid; margin: 0; padding: 0; list-style: none; }
+.gv-activity > li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding: 10px 0; }
+.gv-activity__avatar { width: 30px; height: 30px; background: var(--accs-tint); color: var(--site-accent-ink); font-size: 0.6875rem; font-weight: 600; }
+.gv-activity__avatar[data-quiet] { background: var(--accs-paper); }
+.gv-activity__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: var(--accs-ink); font-size: 0.8125rem; }
+.gv-activity__text { margin: 2px 0 0; color: var(--accs-ink-2); font-size: 0.8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+.gv-activity__meta { display: flex; flex-wrap: wrap; gap: 2px 0; margin: 3px 0 0; color: var(--accs-muted); font-size: 0.75rem; }
+.gv-activity__meta > * + *::before { content: '·'; margin-inline: 6px; }
 
 /* ---------- Facts ---------- */
+/* Label on the left, value on the right, like the Details card. */
 .gv-facts { display: grid; gap: 0; margin: 0; }
-.gv-facts > div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--accs-line); }
-.gv-facts > div:last-child { border-bottom: 0; }
+.gv-facts > div { display: grid; grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr); align-items: baseline; gap: 16px; padding: 10px 0; }
 .gv-facts dt { color: var(--accs-muted); font-size: 0.8125rem; }
-.gv-facts dd { margin: 0; color: var(--accs-ink); font-size: 0.875rem; font-weight: 500; overflow-wrap: anywhere; }
+.gv-facts dd { margin: 0; color: var(--accs-ink); font-size: 0.8125rem; font-weight: 500; text-align: end; overflow-wrap: anywhere; }
 
 /* ---------- Narrative, timeline, thread ---------- */
 .gv-narrative { margin: 0; color: var(--accs-ink-2); font-size: 0.9375rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .gv-narrative p { margin: 0; }
+/* The statement, set off with a bar in the link color. */
+.gv-quote { padding-inline-start: 14px; border-inline-start: 3px solid var(--accs-link); color: var(--accs-ink); line-height: 1.6; }
 
 .gv-timeline { gap: 20px; }
 .gv-timeline > li[data-current]::before {
@@ -302,7 +526,6 @@
 .gv-routing { margin: 4px 0 8px; padding-inline-start: 18px; }
 /* New reports have long IDs: the reference stays on one line and is cut with an ellipsis (the full ID is in the tooltip). */
 .gv-row__ref, .gv-ref-link { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gv-c-ref { max-width: 14ch; }
 .gv-missing { margin: 4px 0 0; padding-inline-start: 18px; }
 /* Five equal steps of a student's report (Submitted, Read, Escalated, Resolved, Closed). */
 .gv-steps-wrap { display: grid; gap: 6px; min-width: 0; }
