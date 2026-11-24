@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Checkbox,
+  CheckboxGroup,
   DatePicker,
   Disclosure,
   Icon,
@@ -905,10 +906,16 @@ function FacultyResults({
   const faculty = object(result.faculty);
   const [note, setNote] = useState("");
   const action = useEvaluationAction("P29");
-  const canFollowUp =
+  // Paper Fig 3.14: the full result and follow-up notes show only once 100% of the program has rated; until then the
+  // faculty average only. A result from an older API without `released` shows in full.
+  const released = result.released !== false;
+  const oversight =
     session.data?.user.roles.some((role) =>
       ["chair", "dean"].includes(role),
     ) === true;
+  const canFollowUp =
+    oversight && (result.canFollowUp === undefined || result.canFollowUp === true);
+  const followUps = items(result.followUps);
   const programAverage = object(page.data.programAverage);
   const programCriteria = items(programAverage.criteria);
   const criteria: BarDatum[] = items(result.criteria).map((criterion) => {
@@ -963,6 +970,17 @@ function FacultyResults({
               note="Of the forms you can see"
             />
           </Kpis>
+          {!released ? (
+            <Panel>
+              <p className="ev-note">
+                Faculty average only. The full result opens when 100% of{" "}
+                {words(faculty.program, "the program")} has rated (
+                {number(programAverage.submitted)} of{" "}
+                {number(programAverage.assigned)} evaluations in).
+              </p>
+            </Panel>
+          ) : (
+          <>
           <Panel title="By criterion">
             <CriteriaBars
               data={criteria}
@@ -998,6 +1016,8 @@ function FacultyResults({
               <Empty title="No themes yet" />
             )}
           </Panel>
+          </>
+          )}
         </>
       ) : (
         <Panel>
@@ -1011,6 +1031,21 @@ function FacultyResults({
       {/* TBD(D-08): release thresholds and feedback retention need QCU approval. */}
       {canFollowUp && (
         <Panel title="Follow-up">
+          {followUps.length > 0 && (
+            <ul className="accs-rows">
+              {followUps.map((entry, index) => (
+                <li key={words(entry.id, String(index))}>
+                  <div className="ev-theme">
+                    <strong>
+                      {words(object(entry.author).name, "Follow-up")}
+                      <span className="ev-muted">{formatDateTime(words(entry.at))}</span>
+                    </strong>
+                    <p>{words(entry.note)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="ev-followup">
             <TextArea
               label="Follow-up note"
@@ -1704,6 +1739,11 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const [instructions, setInstructions] = useState(words(record.instructions));
   const [opens, setOpens] = useState(words(record.opens));
   const [closes, setCloses] = useState(words(record.closes));
+  // 360-degree evaluation (paper, Chapter 1 Scope item 5): the student form is always on; the Dean may add the peer and
+  // upward forms.
+  const [forms, setForms] = useState(() => [
+    ...new Set(["student", ...strings(record.forms)]),
+  ]);
   const [formQuestions, setFormQuestions] = useState(
     questions(record.questions),
   );
@@ -1747,8 +1787,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     instructions,
     opens,
     closes,
-    // Cycles use the student evaluation form only (MeetingAt10/accs-backend#47).
-    forms: ["student"],
+    forms,
     questions: formQuestions,
   };
 
@@ -1860,10 +1899,20 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             isDisabled={!editable}
           />
         </div>
-        <p className="ev-note">
-          Form: <strong>{formLabels.student}</strong>. Students evaluate the
-          faculty who teach their sections; it is the only form a cycle uses.
-        </p>
+        <CheckboxGroup
+          label="Forms"
+          description="Students always evaluate the faculty who teach their sections. Add the peer and upward forms for a 360-degree evaluation."
+          value={forms}
+          onChange={(next) => setForms([...new Set(["student", ...next])])}
+          isDisabled={!editable}
+          isRequired
+        >
+          {Object.entries(formLabels).map(([key, label]) => (
+            <Checkbox value={key} key={key} isDisabled={key === "student"}>
+              {label}
+            </Checkbox>
+          ))}
+        </CheckboxGroup>
       </Panel>
       <Panel title="Participation">
         {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}

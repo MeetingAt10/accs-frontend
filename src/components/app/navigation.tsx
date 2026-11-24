@@ -481,6 +481,27 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
+  // President's Office (restored 2026-11-24): receives only executive-level cases from OSAS.
+  president: [
+    {
+      label: "Workspace",
+      entries: [
+        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
+        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+      ],
+    },
+    {
+      label: "Cases",
+      entries: [
+        {
+          label: "Executive cases",
+          href: "/cases",
+          pageId: "P21",
+          icon: "tray",
+        },
+      ],
+    },
+  ],
   osas: [
     {
       label: "Workspace",
@@ -1040,6 +1061,7 @@ export function AppChrome({
       "dean",
       "guidance",
       "osas",
+      "president",
     ].includes(role),
   )
     ? "compact"

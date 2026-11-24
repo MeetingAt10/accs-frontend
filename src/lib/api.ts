@@ -8,6 +8,7 @@ export type Role =
   | 'administrator'
   | 'guidance'
   | 'osas'
+  | 'president'
   | 'secretary'
 
 export interface SessionUser {
