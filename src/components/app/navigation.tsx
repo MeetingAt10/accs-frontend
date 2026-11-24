@@ -1056,6 +1056,11 @@ export function AppChrome({
   const [menuOpen, setMenuOpen] = useState(false);
   // The Assistant drawer opens from the panel's Assistant card (and the same card in the phone menu).
   const [assistantOpen, setAssistantOpen] = useState(false);
+  // On the Assistant page itself the sheet would only repeat the page, so the card does nothing there.
+  const onAssistantPage = path === "/assistant";
+  const openAssistant = () => {
+    if (!onAssistantPage) setAssistantOpen(true);
+  };
   const signOutAction = useSignOut();
   const onSignOut = () => signOutAction.mutate();
   const allowed = new Set(session.allowedPages);
@@ -1152,6 +1157,8 @@ export function AppChrome({
 
   // The drawer is a mobile-only surface; any route change closes it.
   useEffect(() => setMenuOpen(false), [path]);
+  // Same for the Assistant drawer, so "Open the assistant page" does not leave the sheet over the page.
+  useEffect(() => setAssistantOpen(false), [path]);
 
   // Ctrl+K (Cmd+K on a Mac) opens the quick jump from anywhere in the portal.
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -1225,7 +1232,7 @@ export function AppChrome({
           current={site}
           siteGroups={siteGroups}
           currentHref={panelCurrent}
-          onAssistant={() => setAssistantOpen(true)}
+          onAssistant={openAssistant}
         />
         <div className="shell-main">
           <Topbar
@@ -1272,18 +1279,29 @@ export function AppChrome({
             <AssistantCard
               onPress={() => {
                 setMenuOpen(false);
-                setAssistantOpen(true);
+                openAssistant();
               }}
             />
           }
         />
       </Drawer>
       <Onboarding session={session} destinations={destinations} />
-      <Drawer title="Assistant" side="end" className="shell-assist-drawer" isOpen={assistantOpen} onOpenChange={setAssistantOpen}>
-        <Stack gap={16}>
-          <AssistantPanel suggestions={assistantSuggestions(path)} />
-          <Link href="/assistant">Open the assistant page</Link>
-        </Stack>
+      <Drawer
+        title={
+          <>
+            <span>Assistant</span>
+            {/* The full page sits in the header, so the chat runs to the drawer's bottom edge. */}
+            <Link href="/assistant" variant="standalone" icon="arrow-up-right" className="shell-assist-drawer__page">
+              Open full page
+            </Link>
+          </>
+        }
+        side="end"
+        className="shell-assist-drawer"
+        isOpen={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      >
+        <AssistantPanel suggestions={assistantSuggestions(path)} />
       </Drawer>
     </div>
   );

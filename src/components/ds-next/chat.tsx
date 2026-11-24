@@ -325,7 +325,6 @@ export function MessageComposer({
         value={value}
         onChange={onChange}
         maxLength={maxLength}
-        showCount
         isRequired={!hasFiles}
         isDisabled={isPending}
         onKeyDown={(event) => {
@@ -373,6 +372,10 @@ export function MessageComposer({
           line
         </small>
         <div className="ds-next-composer__buttons">
+          {/* Counted from the value, not from typing: the design-system count stayed at the old length after a send or a picked suggestion. */}
+          <span className="ds-next-composer__count" aria-live="polite">
+            {value.length} / {maxLength}
+          </span>
           {attachments && onAddFiles && (
             <>
               <input
