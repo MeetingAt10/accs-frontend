@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 
 import { pageAllowed, routePermission } from '@/lib/page-catalog'
 import { sessionQuery } from '@/lib/queries'
-import { authRedirectFor } from '@/lib/session-errors'
+import { authRedirectFor, isSessionExpired } from '@/lib/session-errors'
 import { canOpenSite, landingFor, roleLabel, siteById, siteForPath } from '@/lib/sites'
 
 import './sites.css'
@@ -63,7 +63,7 @@ export function RequirePermission({ pageId, children }: { pageId: string; childr
   // An ended session is on its way to Sign in (main.tsx); a failed check is not a missing permission, so offer a retry.
   if (session.error && !session.data) {
     return authRedirectFor(session.error)
-      ? <ViewState kind="loading" title="Your session ended" description="Taking you to Sign in…" />
+      ? <ViewState kind="loading" title={isSessionExpired(session.error) ? "Your session ended" : "Sign in to continue"} description="Taking you to Sign in…" />
       : <RetryView onRetry={() => void session.refetch()} />
   }
   const permission = routePermission[pageId]
