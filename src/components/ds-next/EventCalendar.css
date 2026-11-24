@@ -280,7 +280,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  min-height: 22px;
+  min-height: 64px;
   padding: 3px 6px 3px 7px;
   overflow: hidden;
   border: 0;
@@ -299,9 +299,9 @@
   transform: translateY(-1px);
   box-shadow: var(--accs-shadow-hover);
 }
-.ec-block__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ec-block__time { font-size: 0.625rem; font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* A block too short for two lines shows only its title, so the week view does not pile text up. */
+.ec-block__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.ec-block__time { font-size: 0.625rem; font-weight: 400; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* Blocks keep a minimum height so the title and the time both stay readable. The time hides only if a block is forced shorter. */
 .ec-block { container-type: size; }
 @container (max-height: 34px) { .ec-block__time { display: none; } }
 /* Overlapping events that did not fit beside the others: a link to the week's list below. */

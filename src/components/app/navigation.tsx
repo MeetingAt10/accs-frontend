@@ -62,6 +62,7 @@ import {
 } from "@/lib/sites";
 
 import { Onboarding } from "@/components/app/onboarding";
+import { useFocusNewDialogs } from "@/components/app/dialog-focus";
 import "./shell.css";
 
 type RoleEntry = NavEntry & { pageId?: string };
@@ -950,6 +951,24 @@ function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen
   );
 }
 
+// Suggestions for the Assistant drawer that match the page open behind it. Other pages keep the general ones.
+// Suggestions for the page the person is on. On a report page they name the report, so the assistant answers about that report only.
+const pageSuggestions: [RegExp, string[] | ((match: RegExpMatchArray) => string[])][] = [
+  [/^\/reports\/(RPT-[0-9A-Z]+)/, ([, id]) => [`Explain the stage of ${id}`, `What happens next with ${id}?`, "Who can see this report?"]],
+  [/^\/reports/, ["Explain my report milestones", "How do I file a new report?"]],
+  [/^\/consultations/, ["How do I book a consultation?", "Show my schedule"]],
+  [/^\/feed/, ["How do I post to the feed?", "What is the difference between a post and an announcement?"]],
+  [/^\/messages/, ["How do I send a message?", "How do I report a message?"]],
+  [/^\/spaces/, ["What can I do in this space?", "Where are the class materials?"]],
+]
+export function assistantSuggestions(path: string) {
+  for (const [pattern, suggestions] of pageSuggestions) {
+    const match = path.match(pattern);
+    if (match) return typeof suggestions === "function" ? suggestions(match) : suggestions;
+  }
+  return undefined;
+}
+
 export function AppChrome({
   session,
   title,
@@ -962,6 +981,8 @@ export function AppChrome({
   const path = useRouterState({ select: (state) => state.location.pathname });
   const site = siteForPath(path);
   const destinations = siteDestinations(session);
+  // The design-system dialogs leave focus on the page; move it into each new dialog so Escape closes it.
+  useFocusNewDialogs();
   const { groups, current } = siteNav(session, path, site);
   const [menuOpen, setMenuOpen] = useState(false);
   // The Assistant drawer opens from the panel's Assistant card (and the same card in the phone menu).
@@ -1184,7 +1205,7 @@ export function AppChrome({
       <Onboarding session={session} destinations={destinations} />
       <Drawer title="Assistant" side="end" className="shell-assist-drawer" isOpen={assistantOpen} onOpenChange={setAssistantOpen}>
         <Stack gap={16}>
-          <AssistantPanel />
+          <AssistantPanel suggestions={assistantSuggestions(path)} />
           <Link href="/assistant">Open the assistant page</Link>
         </Stack>
       </Drawer>

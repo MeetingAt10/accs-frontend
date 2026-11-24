@@ -174,3 +174,15 @@ a.hm-news__row:hover .hm-news__title { color: var(--accs-link); text-decoration:
   :root .hm-queue, :root .hm-news { padding: 16px 16px 8px; }
   .hm-queue__lede { display: none; }
 }
+
+/* Loading placeholders (skeleton-page.tsx) */
+.pg-skel { display: grid; gap: 16px; }
+.pg-skel__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pg-skel__tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 12px; }
+.pg-skel__tile { height: 88px; border-radius: var(--accs-radius-card); }
+.pg-skel__card { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); }
+.pg-skel__block { height: 220px; border-radius: var(--accs-radius-card); }
+
+/* Before the session is known there is no shell yet, so the placeholders sit on the bare page. */
+.pg-skel-page { min-height: 100dvh; padding: 32px 16px; background: var(--accs-paper); }
+@media (min-width: 768px) { .pg-skel-page { padding: 32px 40px 48px; } }

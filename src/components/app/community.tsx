@@ -1,4 +1,5 @@
-import { campusToday } from '@/lib/campus-date'
+import { typedDateImpossible } from '@/lib/typed-date'
+import { campusNowLocal, campusToday } from '@/lib/campus-date'
 import { parseDate } from '@internationalized/date'
 import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
 import type { MessageFile } from '@/lib/api'
@@ -430,7 +431,8 @@ function ThreadList({
                   {post.title}
                 </Link>
               </h3>
-              {post.body && <p className="fx-thread__excerpt">{post.body}</p>}
+              {/* A removed post's title already reads "This content was removed.", so its body is not repeated under it. */}
+              {post.body && !post.removed && <p className="fx-thread__excerpt">{post.body}</p>}
               {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
               <div className="fx-thread__foot">
                 <span className="fx-stat" title={reactionsRead.total ? topReactions(reactionsRead.counts, 6).map((r) => `${r.label} ${reactionsRead.counts[r.id]}`).join(', ') : undefined}>
@@ -500,7 +502,7 @@ function FeedRail({
   organizationsLoad?: Retry
 }) {
   const announcements = posts
-    .filter((post) => post.kind === 'announcement')
+    .filter((post) => post.kind === 'announcement' && !post.removed)
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 4)
   const orgs = [...organizations]
@@ -910,6 +912,8 @@ export function PostComposer({
   // "Add event" on the calendar opens this form with its date (YYYY-MM-DD, today or later).
   const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') && (params.get('date') ?? '') >= campusToday().toString() ? params.get('date')! : ''
   const [eventDate, setEventDate] = useState(requestedDate)
+  // Set while the typed event date is a day that does not exist (02/31), which the picker would quietly change.
+  const [eventDateBad, setEventDateBad] = useState(false)
   const [eventTime, setEventTime] = useState('')
   const [eventPlace, setEventPlace] = useState('')
   const [eventContact, setEventContact] = useState('')
@@ -951,10 +955,13 @@ export function PostComposer({
     if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
     if (eventRequired || (eventShown && eventGiven)) {
-      if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
+      if (eventDateBad) nextErrors.eventDate = "That date doesn't exist."
+      else if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
       else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTime))
         nextErrors.eventTime = 'Enter a time as HH:MM.'
+      else if (eventDate === campusToday().toString() && eventTime <= campusNowLocal().slice(11))
+        nextErrors.eventTime = 'Choose a time that has not passed.'
     }
     if (eventRequired) {
       if (!eventPlace.trim()) nextErrors.eventPlace = 'Enter the event place.'
@@ -1149,7 +1156,11 @@ export function PostComposer({
                     isRequired={eventRequired}
                     defaultValue={requestedDate ? parseDate(requestedDate) : undefined}
                     minValue={campusToday()}
-                    onChange={(value) => setEventDate(value?.toString() ?? '')}
+                    onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setEventDateBad(bad) }}
+                    onChange={(value) => {
+                      setEventDate(value?.toString() ?? '')
+                      if (document.activeElement?.closest('.ds-date-picker__popover')) setEventDateBad(false)
+                    }}
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
@@ -2274,7 +2285,9 @@ function SpacePage({
               </div>
             </div>
             {discussions.length ? (
-              <ThreadList posts={discussions} spaces={[space]} />
+              <PagedList items={discussions} noun="posts" resetKey={query}>
+                {(shown) => <ThreadList posts={shown} spaces={[space]} />}
+              </PagedList>
             ) : (
               <Panel>
                 <Empty
@@ -2393,7 +2406,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
                     <span className="fx-count-label">
                       <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
                       members
-                      {organization.member ? ' · Member' : ''}
+                      {organization.member && <>{' '}<StatusChip tone="ok">Member</StatusChip></>}
                     </span>
                   </div>
                 </li>

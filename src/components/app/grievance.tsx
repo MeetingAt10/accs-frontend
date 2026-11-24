@@ -448,9 +448,9 @@ export function ReportWizard({ page }: { page: PageEnvelope }) {
                       </Select>}
                   </Grid>
                   <RadioGroup label="How serious is it?" value={draft.severity} onChange={(value) => update('severity', value as SeverityLevel)} isRequired>
-                    <Radio value="low" card description="Limited impact right now.">Low</Radio>
-                    <Radio value="medium" card description="Affects ongoing activities or support.">Medium</Radio>
-                    <Radio value="high" card description="Needs prompt review by a person.">High</Radio>
+                    <Radio value="low" card description="Limited impact right now."><span className="gv-sev gv-sev--dot" data-level="low">Low</span></Radio>
+                    <Radio value="medium" card description="Affects ongoing activities or support."><span className="gv-sev gv-sev--dot" data-level="medium">Medium</span></Radio>
+                    <Radio value="high" card description="Needs prompt review by a person."><span className="gv-sev gv-sev--dot" data-level="high">High</span></Radio>
                   </RadioGroup>
                   <RadioGroup label="Is this concern about your adviser?" value={draft.aboutAdvisor ? 'yes' : 'no'} onChange={(value) => update('aboutAdvisor', value === 'yes')}>
                     <Radio value="no" card description="It goes to your adviser.">No</Radio>

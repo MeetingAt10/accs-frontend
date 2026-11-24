@@ -183,6 +183,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
     font-weight: 600;
   }
   .accs-table.adm-stack .adm-trunc, .accs-table.adm-stack .adm-trunc--wide { display: inline-block; max-width: calc(100% - 7rem); vertical-align: bottom; }
+  .accs-table.adm-stack tr.adm-row { grid-template-columns: minmax(0, 1fr); }
   .adm-meter { grid-template-columns: minmax(4.5rem, 7rem) minmax(0, 1fr) 3.5rem; }
 }
 

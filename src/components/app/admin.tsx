@@ -411,7 +411,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       )}
       <div className="accs-stack accs-stack--tight">
         <Note>
-          Role changes take effect at the next sign-in. This matrix does not
+          Role changes take effect right away. This matrix does not
           decide case outcomes or restrictions.
         </Note>
         <div className="adm-legend" aria-label="Legend">
@@ -981,7 +981,7 @@ function UsersPage({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Users" })}
         title="Users and roles"
-        description="Role changes take effect at the next sign-in and go in the audit trail. Only the System Administrator and the CCS Secretary see this list; students and staff never see each other's roles here."
+        description="Role changes take effect right away and go in the audit trail. Only the System Administrator and the CCS Secretary see this list; students and staff never see each other's roles here."
         actions={
           <Button
             variant="secondary"
@@ -1282,8 +1282,8 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
         <Panel title="Roles and assignment">
           <div className="adm-form">
             <Note>
-              Role changes apply at the next sign-in. The current session keeps
-              its roles. The audit trail records this change.
+              Role changes apply right away, including in the user's current
+              session. The audit trail records this change.
             </Note>
             {/* At most two roles; a student may also be a CCS student organization representative (decided 20 November 2026).
                 The checkboxes are the only way to add a role: an "Add role" button did the same (QA 17 November, V3). */}

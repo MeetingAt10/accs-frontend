@@ -591,7 +591,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
             )}
             {page.data.canViewResults === true && (
               <Button href="/evaluations/results" variant="secondary">
-                {professor ? "My results" : "Results"}
+                {professor && !session.data?.user.roles.some((role) => ["chair", "dean"].includes(role)) ? "My results" : "Results"}
               </Button>
             )}
           </>
@@ -1065,7 +1065,8 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
   );
   const criteria: BarDatum[] = ["Clarity", "Support", "Fairness"].map(
     (label) => {
-      const values = results.flatMap((result) =>
+      // Only faculty with responses: a faculty member nobody evaluated would count as 0 and drag the average down.
+      const values = results.filter((result) => number(result.responses) > 0).flatMap((result) =>
         items(result.criteria)
           .filter((criterion) => criterion.label === label)
           .map((criterion) => number(criterion.value)),
@@ -1104,12 +1105,7 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             label="Completion rate"
             value={
               <AnimatedNumber
-                value={Math.round(
-                  results.reduce(
-                    (total, result) => total + number(result.completion),
-                    0,
-                  ) / Math.max(1, results.length),
-                )}
+                value={completionRate(results)}
                 suffix="%"
               />
             }
@@ -1131,10 +1127,10 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             value={
               <AnimatedNumber
                 value={
-                  results.reduce(
-                    (total, result) => total + number(result.average),
-                    0,
-                  ) / Math.max(1, results.length)
+                  results
+                    .filter((result) => number(result.responses) > 0)
+                    .reduce((total, result) => total + number(result.average), 0) /
+                  Math.max(1, results.filter((result) => number(result.responses) > 0).length)
                 }
                 decimals={2}
               />
@@ -1648,11 +1644,11 @@ export function QuestionEditor({
 
 /* ---------- P31 Cycle detail ---------- */
 
-function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
+function CompletionTable({ title, rows, noun = "people" }: { title: string; rows: Item[]; noun?: string }) {
   return (
     <Panel flush title={title}>
       {rows.length ? (
-        <PagedList items={rows} noun="students">
+        <PagedList items={rows} noun={noun}>
           {(rows) => (
           <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
             <table className="accs-table" aria-label={title}>
@@ -1987,8 +1983,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           ))}
         </Select>
       </div>
-      <CompletionTable title="By section" rows={visible(completion)} />
-      <CompletionTable title="By faculty" rows={visible(facultyCompletion)} />
+      <CompletionTable title="By section" rows={visible(completion)} noun="sections" />
+      <CompletionTable title="By faculty" rows={visible(facultyCompletion)} noun="faculty" />
     </div>
   );
 
@@ -2363,4 +2359,11 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
       </div>
     </RequirePermission>
   );
+}
+
+/** Submitted evaluations out of those assigned, across the listed faculty. Faculty with nothing assigned in a published cycle don't count. */
+function completionRate(results: Item[]) {
+  const assigned = results.reduce((total, result) => total + number(result.assigned), 0)
+  const submitted = results.reduce((total, result) => total + number(result.responses), 0)
+  return assigned ? Math.round((submitted / assigned) * 100) : 0
 }

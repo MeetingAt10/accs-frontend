@@ -13,7 +13,7 @@ describe('restricted features', () => {
 
 describe('filterRestrictions', () => {
   const rows = [
-    { id: 'a', features: ['post.create'], student: { id: 'QCU-STU-IT-A', name: 'Ana Reyes', program: 'BSIT' } },
+    { id: 'a', features: ['post.create'], student: { id: 'QCU-STU-IT-A', studentId: '24-0103', name: 'Ana Reyes', program: 'BSIT' } },
     { id: 'b', features: ['post.comment', 'report.anonymous'], student: { id: 'QCU-STU-CS', name: 'Ben Cruz', program: 'BSCS' } },
   ]
   const ids = (q: string, feature = '', program = '') => filterRestrictions(rows, { q, feature, program }).map((row) => row.id)
@@ -21,6 +21,7 @@ describe('filterRestrictions', () => {
     expect(ids('')).toEqual(['a', 'b'])
     expect(ids('ben')).toEqual(['b'])
     expect(ids('stu-it')).toEqual(['a'])
+    expect(ids('24-0103')).toEqual(['a'])
     expect(ids('', 'report.anonymous')).toEqual(['b'])
     expect(ids('', '', 'BSIT')).toEqual(['a'])
     expect(ids('ana', '', 'BSCS')).toEqual([])
