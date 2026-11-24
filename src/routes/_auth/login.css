@@ -1,5 +1,5 @@
-/* Sign in, from the Figma "User Login" frame (1440 x 844). Builds on auth.css; every rule is scoped to .lg so
-   /first-login keeps the shared auth look. Desktop: navy panel left, form right. Below 960px: navy band above the form. */
+/* Sign in and /first-login, from the Figma "User Login" frame (1440 x 844). Builds on auth.css; every rule is scoped
+   to .lg. Desktop: navy panel left, form right. Below 960px: navy band above the form. */
 @import '@fontsource-variable/inter/wght.css';
 
 .lg {

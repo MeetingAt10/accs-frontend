@@ -119,7 +119,7 @@ export const changePassword = (input: { currentPassword: string; password: strin
   post<Done>('/auth/change-password', input)
 
 /** Replaces the temporary username and password. Answers with the new session. */
-export const completeFirstLogin = (input: { currentPassword: string; username: string; password: string }) =>
+export const completeFirstLogin = (input: { password: string; currentPassword?: string; username?: string }) =>
   post<Session>('/auth/complete-first-login', input)
 
 export const signOut = () =>
