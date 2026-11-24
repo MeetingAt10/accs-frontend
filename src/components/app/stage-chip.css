@@ -18,6 +18,7 @@
 .stage-chip[data-stage='dean'] { --stage: var(--accs-stage-dean); }
 .stage-chip[data-stage='guidance'] { --stage: var(--accs-stage-guidance); }
 .stage-chip[data-stage='osas'] { --stage: var(--accs-stage-osas); }
+.stage-chip[data-stage='executive'] { --stage: var(--accs-stage-osas); }
 .stage-chip[data-stage='resolved'] { --stage: var(--accs-stage-done); }
 .stage-chip:is([data-stage='submitted'], [data-stage='closed']) { --stage: var(--accs-muted); }
 

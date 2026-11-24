@@ -210,6 +210,7 @@ const roleNames: Record<string, string> = {
   dean: 'Dean',
   guidance: 'Guidance',
   osas: 'OSAS',
+  president: 'President’s Office',
   administrator: 'System Administrator',
 }
 

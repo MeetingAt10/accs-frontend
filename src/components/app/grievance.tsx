@@ -49,8 +49,8 @@ const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new D
 const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
 const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
 
-// Pipeline: the five handling stages (Adviser to OSAS, which is the last) plus Submitted and Resolved.
-const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
+// Pipeline: the six handling stages (Adviser to the President's Office, restored 2026-11-24) plus Submitted and Resolved.
+const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['executive', "President's Office"], ['resolved', 'Resolved']] as const
 // The stage is always the office handling it: the status is now a step ("Submitted"), which must not turn the Adviser's
 // stage into "Submitted" (20 November 2026).
 const stageOf = (report: Item): string => isClosed(report) ? 'resolved' : words(report.stage, 'adviser')
@@ -127,7 +127,7 @@ function PillGroup({ id, label, value, options, onChange }: { id: string; label:
   )
 }
 
-const actorRoles: Record<string, string> = { professor: 'Adviser', adviser: 'Adviser', chair: 'Program Chair', dean: 'Dean', guidance: 'Guidance', osas: 'OSAS', system: 'System' }
+const actorRoles: Record<string, string> = { professor: 'Adviser', adviser: 'Adviser', chair: 'Program Chair', dean: 'Dean', guidance: 'Guidance', osas: 'OSAS', president: "President's Office", system: 'System' }
 
 function Timeline({ report, handler = false }: { report: Item; handler?: boolean }) {
   const me = useQuery(sessionQuery()).data?.user.id
@@ -755,8 +755,8 @@ export function CaseNotes({ report }: { report: Report }) {
   )
 }
 
-const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone' }
-const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' } }
+const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone', return: 'Return to OSAS' }
+const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' }, osas: { stage: 'executive', label: "President's Office" } }
 // One line under each action in "What you can do", saying what it does.
 const actionNotes: Record<string, string> = {
   respond: 'Send the reporter an update and record it.',
@@ -771,8 +771,8 @@ const actionNotes: Record<string, string> = {
 function caseActions(report: Report) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
   const all = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
-  // OSAS is the last office: it has no next office, and no case is returned to an earlier one.
-  return all.filter((type) => type !== 'return' && !(report.stage === 'osas' && ['escalate', 'transfer'].includes(type)))
+  // OSAS can transfer an executive-level case to the President's Office, which can return it to OSAS.
+  return all
 }
 
 export function CaseActionBar({ report }: { report: Report }) {
@@ -785,7 +785,7 @@ export function CaseActionBar({ report }: { report: Report }) {
   const action = useAction('P22')
   const leave = useAction('P22', '/cases')
   const allowed = caseActions(report)
-  const transition = ['escalate', 'transfer'].includes(selected)
+  const transition = ['escalate', 'transfer', 'return'].includes(selected)
   const next = nextOffices[report.stage]
   const decision = ['chair', 'dean'].includes(report.stage)
   const label = (type: string) => type === 'recordAction' && decision ? 'Record decision'
@@ -833,9 +833,9 @@ export function CaseActionBar({ report }: { report: Report }) {
   )
 }
 
-// The stage tracker: every office a case can reach, OSAS included, then Resolved and Closed.
-const trackSteps = [['adviser', 'Adviser'], ['chair', 'Program Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved'], ['closed', 'Closed']] as const
-const upcomingNotes: Record<string, string> = { adviser: 'Reviews it first', chair: 'If escalated', dean: 'If escalated', guidance: 'If referred', osas: 'If transferred', resolved: 'Outcome recorded', closed: 'Close it after resolving' }
+// The stage tracker: every office a case can reach, the President's Office included, then Resolved and Closed.
+const trackSteps = [['adviser', 'Adviser'], ['chair', 'Program Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['executive', "President's Office"], ['resolved', 'Resolved'], ['closed', 'Closed']] as const
+const upcomingNotes: Record<string, string> = { adviser: 'Reviews it first', chair: 'If escalated', dean: 'If escalated', guidance: 'If referred', osas: 'If transferred', executive: 'Executive-level cases only', resolved: 'Outcome recorded', closed: 'Close it after resolving' }
 const stepStates: Record<string, string> = { done: 'done', current: 'current stage', skipped: 'skipped', todo: 'not reached' }
 
 /**
@@ -1192,7 +1192,7 @@ const osasActed = (report: Item) => items(report.history).some((entry) => entry.
 function CaseQueue({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   const roles = session.data?.user.roles ?? []
-  const role = ['chair', 'dean', 'guidance', 'osas', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
+  const role = ['chair', 'dean', 'guidance', 'osas', 'president', 'professor'].find((candidate) => roles.some((value) => value === candidate)) ?? 'professor'
   const initial = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
   const [query, setQuery] = useState(initial.get('q') ?? '')
   const [level, setLevel] = useState(initial.get('severity') ?? '')
@@ -1215,6 +1215,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
     : role === 'dean' ? [['open', 'At Dean stage'], ...adviserTab, ['history', 'Transferred'], ['closed', 'Closed']]
       : role === 'guidance' ? [['intake', 'Escalated to me'], ['open', 'Active Case Files'], ['history', 'Transferred to OSAS'], ['closed', 'Closed']]
         : role === 'osas' ? [['open', 'New transfers'], ['active', 'Active'], ['history', 'Transferred'], ['closed', 'Closed']]
+          : role === 'president' ? [['open', 'Awaiting action'], ['history', 'Returned to OSAS'], ['closed', 'Closed']]
           : [['open', 'Open'], ['waiting', 'Waiting on reporter'], ['closed', 'Closed']]
   // Rows this reader can see but not act on (read-only, status only) have their own tab.
   const followLabel = role === 'chair' ? 'All in program' : role === 'dean' ? 'All concerns' : 'Following'
@@ -1237,7 +1238,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
-  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : 'Assigned reports'
+  const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : role === 'president' ? 'Executive cases' : 'Assigned reports'
   const intro = role === 'chair' ? 'Every concern in your program, who holds it, and how long it has waited.' : 'The reports routed to you, where each one is, and how long it has waited.'
   const toggleSort = (column: string) => setSort((current) => ({ column, direction: current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending' }))
   const shownPage = Math.min(currentPage, pageCount)

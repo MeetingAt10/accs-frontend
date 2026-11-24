@@ -132,7 +132,7 @@ function openableStats(stats: Item[], session: Parameters<typeof canOpenPath>[0]
 }
 
 /** The office a role works a case as, so Home can mark the cases waiting on this person. */
-const ownStage: Record<string, string> = { professor: 'adviser', chair: 'chair', dean: 'dean', guidance: 'guidance', osas: 'osas' }
+const ownStage: Record<string, string> = { professor: 'adviser', chair: 'chair', dean: 'dean', guidance: 'guidance', osas: 'osas', president: 'executive' }
 
 /** "Today", "Oct 20", or "Oct 20, 2025" for another year, in Manila time. */
 function shortDay(value: unknown) {
@@ -454,7 +454,7 @@ const shortcuts: Shortcut[] = [
   { label: 'Book appointment', short: 'Book', href: '/consultations', icon: 'calendar', when: ['student'] },
   { label: 'Post announcement', short: 'Announce', href: '/feed/new', icon: 'megaphone', permission: 'announcement.publish' },
   { label: 'Manage availability', short: 'Availability', href: '/consultations/availability', icon: 'clock', when: ['professor'] },
-  { label: 'Open case queue', short: 'Cases', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas'] },
+  { label: 'Open case queue', short: 'Cases', href: '/cases', icon: 'list-checks', when: ['chair', 'dean', 'guidance', 'osas', 'president'] },
 ]
 
 /**
