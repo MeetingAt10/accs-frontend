@@ -2205,7 +2205,7 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some(has)) ||
     (["P46", "P47", "P48"].includes(pageId) && has("role.manage"));
   if (session.isPending || page.isPending)
-    return <PageLoading title={pageTitles[pageId] || "Administration"} />;
+    return <PageLoading pageId={pageId} title={pageTitles[pageId] || "Administration"} />;
   if (!roleAllowed)
     return (
       <ViewState

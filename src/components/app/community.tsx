@@ -2645,7 +2645,7 @@ function OrganizationPage({
 export function CommunityPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <PageLoading title={pageTitles[page.pageId] || 'page'} />
+    return <PageLoading pageId={page.pageId} title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P04')
     return <FeedPage page={page} session={session.data} />
   if (page.pageId === 'P05')

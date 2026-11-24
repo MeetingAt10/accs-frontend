@@ -1,6 +1,6 @@
 /* Home for every role (Figma 02 Home — Program Chair, content node; 08 Mobile Home).
    A navy hero, the summary cards, then two columns: cases and the main lists on the left, a 380px side column with
-   announcements and quick access on the right. One column below 1000px of content width. */
+   events and announcements on the right. One column below 1000px of content width. */
 
 .hm {
   container: home / inline-size;

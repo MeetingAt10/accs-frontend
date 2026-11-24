@@ -13,7 +13,6 @@ import { keepFilteredPage, pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { dashboardStats } from '@/components/app/community-home'
-import { QuickAccess } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
 import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
@@ -204,8 +203,16 @@ function loadingStats(role: string) {
 /** The Home summary-card labels, worded for what each count is. */
 const statLabels: Record<string, string> = { Appointments: 'Open appointments' }
 
-/** Both Home columns: the main one (cases, events, posts) and the 380px side one (announcements, quick access, the rest). */
-function DashboardPanel({ data, role, quick, loading }: { data: Item; role: string; quick?: ReactNode; loading?: boolean }) {
+/** What the main Home column says when it has nothing to list yet, worded for the role's own lists. */
+function mainEmptyText(role: string) {
+  if (role === 'student') return { panel: 'My reports', title: 'No reports yet', body: 'Concerns you file show up here, with where each one stands.' }
+  if (role === 'professor') return { panel: 'Assigned reports', title: 'No assigned reports yet', body: 'Concerns from your advisees show up here when they reach you.' }
+  if (ownStage[role]) return { panel: 'Case queue', title: 'Your queue is empty', body: 'Concerns that reach your office show up here, with where each one stands.' }
+  return { panel: 'Your work', title: 'Nothing needs you yet', body: 'Requests and records for your role show up here once there are any.' }
+}
+
+/** Both Home columns: the main one (evaluations, reports, cases) and the 380px side one (events, announcements, posts). */
+function DashboardPanel({ data, role, loading }: { data: Item; role: string; loading?: boolean }) {
   const allow = useAllow()
   const session = useQuery(sessionQuery())
   const me = session.data?.user.id
@@ -236,9 +243,10 @@ function DashboardPanel({ data, role, quick, loading }: { data: Item; role: stri
     .slice(0, 3)
   const submitted = assignments.filter((item) => /submitted/i.test(text(item.status))).length
   const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
-  const empty =
-    reports.length + cases.length + sections.length + consultations.length + announcements.length + posts.length +
-      events.length + pendingEvaluations.length === 0
+  // The main column can be empty while the side one is not (a secretary or organization has no case lists; a chair's
+  // queue can be empty), so it says so itself instead of leaving a blank space.
+  const mainEmpty = reports.length + cases.length + sections.length + pendingEvaluations.length === 0
+  const emptyText = mainEmptyText(role)
 
   if (loading) {
     return (
@@ -249,7 +257,6 @@ function DashboardPanel({ data, role, quick, loading }: { data: Item; role: stri
           <aside className="hm-col hm-side">
             <Panel flush title="Coming up"><SkeletonRows count={3} /></Panel>
             <Panel flush title="Announcements"><SkeletonRows count={3} /></Panel>
-            {quick}
           </aside>
         </div>
       </div>
@@ -278,9 +285,9 @@ function DashboardPanel({ data, role, quick, loading }: { data: Item; role: stri
       )}
       <div className="hm-cols">
         <div className="hm-col accs-stagger">
-          {empty && (
-            <Panel>
-              <Empty title="Nothing here yet">Reports, events, and announcements for your role show up here once they exist.</Empty>
+          {mainEmpty && (
+            <Panel title={emptyText.panel}>
+              <Empty title={emptyText.title}>{emptyText.body}</Empty>
             </Panel>
           )}
           <div className="hm-pair">
@@ -457,7 +464,6 @@ function DashboardPanel({ data, role, quick, loading }: { data: Item; role: stri
               </Rows>
             </Panel>
           )}
-          {quick}
         </aside>
       </div>
     </div>
@@ -562,7 +568,6 @@ function HomeDashboard({ page }: { page?: PageEnvelope }) {
   const pill = scope
     ? (scope.includes(roleName) ? scope : `${scope} · ${roleName}`)
     : [user?.program ?? (role === 'dean' ? 'CCS' : ''), roleName].filter(Boolean).join(' · ')
-  const quick = session.data ? <QuickAccess session={session.data} /> : undefined
   // The role views sit in the top bar from tablet width up; phones keep them on the page, where the bar has no room.
   const topSlot = useTopSlot()
   const views = (
@@ -586,10 +591,10 @@ function HomeDashboard({ page }: { page?: PageEnvelope }) {
       {tabbed && (topSlot ? createPortal(views, topSlot) : <div className="hm-views">{views}</div>)}
       {tabbed ? (
         <SwapView id={role}>
-          <DashboardPanel data={panel} role={role} quick={quick} loading={!page} />
+          <DashboardPanel data={panel} role={role} loading={!page} />
         </SwapView>
       ) : (
-        <DashboardPanel data={panel} role={role} quick={quick} loading={!page} />
+        <DashboardPanel data={panel} role={role} loading={!page} />
       )}
     </div>
   )
@@ -640,7 +645,7 @@ function LoadingPage({ pageId }: { pageId: string }) {
   if (communityLists.includes(pageId)) return <LoadingLayout><CommunityPage page={page} /></LoadingLayout>
   if (scheduleLists.includes(pageId)) return <LoadingLayout><SchedulePage page={page} /></LoadingLayout>
   if (grievanceLists.includes(pageId)) return <LoadingLayout><GrievancePage page={page} /></LoadingLayout>
-  return <PageLoading title={pageTitles[pageId] || 'page'} kpis={3} />
+  return <PageLoading pageId={pageId} title={pageTitles[pageId] || 'page'} kpis={3} />
 }
 
 export function PageScreen({ pageId }: { pageId: string }) {
