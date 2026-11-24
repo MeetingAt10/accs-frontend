@@ -1,11 +1,12 @@
 import { Button, Icon, Row, type IconName } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
-import { type ErrorComponentProps, useRouter } from '@tanstack/react-router'
+import { type ErrorComponentProps, useRouter, useRouterState } from '@tanstack/react-router'
 import { type ReactNode, useEffect } from 'react'
 
 import { reportError } from '@/lib/observability'
 import { sessionQuery } from '@/lib/queries'
 import { landingFor } from '@/lib/sites'
+import { PageSkeleton } from './skeleton-page'
 
 import './sites.css'
 
@@ -83,5 +84,17 @@ export function RouteError({ error }: ErrorComponentProps) {
     >
       This page ran into a problem. Try again, or go back to a page that works.
     </FallbackScreen>
+  )
+}
+
+/** Router-wide `defaultPendingComponent` (and the session check's): grey placeholders instead of a blank screen while a redirect or load settles. */
+export function RoutePending() {
+  const path = useRouterState({ select: (state) => state.location.pathname })
+  // Sign-in and first-login are not app pages: show only the themed page background, no app-shaped skeleton.
+  if (path === '/sign-in' || path === '/first-login') return null
+  return (
+    <div className="pg-skel-page">
+      <PageSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />
+    </div>
   )
 }

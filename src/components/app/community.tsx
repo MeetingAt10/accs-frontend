@@ -56,7 +56,7 @@ import {
 import { Comment, CommentThread } from '@/components/ds-next'
 import { SubjectList, SubjectMaterials } from '@/components/app/materials'
 import { QueryProblem } from '@/components/app/query-problem'
-import { ReactionBar, readReactions, topReactions } from '@/components/app/reactions'
+import { ReactionBar, readReactions, topReactions, type ReactionId } from '@/components/app/reactions'
 import {
   performPageAction,
   type PageAction,
@@ -64,7 +64,9 @@ import {
   type Session,
 } from '@/lib/api'
 import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
+import { useLocalDraft } from '@/lib/local-draft'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { canOpenPath } from '@/lib/sites'
 import { replaceFilters } from '@/lib/url-filters'
 import { TypedSearch } from '@/components/app/typed-search'
 import './community.css'
@@ -109,6 +111,7 @@ export interface CommunityPost {
   owned: boolean
   reactionCount: number
   reacted: boolean
+  canReact?: boolean
   commentCount: number
   /** Pictures and files posted with it. */
   attachments?: MessageFile[]
@@ -149,6 +152,10 @@ export const isSectionGroup = (space: { title: string; subject: string }) => !sp
 /** A space's name: "SBIT3A" for a section group, "SBIT3A - CC 104 Data Structures" for one of its subjects. */
 export const spaceName = (space: { title: string; subject: string }) => isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} - ${space.subject}`
 /** Spaces in one order: by section code, the section group first, then its subjects by name. */
+/** Newest comment or the post itself: the tie-break for "Most active". */
+const lastActivity = (post: CommunityPost) =>
+  post.comments.reduce((latest, comment) => (comment.at > latest ? comment.at : latest), post.at)
+
 export function sortBySection<T extends { title: string; subject: string }>(spaces: T[]) {
   return [...spaces].sort((a, b) => sectionCode(a).localeCompare(sectionCode(b)) || Number(isSectionGroup(b)) - Number(isSectionGroup(a)) || a.subject.localeCompare(b.subject))
 }
@@ -268,6 +275,39 @@ function useCommunityAction(pageId: string) {
       toast(result.message, { tone: 'success' })
     },
   })
+}
+
+/**
+ * One reaction button for a post: the new reaction shows on the first press (held locally until the server answers,
+ * then the refetched data takes over); the button is disabled only while the request is in flight.
+ */
+function PostReactionBar({ post, disabled, size }: { post: CommunityPost; disabled: boolean; size?: "md" | "sm" }) {
+  const queryClient = useQueryClient()
+  const [held, setHeld] = useState<Record<string, unknown> | null>(null)
+  const react = useMutation({
+    mutationFn: (reaction: ReactionId) => performPageAction('P06', { action: 'react', recordId: post.id, payload: { reaction } }),
+    onMutate: (reaction) => {
+      const { counts, mine } = readReactions(post as unknown as Record<string, unknown>)
+      const next = { ...counts }
+      if (mine) next[mine] -= 1
+      if (reaction !== mine) next[reaction] += 1
+      setHeld({ ...post, reactionCounts: next, myReaction: reaction === mine ? null : reaction })
+    },
+    // Not awaited: the button re-enables when the server answers, not after the refetch.
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['page'] }).then(() => setHeld(null)) },
+  })
+  return (
+    <>
+      <ReactionBar
+        item={held ?? (post as unknown as Record<string, unknown>)}
+        size={size}
+        disabled={disabled}
+        pending={react.isPending}
+        onReact={(reaction) => react.mutate(reaction)}
+      />
+      {react.error && <span role="alert" className="fx-review">{react.error.message}</span>}
+    </>
+  )
 }
 
 function ActionError({ error }: { error: unknown }) {
@@ -451,6 +491,7 @@ function ThreadList({
                     <span><span className="accs-num">{files}</span>{files === 1 ? ' file' : ' files'}</span>
                   </span>
                 ) : null}
+                {!post.removed && post.canReact === true && <PostReactionBar post={post} disabled={false} size="sm" />}
                 {!post.removed && <RowComment post={post} />}
               </div>
             </motion.li>
@@ -669,7 +710,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     )
     .sort((a, b) =>
       sort === 'active'
-        ? b.commentCount + b.reactionCount - a.commentCount - a.reactionCount
+        ? b.commentCount + b.reactionCount - a.commentCount - a.reactionCount ||
+          lastActivity(b).localeCompare(lastActivity(a))
         : b.at.localeCompare(a.at),
     )
   const pageCount = Math.max(1, Math.ceil(posts.length / 10))
@@ -701,8 +743,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
       <PageHeader
         title="Feed"
         description="Posts and announcements from the groups you belong to."
-        // The composer card below says "Share an update", so this is the one "Start a discussion" (QA 17 November: it
-        // was there twice). It shows disabled while posting is paused.
+        // The composer card below is the one way to start a post (QA 17 and 24 November: it was there twice). The
+        // header button only shows, disabled, while posting is paused and there is no composer.
         actions={
           <div className="fx-head-actions">
             <div className="fx-head-search">
@@ -714,12 +756,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
                 onChange={(q) => update({ q })}
               />
             </div>
-            {canParticipate && (
-              <Button
-                icon="plus"
-                href={canPost ? composeHref : '/feed/new'}
-                isDisabled={!canPost}
-              >
+            {canParticipate && !canPost && (
+              <Button icon="plus" href="/feed/new" isDisabled>
                 Start a discussion
               </Button>
             )}
@@ -903,9 +941,12 @@ export function PostComposer({
   const [audience, setAudience] = useState(
     initialOptions.includes(requestedAudience) ? requestedAudience : '',
   )
-  const [label, setLabel] = useState('')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  // Text survives a reload; attachments do not.
+  const [text, setText, clearText] = useLocalDraft(`accs-post-draft-${session.user.id}`, { label: '', title: '', body: '' })
+  const { label, title, body } = text
+  const setLabel = (value: string) => setText((current) => ({ ...current, label: value }))
+  const setTitle = (value: string) => setText((current) => ({ ...current, title: value }))
+  const setBody = (value: string) => setText((current) => ({ ...current, body: value }))
   const uploads = useFileUploads(10)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
@@ -993,6 +1034,7 @@ export function PostComposer({
       })
       const created = record<CommunityPost>(result.record)
       allowLeave.current = true
+      clearText()
       router.history.push(
         created?.id ? `/feed/${encodeURIComponent(created.id)}` : '/feed',
       )
@@ -1249,7 +1291,7 @@ export function PostComposer({
           <Button
             variant="destructive"
             onPress={() => {
-              if (blocker.status === 'blocked') blocker.proceed()
+              if (blocker.status === 'blocked') { clearText(); blocker.proceed() }
             }}
           >
             Discard post
@@ -1520,14 +1562,7 @@ function PostDetailPage({
         <Panel as="div" className="fx-post-panel">
           <PostView post={post} />
           <div className="fx-actions">
-            <ReactionBar
-              item={post as unknown as Record<string, unknown>}
-              disabled={page.data.canReact !== true}
-              pending={action.isPending && action.variables?.action === 'react'}
-              onReact={(reaction) =>
-                action.mutate({ action: 'react', recordId: post.id, payload: { reaction } })
-              }
-            />
+            <PostReactionBar post={post} disabled={page.data.canReact !== true} />
             {page.data.canComment === true && (
               <Button variant="tertiary" icon="chat" onPress={focusReply}>
                 Reply
@@ -1675,7 +1710,6 @@ function PostDetailPage({
                       label="Add a comment"
                       value={body}
                       onChange={setBody}
-                      isRequired
                       autoFocus
                       maxLength={4000}
                       showCount
@@ -1898,6 +1932,7 @@ function MemberList({
   /** The organization account manages its members and their positions (19 November 2026). */
   manage?: { organizationId: string; accountId?: string; students: StudentChoice[] }
 }) {
+  const session = useQuery(sessionQuery())
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const filtered = members.filter((member) =>
@@ -1941,7 +1976,7 @@ function MemberList({
                     <div className="fx-member__text">
                       {/* Opens their profile (QA 17 November: roster and member names did not). */}
                       <p className="accs-row__title">
-                        {member.id ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
+                        {member.id && session.data && canOpenPath(session.data, `/people/${encodeURIComponent(member.id)}`) ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
                       </p>
                       {academic && (
                         <p className="accs-row__sub">

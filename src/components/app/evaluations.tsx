@@ -68,6 +68,7 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
+import { useLocalDraft } from "@/lib/local-draft";
 import { pageQuery, sessionQuery } from "@/lib/queries";
 import { replaceFilters } from "@/lib/url-filters";
 
@@ -1717,7 +1718,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     ...(!title.trim() ? ["Name"] : []),
     ...(!instructions.trim() ? ["Instructions"] : []),
     ...(!opens || !closes || closes < opens
-      ? ["Open and close dates (close on or after open)"]
+      ? ["Close date must be on or after the open date."]
       : []),
     ...(!formQuestions.length ||
     formQuestions.some(
@@ -1729,6 +1730,10 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const completion = items(page.data.completion);
   const facultyCompletion = items(page.data.facultyCompletion);
   const facultyReviews = items(page.data.facultyReviews);
+  const reviewsOpen = facultyReviews.filter((review) => review.status !== "Reviewed").length;
+  const reviewBlock = reviewsOpen
+    ? `${reviewsOpen} faculty review${reviewsOpen === 1 ? " is" : "s are"} pending or ask for changes. Publish once all are reviewed.`
+    : "";
   const visible = (rows: Item[]) =>
     rows.filter(
       (entry) =>
@@ -2005,12 +2010,15 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             </StatusChip>
             {record.status === "Draft" && sendForReview}
             {record.status === "In review" && (
-              <Button
-                isDisabled={incomplete.length > 0}
-                onPress={() => setConfirmStatus("Published")}
-              >
-                Publish
-              </Button>
+              <>
+                {reviewBlock && <span className="ev-muted">{reviewBlock}</span>}
+                <Button
+                  isDisabled={incomplete.length > 0 || reviewsOpen > 0}
+                  onPress={() => setConfirmStatus("Published")}
+                >
+                  Publish
+                </Button>
+              </>
             )}
             {record.status === "Published" && (
               <Button
@@ -2130,7 +2138,10 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const formQuestions = questions(record.questions);
   const savedReview = items(record.reviews)[0];
   const [decisions, setDecisions] = useState<Record<string, string>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const me = useQuery(sessionQuery()).data?.user.id ?? "signed-in";
+  const [saved, setSaved, clearSaved] = useLocalDraft<{ comments: Record<string, string> }>(`accs-question-review-draft-${me}-${words(record.id)}`, { comments: {} });
+  const comments = saved.comments;
+  const setComments = (update: (current: Record<string, string>) => Record<string, string>) => setSaved((current) => ({ comments: update(current.comments) }));
   const [sent, setSent] = useState(false);
   const action = useEvaluationAction("P32");
   const readOnly = sent || page.data.canReview !== true;
@@ -2168,6 +2179,7 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         },
       });
       setSent(true);
+      clearSaved();
     } catch {
       // Comments remain available after an error.
     }

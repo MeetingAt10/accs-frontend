@@ -4,7 +4,7 @@ import { permissionGroup, permissionLabel, proposalWords } from './permission-wo
 
 describe('permission words', () => {
   it('names each permission in words, and keeps the code for an unknown one', () => {
-    expect(permissionLabel('post.anonymous')).toBe('Post anonymously')
+    expect(permissionLabel('post.anonymous')).toBe('Allow to post anonymously')
     expect(permissionLabel('restriction.manage')).toBe('Manage restrictions')
     expect(permissionLabel('new.thing')).toBe('new.thing')
     expect(permissionGroup('todo.manage')).toBe('Todo')

@@ -1,4 +1,5 @@
 import { featureLabels, filterRestrictions, newestFirst, type RestrictionFilters } from "@/lib/restrictions";
+import { canOpenPath } from "@/lib/sites";
 import { campusToday } from "@/lib/campus-date";
 import { useFocusDialogOnOpen } from "@/components/app/dialog-focus";
 import { PagedList } from '@/components/app/paging'
@@ -1015,7 +1016,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           value={rangeDraft.from ?? search.get("from") ?? ""}
           onChange={(value) => changeRange("from", value)}
           isInvalid={rangeProblem === "from"}
-          errorMessage={rangeProblem === "from" ? "Choose a date on or before the To date." : undefined}
+          errorMessage={rangeProblem === "from" ? "Start date must be on or before the end date." : undefined}
         />
         <TextField
           type="date"
@@ -1023,7 +1024,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           value={rangeDraft.to ?? search.get("to") ?? ""}
           onChange={(value) => changeRange("to", value)}
           isInvalid={rangeProblem === "to"}
-          errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
+          errorMessage={rangeProblem === "to" ? "End date must be on or after the start date." : undefined}
         />
         </div>
       </div>
@@ -1205,6 +1206,8 @@ function RecordList({ page }: { page: PageEnvelope }) {
         : role === "guidance"
           ? "Students in Guidance cases"
           : "Students under OSAS authority";
+  // Guidance and OSAS see a student only once a case reaches their office (offense records stay restricted).
+  const caseScoped = role === "guidance" || role === "osas";
   // Every CCS program for readers who see the whole college (BSIS was missing while no BSIS student was listed); a
   // Program Chair sees only their program, so they get no program filter.
   const programs = role === "chair"
@@ -1353,6 +1356,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
                           <span className="rc-tags">
                             <span className="accs-tag">{word(student.program, "—")}</span>
                             <span className="rc-muted">{word(student.sectionName, "Section " + word(student.section, "—"))}</span>
+                            {student.irregular === true && <StatusChip tone="neutral">Irregular</StatusChip>}
                           </span>
                         </td>
                         <td data-label="Standing">
@@ -1392,7 +1396,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
               ) : undefined
             }
           >
-            {filtered ? "Change the search or clear a filter." : undefined}
+            {filtered
+              ? "Change the search or clear a filter."
+              : caseScoped
+                ? "Students appear here once a case reaches your office. Other students are not listed."
+                : undefined}
           </Empty>
         </Panel>
       )}
@@ -1654,6 +1662,7 @@ function StudentRecord({
               <span className="accs-tag">{word(record.program, "—")}</span>
               <span>{word(record.sectionName, "Section " + word(record.section, "—"))}</span>
               <span>Year {word(record.year, "—")}</span>
+              {record.irregular === true && <StatusChip tone="neutral">Irregular</StatusChip>}
             </span>
           }
           actions={
@@ -1799,8 +1808,19 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
     setOpenRequestId("");
     setOpenId(id);
   };
-  const studentLink = (student: Item) =>
-    admin ? `/admin/users/${encodeURIComponent(word(student.id))}` : `/records?q=${encodeURIComponent(word(student.name))}`;
+  // Same record route as the records list when the viewer may open it (P34); administrators otherwise keep their user page.
+  const studentLink = (student: Item) => {
+    const id = encodeURIComponent(word(student.id));
+    const data = session.data;
+    if (!data) return undefined;
+    if (canOpenPath(data, "/records/" + id)) return "/records/" + id;
+    return canOpenPath(data, "/admin/users/" + id) ? "/admin/users/" + id : undefined;
+  };
+  const studentName = (student: Item) => {
+    const href = studentLink(student);
+    const name = word(student.name, "—");
+    return href ? <Link variant="quiet" href={href}>{name}</Link> : name;
+  };
   const submitApply = () =>
     action.mutate(
       {
@@ -1943,7 +1963,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             <Facts
               stacked
               rows={[
-                ["Student", <Link key="s" variant="quiet" href={studentLink(object(opened.student))}>{word(object(opened.student).name, "—")}</Link>],
+                ["Student", studentName(object(opened.student))],
                 ["Paused", features(opened).join(", ") || "—"],
                 ["Basis", word(opened.basis, "—")],
                 ["Decision reference", <span key="d" className="accs-mono">{word(opened.decisionReference, "—")}</span>],
@@ -1985,7 +2005,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             <Facts
               stacked
               rows={[
-                ["Student", <Link key="s" variant="quiet" href={studentLink(object(openedRequest.student))}>{word(object(openedRequest.student).name, "—")}</Link>],
+                ["Student", studentName(object(openedRequest.student))],
                 ["Requested change", word(openedRequest.change, "—")],
                 ["Reason", word(openedRequest.reason, "—")],
                 ["Requested by", word(object(openedRequest.actor).name, "—")],
@@ -2130,7 +2150,7 @@ function RestrictionRows({
 }: {
   rows: Item[];
   filtered: boolean;
-  studentLink: (student: Item) => string;
+  studentLink: (student: Item) => string | undefined;
   onOpen: (id: string) => void;
   onApply?: () => void;
 }) {

@@ -3,7 +3,7 @@ import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { RouteError, RouteNotFound } from '@/components/app/route-fallbacks'
+import { RouteError, RouteNotFound, RoutePending } from '@/components/app/route-fallbacks'
 import { initAnalytics, initObservability } from '@/lib/observability'
 import { authRedirectFor, sessionEndedHref, signedOutPaths } from '@/lib/session-errors'
 
@@ -47,6 +47,9 @@ const router = createRouter({
   // example) still takes over for its own errors; this only catches everything else.
   defaultNotFoundComponent: RouteNotFound,
   defaultErrorComponent: RouteError,
+  defaultPendingComponent: RoutePending,
+  defaultPendingMs: 150,
+  defaultPendingMinMs: 300,
 })
 
 declare module '@tanstack/react-router' {

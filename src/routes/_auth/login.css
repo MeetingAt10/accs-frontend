@@ -5,17 +5,19 @@
 .lg {
   --lg-navy: #032e87;
   --lg-navy-deep: #010b21;
-  --lg-field: #bbc0c9;
-  --lg-muted: rgb(0 0 0 / 50%);
+  --lg-field: light-dark(#bbc0c9, var(--accs-sunken));
+  --lg-ink: light-dark(#000, var(--accs-ink));
+  --lg-accent: light-dark(#032e87, var(--accs-link));
+  --lg-muted: light-dark(rgb(0 0 0 / 50%), var(--accs-muted));
   /* The shared auth rules (links, focus rings, submit) read --accs-navy; the design uses the brand navy here. */
   --accs-navy: var(--lg-navy);
   --accs-on-accent: #fff;
-  color-scheme: light;
-  background: #fff;
-  color: #000;
+  /* Follows the chosen theme (theme-boot sets color-scheme on html); the brand panel stays navy in both. */
+  background: var(--accs-paper);
+  color: var(--lg-ink);
   font-family: 'Inter Variable', 'Inter', var(--accs-font-body);
 }
-html:has(.lg) { background: #fff; }
+html:has(.lg) { background: var(--accs-paper); }
 
 /* Brand panel */
 .lg-brand {
@@ -70,7 +72,7 @@ html:has(.lg) { background: #fff; }
 .lg-col { max-width: 397px; }
 .lg .au-title {
   margin: 0 0 13px;
-  color: var(--lg-navy);
+  color: var(--lg-accent);
   font-family: inherit;
   font-size: 2rem;
   font-weight: 600;
@@ -80,7 +82,7 @@ html:has(.lg) { background: #fff; }
 .lg .au-title:has(+ .au-form) { margin-bottom: 35px; }
 .lg .au-sub {
   margin: 0 0 35px;
-  color: rgb(3 46 135 / 70%);
+  color: color-mix(in srgb, var(--lg-accent) 70%, transparent);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.072;
@@ -102,18 +104,18 @@ html:has(.lg) { background: #fff; }
   border: 0;
   border-radius: 10px;
   background: var(--lg-field);
-  color: #000;
+  color: var(--lg-ink);
 }
-.lg .au-input:hover { background: #b2b8c2; }
+.lg .au-input:hover { background: color-mix(in srgb, var(--lg-field) 93%, var(--lg-ink)); }
 /* Keep the grey field when the browser autofills it. */
-.lg .au-input:autofill { box-shadow: inset 0 0 0 100px var(--lg-field); -webkit-text-fill-color: #000; }
+.lg .au-input:autofill { box-shadow: inset 0 0 0 100px var(--lg-field); -webkit-text-fill-color: var(--lg-ink); }
 .lg .au-input:autofill:focus-visible { box-shadow: inset 0 0 0 100px var(--lg-field), 0 0 0 2px var(--lg-navy), 0 0 0 5px rgb(3 46 135 / 18%); }
 .lg .au-input:focus-visible { box-shadow: 0 0 0 2px var(--lg-navy), 0 0 0 5px rgb(3 46 135 / 18%); }
 .lg .au-input[aria-invalid='true'] { box-shadow: inset 0 0 0 2px var(--accs-danger); }
 .lg .au-input[aria-invalid='true']:focus-visible { box-shadow: inset 0 0 0 2px var(--accs-danger), 0 0 0 3px color-mix(in srgb, var(--accs-danger) 22%, transparent); }
 .lg .au-hint { color: var(--lg-muted); }
-.lg .au-eye { color: rgb(0 0 0 / 55%); }
-.lg .au-eye:hover, .lg .au-eye[aria-pressed='true'] { color: #000; }
+.lg .au-eye { color: var(--lg-muted); }
+.lg .au-eye:hover, .lg .au-eye[aria-pressed='true'] { color: var(--lg-ink); }
 
 /* Remember Me and Forgot Password? sit 36px under the password field; Sign In 35px under them. */
 .lg .au-row { margin: 10px 0 6px; }

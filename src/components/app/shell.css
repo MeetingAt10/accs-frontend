@@ -335,6 +335,8 @@
    page and Escape did nothing. A flex column keeps the same head/body/foot layout and lets the dialog take focus. */
 :root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 :root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog:focus-visible { outline: none; }
+/* The drawer body is auto-height, so the chat grew with its messages and .cm-chat__scroll (overscroll-behavior: contain) never overflowed, and the wheel went nowhere. A fixed height makes the message list the scroller. */
+:root .shell-assist-drawer .cm-chat { height: calc(100dvh - 12rem); }
 
 /* Skip link: brand navy with white text in both themes (the ink fill turned light in dark mode, under white text). */
 :root .shell .shell-skip { background: var(--accs-brand-800); color: var(--accs-on-brand); box-shadow: var(--accs-shadow-pop); }
@@ -382,3 +384,10 @@
 :root .shell .shell-side[data-collapsed] .shell-assist__icon { width: 20px; height: 20px; }
 /* With the sub-links hidden, the current site carries the highlight itself. */
 :root .shell .shell-side[data-collapsed] .shell-nav-item[data-section] { background: rgb(255 255 255 / 12%); color: var(--accs-on-brand); }
+
+/* Go to (Ctrl+K): sit near the top so the results list has room to open downward under the input. */
+.ds-modal-overlay:has(> .quick-jump) { place-items: start center; padding-top: 12dvh; }
+@media (max-width: 599.98px) {
+  .ds-modal-overlay:has(> .quick-jump) { place-items: start stretch; padding-top: 0; }
+  .quick-jump { border-radius: 0 0 var(--ds-radius-overlay) var(--ds-radius-overlay); }
+}

@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, useRouter, useRouterState } from '@tanstack/react-router'
 
 import { AccessDenied, RetryView } from '@/components/app/guards'
-import { PageSkeleton } from '@/components/app/skeleton-page'
+import { RoutePending } from '@/components/app/route-fallbacks'
 import { AppChrome } from '@/components/app/navigation'
 import { sessionCheckSignedOut, sessionQuery } from '@/lib/queries'
 import { titleForPath } from '@/lib/page-catalog'
@@ -23,7 +23,7 @@ export const Route = createFileRoute('/_app')({
   },
   errorComponent: SessionErrorView,
   // A slow session check shows grey placeholders in the page's shape instead of a blank screen.
-  pendingComponent: SessionPending,
+  pendingComponent: RoutePending,
   pendingMs: 150,
   component: AppLayout,
 })
@@ -33,15 +33,6 @@ export const Route = createFileRoute('/_app')({
 function SessionErrorView() {
   const router = useRouter()
   return <RetryView onRetry={() => void router.invalidate()} />
-}
-
-function SessionPending() {
-  const path = useRouterState({ select: (state) => state.location.pathname })
-  return (
-    <div className="pg-skel-page">
-      <PageSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />
-    </div>
-  )
 }
 
 function AppLayout() {

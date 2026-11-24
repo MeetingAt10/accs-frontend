@@ -25,6 +25,9 @@ describe('canAddRole', () => {
     expect(canAddRole(['professor'], 'dean')).toBe(true)
     expect(canAddRole(['professor', 'dean'], 'chair')).toBe(false)
     expect(canAddRole(['professor', 'dean'], 'dean')).toBe(true)
+    expect(canAddRole(['dean'], 'secretary')).toBe(false)
+    expect(canAddRole(['osas'], 'professor')).toBe(false)
+    expect(canAddRole(['professor'], 'administrator')).toBe(false)
   })
 })
 
@@ -32,6 +35,7 @@ describe('sectionProblem', () => {
   it('takes letters only', () => {
     expect(sectionProblem('A')).toBeUndefined()
     expect(sectionProblem('')).toBeUndefined()
+    expect(sectionProblem('AB')).toBe('Use the section letter, like A.')
     expect(sectionProblem('200')).toBe('Use the section letter, like A.')
   })
 })
@@ -42,7 +46,7 @@ describe('full section names (QA 19 November)', () => {
     expect(sectionPrefix({ campus: 'SB', program: 'BSIT', year: 4 })).toBe('SBIT4')
     expect(sectionPrefix({ program: 'BSCS', year: 2 })).toBe('SBCS2')
     expect(sectionLetter('SBIT4A', 'SBIT4')).toBe('A')
-    expect(sectionLetter('sbit4ab', 'SBIT4')).toBe('AB')
+    expect(sectionLetter('sbit4ab', 'SBIT4')).toBeUndefined()
     expect(sectionLetter('A', 'SBIT4')).toBe('A')
     expect(sectionLetter('SBCS4A', 'SBIT4')).toBeUndefined()
     expect(sectionLetter('SBIT3A', 'SBIT4')).toBeUndefined()

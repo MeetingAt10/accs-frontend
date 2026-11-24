@@ -656,3 +656,7 @@ select {
 :root .ds-btn--secondary:not(:disabled, [data-disabled], .ds-section--plate *) { border-color: var(--accs-line); background: var(--accs-surface); color: var(--accs-ink); }
 :root .ds-btn--tertiary:not(.ds-section--plate *) { color: var(--accs-ink); }
 :root .ds-btn--secondary:not(:disabled, [data-disabled], .ds-section--plate *):is(:hover, [data-hovered]) { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
+
+/* Date pickers: always reserve 6 week rows so the popover (which opens above the field) keeps one height and the month arrows do not jump. */
+:root .ds-calendar { align-content: start; min-height: calc(var(--ds-size-control-sm) + var(--ds-space-12) + 2px + 1rem + 6px + 6 * (2.5rem + 2px)); }
+@media (pointer: coarse) { :root .ds-calendar { min-height: calc(var(--ds-size-control-sm) + var(--ds-space-12) + 2px + 1rem + 6px + 6 * (var(--ds-size-touch-min) + 2px)); } }

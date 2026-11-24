@@ -205,7 +205,7 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
-/* View all and Mark all as read on one row under the list. */
+/* View all under the list. */
 .shell-bell__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .shell-top__tools { display: flex; align-items: center; gap: 4px; flex: none; }
 .shell-top__search { display: none; width: min(22rem, 30vw); margin-right: 8px; }
@@ -287,6 +287,10 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+/* Mark all as read on top, View all at the bottom: both stay in view while the list scrolls. */
+.shell-bell__head, .shell-bell__foot { position: sticky; z-index: 1; background: var(--ds-overlay-bg); }
+.shell-bell__head { top: 0; display: flex; justify-content: flex-end; padding-bottom: 4px; }
+.shell-bell__foot { bottom: 0; padding-top: 8px; }
 .ds-popover:has(.shell-bell__foot) .ds-next-notification-item__text { overflow-wrap: anywhere; }
 /* Hide on the paused-features banner, at the end of its row; once hidden, a dot on the avatar marks it (QA 17 November, V3). */
 .shell-banner__hide { margin-inline-start: auto; }

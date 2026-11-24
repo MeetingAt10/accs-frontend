@@ -27,6 +27,8 @@ export interface EventCalendarProps {
   events: CalendarEvent[]
   onDateChange?: (date: string) => void
   onEventPress?: (event: CalendarEvent) => void
+  /** Month view: a day was clicked (empty area or its number). Past days are not offered. */
+  onDateClick?: (date: string) => void
   label?: string
   startHour?: number
   endHour?: number
@@ -176,7 +178,8 @@ function Month({
   label,
   onDateChange,
   onEventPress,
-}: Pick<EventCalendarProps, 'date' | 'events' | 'onDateChange' | 'onEventPress'> & {
+  onDateClick,
+}: Pick<EventCalendarProps, 'date' | 'events' | 'onDateChange' | 'onEventPress' | 'onDateClick'> & {
   label: string
 }) {
   const [expanded, setExpanded] = useState<string>()
@@ -227,6 +230,10 @@ function Month({
                       key={value}
                       data-today={value === today || undefined}
                       data-selected={value === date || undefined}
+                      data-addable={(onDateClick && value >= today) || undefined}
+                      onClick={(event) => {
+                        if (event.target === event.currentTarget && value >= today) onDateClick?.(value)
+                      }}
                       data-outside={
                         day.getMonth() !== selected.getMonth() || undefined
                       }
@@ -244,6 +251,16 @@ function Month({
                       >
                         <time dateTime={value}>{day.getDate()}</time>
                       </button>
+                      {onDateClick && value >= today && (
+                        <button
+                          type="button"
+                          className="ec-add"
+                          onClick={() => onDateClick(value)}
+                          aria-label={`Add on ${longDay(day)}`}
+                        >
+                          +
+                        </button>
+                      )}
                       {dayEvents.length > 0 && (
                         <ul className="ec-chips">
                           {shown.map((event) => (
@@ -521,6 +538,7 @@ export function EventCalendar({
   events,
   onDateChange,
   onEventPress,
+  onDateClick,
   label = 'Events calendar',
   startHour = 7,
   endHour = 19,
@@ -562,6 +580,7 @@ export function EventCalendar({
               label={label}
               onDateChange={onDateChange}
               onEventPress={onEventPress}
+              onDateClick={onDateClick}
             />
           )}
           {view === 'week' && (

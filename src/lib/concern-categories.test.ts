@@ -23,9 +23,9 @@ describe('concern categories', () => {
     expect(cleanChoice({ category: 'Other (please specify)', subcategory: 'Other bullying', categoryDetail: 'Lost ID' }, options)).toEqual({ category: 'Other (please specify)', subcategory: '', categoryDetail: 'Lost ID' })
   })
 
-  it('asks for a sub-category, or a description for Other', () => {
+  it('asks for a description for Other', () => {
     expect(choiceProblems({ category: '', subcategory: '', categoryDetail: '' }, options)).toHaveProperty('category')
-    expect(choiceProblems({ category: 'Bullying', subcategory: '', categoryDetail: '' }, options)).toHaveProperty('subcategory')
+    expect(choiceProblems({ category: 'Bullying', subcategory: '', categoryDetail: '' }, options)).toEqual({})
     expect(choiceProblems({ category: 'Bullying', subcategory: 'Other bullying', categoryDetail: '' }, options)).toEqual({})
     expect(choiceProblems({ category: 'Other (please specify)', subcategory: '', categoryDetail: '   ' }, options)).toHaveProperty('categoryDetail')
     expect(choiceProblems({ category: 'Other (please specify)', subcategory: '', categoryDetail: 'Lost ID' }, options)).toEqual({})

@@ -875,6 +875,13 @@ function Topbar({
             ) : recentNotifications.length ? (
               <Stack gap={12}>
                 <BellCloser closeRef={closeBell} />
+                {unreadCount > 0 && (
+                  <div className="shell-bell__head">
+                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
+                      Mark all as read
+                    </Button>
+                  </div>
+                )}
                 <NotificationList>
                   {recentNotifications.map((notification) => (
                     <NotificationItem
@@ -893,18 +900,14 @@ function Topbar({
                   ))}
                 </NotificationList>
                 <div className="shell-bell__foot">
-                  <Link href="/notifications">View all notifications</Link>
-                  {unreadCount > 0 && (
-                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
-                      Mark all as read
-                    </Button>
-                  )}
+                  <Link href="/notifications" onPress={() => closeBell.current?.()}>View all notifications</Link>
                 </div>
               </Stack>
             ) : (
               <Stack gap={12}>
+                <BellCloser closeRef={closeBell} />
                 <p>No new notifications.</p>
-                <Link href="/notifications">Open notifications</Link>
+                <Link href="/notifications" onPress={() => closeBell.current?.()}>Open notifications</Link>
               </Stack>
             )}
           </Popover>
@@ -923,7 +926,7 @@ function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen
   const router = useRouter();
   const items = jumpItems(visibleEntries(session).map((entry) => ({ label: entry.label, href: entry.href })), session.allowedPages);
   return (
-    <Modal title="Go to" isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal title="Go to" className="quick-jump" isOpen={isOpen} onOpenChange={onOpenChange}>
       <ModalBody>
         <ComboBox
           label="Page or action"

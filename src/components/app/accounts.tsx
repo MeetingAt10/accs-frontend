@@ -52,6 +52,7 @@ import {
   ApiError,
   createFaculty,
   createStudents,
+  enrollStudents,
   getAccountTypes,
   getAdvisors,
   listAccounts,
@@ -71,6 +72,7 @@ import {
   type RowResult,
 } from '@/lib/api'
 import { sessionQuery } from '@/lib/queries'
+import { sectionProblem } from '@/lib/role-rules'
 
 import './accounts.css'
 
@@ -1094,8 +1096,34 @@ function StudentList() {
     placeholderData: keepPreviousData,
   })
   const toggle = useToggleActive()
+  const refresh = useRefresh()
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [enrolling, setEnrolling] = useState(false)
+  const [year, setYear] = useState('')
+  const [section, setSection] = useState('')
+  const enroll = useMutation({
+    mutationFn: () => enrollStudents({ ids: (students.data?.accounts ?? []).filter((student) => selected.has(student.id)).map((student) => student.id), ...(year ? { year: Number(year) } : {}), ...(section.trim() ? { section: section.trim() } : {}) }),
+    onSuccess: async ({ message }) => {
+      toast(message, { tone: 'success' })
+      setSelected(new Set())
+      setEnrolling(false)
+      setYear('')
+      setSection('')
+      await refresh()
+    },
+  })
   const list = students.data?.accounts ?? []
   const total = students.data?.total ?? 0
+  const picked = list.filter((student) => selected.has(student.id))
+  const everyone = list.length > 0 && picked.length === list.length
+  const pick = (id: string, on: boolean) =>
+    setSelected((previous) => {
+      const next = new Set(previous)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  const sectionError = sectionProblem(section)
 
   return (
     <Panel
@@ -1116,7 +1144,54 @@ function StudentList() {
           value={search}
           onChange={setSearch}
         />
+        <Checkbox
+          isSelected={everyone}
+          isIndeterminate={picked.length > 0 && !everyone}
+          onChange={(on) => setSelected(on ? new Set(list.map((student) => student.id)) : new Set())}
+        >
+          Select all
+        </Checkbox>
+        <span className="acct-muted" aria-live="polite">
+          {picked.length} selected
+        </span>
+        <div className="acct-actions">
+          <Button size="sm" variant="secondary" isDisabled={!picked.length} onPress={() => setEnrolling(true)}>
+            Set year and section
+          </Button>
+        </div>
       </div>
+      <Modal title={`Set year and section for ${plural(picked.length, 'student')}`} isOpen={enrolling} onOpenChange={(open) => !enroll.isPending && setEnrolling(open)}>
+        <ModalBody>
+          <Select label="Year level" placeholder="Keep each student's year" selectedKey={year || null} onSelectionChange={(key) => setYear(key ? String(key) : '')}>
+            {[1, 2, 3, 4].map((level) => (
+              <SelectOption key={level} id={String(level)}>{`${level}${['st', 'nd', 'rd', 'th'][level - 1]} year`}</SelectOption>
+            ))}
+          </Select>
+          <TextField
+            label="Section letter"
+            placeholder="A"
+            value={section}
+            onChange={(value) => setSection(value.toUpperCase())}
+            maxLength={1}
+            isInvalid={Boolean(sectionError)}
+            errorMessage={sectionError}
+            description="Leave empty to keep each student's section."
+          />
+          {enroll.error && (
+            <Alert tone="danger" title="No student was changed">
+              {errorText(enroll.error)}
+            </Alert>
+          )}
+        </ModalBody>
+        <ModalActions>
+          <Button variant="secondary" isDisabled={enroll.isPending} onPress={() => setEnrolling(false)}>
+            Cancel
+          </Button>
+          <Button loading={enroll.isPending} isDisabled={(!year && !section.trim()) || Boolean(sectionError)} onPress={() => enroll.mutate()}>
+            Save
+          </Button>
+        </ModalActions>
+      </Modal>
       <Gate queries={[students]} what="students">
         {toggle.error && (
           <div className="acct-pad">
@@ -1134,6 +1209,9 @@ function StudentList() {
               <table className="accs-table acct-table acct-stack" aria-label="Student accounts">
                 <thead>
                   <tr>
+                    <th scope="col" className="acct-check">
+                      <span className="acct-sr">Select</span>
+                    </th>
                     <th scope="col">Name</th>
                     <th scope="col">Student ID</th>
                     <th scope="col">Program</th>
@@ -1148,6 +1226,9 @@ function StudentList() {
                 <tbody>
                   {shown.map((student) => (
                     <tr key={student.id}>
+                      <td className="acct-check">
+                        <Checkbox aria-label={`Select ${student.name}`} isSelected={selected.has(student.id)} onChange={(on) => pick(student.id, on)} />
+                      </td>
                       <td className="acct-main">
                         <span className="acct-person">
                           <strong>{student.name}</strong>

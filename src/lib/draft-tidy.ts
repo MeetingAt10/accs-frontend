@@ -2,7 +2,7 @@
 // lays them out under the headings an office reads first. It runs in the browser: the draft is not sent anywhere, and
 // nothing is invented. Facts that are missing are listed for the student to add, never filled in.
 
-export type DraftFacts = { narrative: string; occurredOn?: string; location?: string; category?: string }
+export type DraftFacts = { narrative: string; occurredOn?: string; ongoing?: boolean; location?: string; category?: string }
 export type TidyResult = { text: string; missing: string[] }
 
 /** One sentence: spaces collapsed, a capital first letter, " i " as "I", and a full stop if it has no ending. */
@@ -30,14 +30,15 @@ function longDate(value: string) {
   return `${Number(match[3])} ${months[Number(match[2]) - 1]} ${match[1]}`
 }
 
-export function tidyDraft({ narrative, occurredOn = '', location = '', category = '' }: DraftFacts): TidyResult {
+export function tidyDraft({ narrative, occurredOn = '', ongoing = false, location = '', category = '' }: DraftFacts): TidyResult {
   const what = tidySentences(narrative)
   const lines = [`What happened: ${what}`]
-  if (occurredOn.trim()) lines.push(`When: ${longDate(occurredOn.trim())}.`)
+  if (ongoing) lines.push('When: Ongoing.')
+  else if (occurredOn.trim()) lines.push(`When: ${longDate(occurredOn.trim())}.`)
   if (location.trim()) lines.push(`Where: ${sentence(location)}`)
   const missing: string[] = []
   if (what.split(/\s+/).length < 12) missing.push('More about what happened, in your own words')
-  if (!occurredOn.trim()) missing.push('When it happened (the date field)')
+  if (!ongoing && !occurredOn.trim()) missing.push('When it happened (the date field)')
   if (!location.trim()) missing.push('Where it happened (the place field)')
   if (!category.trim()) missing.push('The category that fits best')
   if (!/\b(want|hope|ask|request|please|would like|need)\b/i.test(narrative)) missing.push('What you would like the office to look at')
