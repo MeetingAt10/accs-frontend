@@ -44,6 +44,7 @@ import {
   RestrictedView,
   RetryView,
 } from "@/components/app/guards";
+import { AssistantMascot } from "@/components/app/assistant-mascot";
 import {
   ApiError,
   apiErrorText,
@@ -1218,6 +1219,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: reduce ? 0 : 0.34, ease }}
                   >
+                    {!message.own && <AssistantMascot still="happy" size={32} className="cm-msg__avatar" />}
                     <div className="cm-msg__bubble">
                       <span className="cm-msg__who">
                         {message.own ? "You" : "ACCS assistant"}
@@ -1243,12 +1245,14 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
             </ol>
           ) : (
             <div className="cm-welcome">
+              <AssistantMascot still="wave" size={96} className="cm-welcome__mascot" />
               <h2>Ask about ACCS</h2>
               <p>Pick a suggestion or type your own question.</p>
             </div>
           )}
           {action.isPending && (
             <div className="cm-typing" role="status">
+              <AssistantMascot still="thinking" size={32} />
               <span className="cm-dots" aria-hidden>
                 <i />
                 <i />

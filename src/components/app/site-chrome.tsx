@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { pageQuery } from '@/lib/queries'
 import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
-import { AssistantCard, assistantIcon, assistantIconName } from '@/components/app/assistant-icon'
+import { AssistantCard, AssistantIcon, assistantIconName } from '@/components/app/assistant-icon'
 import logoMark from '@/components/app/shell-logo-mark.svg'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
@@ -316,7 +316,7 @@ export function SiteNav({
               >
                 {isCurrent && <motion.span layoutId="side-pill" className="shell-nav-item__pill" transition={slide} aria-hidden />}
                 {entry.icon && (entry.icon === assistantIconName
-                  ? <Icon icon={assistantIcon} size={20} />
+                  ? <AssistantIcon size={20} />
                   : <Icon name={entry.icon as never} size={20} />)}
                 {entry.label}
               </NavLink>

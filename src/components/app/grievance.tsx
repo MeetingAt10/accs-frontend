@@ -259,7 +259,13 @@ function DraftHelp({ draft, isOpen, onOpenChange, onUse }: { draft: Draft; isOpe
   const [missing, setMissing] = useState<string[] | null>(first.text ? first.missing : null)
   const action = useAction('P19')
   const reply = words(object(action.data?.record).reply)
-  // Rewrites the student's own words in the browser: nothing is sent, nothing is invented (lib/draft-tidy.ts).
+  // "Tidy up" rewrites the student's own words in the browser: nothing is sent, nothing is invented (lib/draft-tidy.ts).
+  // "Organize with the assistant" sends the draft to the assistant, which reorganizes it without adding facts; the result
+  // lands in the box for review, never straight in the report.
+  const organize = () => action.mutate(
+    { action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.', ...(candidate.trim() ? { draft: candidate.trim() } : {}) } },
+    { onSuccess: (result) => { const text = words(object(result.record).draft); if (text) { setCandidate(text); setMissing(null) } } },
+  )
   const tidy = () => {
     const result = tidyDraft({ narrative: candidate, occurredOn: draft.ongoing ? '' : draft.occurredOn, ongoing: draft.ongoing, location: draft.location, category: draft.category })
     if (result.text) setCandidate(result.text)
@@ -268,11 +274,11 @@ function DraftHelp({ draft, isOpen, onOpenChange, onUse }: { draft: Draft; isOpe
   return (
     <Drawer title="Help with your draft" isOpen={isOpen} onOpenChange={onOpenChange}>
       <div className="gv-stack">
-        <Alert tone="neutral" title="The assistant helps you write">It tidies your own words and lays them out for the office. It doesn't decide what happened or add anything you didn't write.</Alert>
+        <Alert tone="neutral" title="The assistant helps you write">It tidies or organizes your own words and marks what is missing. It doesn't decide what happened or add anything you didn't write.</Alert>
         <TextArea label="Your draft" value={candidate} onChange={(value) => { setCandidate(value); setMissing(null) }} maxLength={4000} showCount description="Edit it here, then use it in your report." />
         <div className="gv-actions">
           <Button variant="secondary" icon="pencil" isDisabled={!candidate.trim() || missing !== null} onPress={tidy}>Tidy up my draft</Button>
-          <Button variant="tertiary" loading={action.isPending} onPress={() => action.mutate({ action: 'assistantAsk', payload: { question: 'Help me write and organize my report draft.' } })}>Writing tips</Button>
+          <Button variant="tertiary" loading={action.isPending} onPress={organize}>{candidate.trim() ? 'Organize with the assistant' : 'Writing tips'}</Button>
         </div>
         {missing && (missing.length
           ? <Alert tone="info" title="You could also add">
