@@ -1,36 +1,31 @@
-/* First-run onboarding dialog. */
-.ob { display: grid; gap: 16px; }
-.ob-steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.ob-steps li { flex: 1; height: 4px; border-radius: 2px; background: var(--accs-line); transition: background-color 200ms var(--accs-ease, ease); }
-.ob-steps li[data-on] { background: var(--accs-link); }
-.ob-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.ob-welcome { display: grid; gap: 10px; color: var(--accs-ink-2); line-height: 1.55; }
-.ob-welcome p { margin: 0; }
-.ob-role {
-  justify-self: start;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--accs-tint);
-  color: var(--accs-link);
-  font-size: 0.8125rem;
-  font-weight: 600;
+/* Guided tour: a dim layer, an outlined control, and a card beside it. */
+.tour { position: fixed; inset: 0; z-index: 1000; }
+.tour-block { position: absolute; inset: 0; }
+.tour-block[data-dim] { background: rgb(0 0 0 / 55%); }
+.tour-spot {
+  position: fixed;
+  border-radius: 10px;
+  outline: 2px solid var(--accs-on-brand, #fff);
+  box-shadow: 0 0 0 4px var(--accs-link), 0 0 0 100vmax rgb(0 0 0 / 55%);
+  pointer-events: none;
+  transition: top 200ms var(--accs-ease, ease), left 200ms var(--accs-ease, ease), width 200ms var(--accs-ease, ease), height 200ms var(--accs-ease, ease);
 }
-.ob-lead { margin: 0; color: var(--accs-muted); font-size: 0.875rem; }
-.ob-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.ob-list li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 4px; border-top: 1px solid var(--accs-line); }
-.ob-list li:first-child { border-top: 0; }
-.ob-icon {
+.tour-card {
+  position: fixed;
   display: grid;
-  flex: none;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--accs-radius-control);
-  background: var(--accs-tint);
-  color: var(--accs-link);
+  gap: 8px;
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 24px));
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--accs-surface, #fff);
+  color: var(--accs-ink);
+  box-shadow: var(--accs-shadow-pop);
+  outline: none;
 }
-.ob-item { display: grid; gap: 2px; min-width: 0; }
-.ob-item__title { color: var(--accs-ink); font-size: 0.9375rem; font-weight: 600; }
-a.ob-item__title { color: var(--accs-link); text-decoration: none; }
-a.ob-item__title:hover { text-decoration: underline; }
-.ob-item__about { color: var(--accs-muted); font-size: 0.8125rem; line-height: 1.45; }
+.tour-count { margin: 0; color: var(--accs-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; }
+.tour-title { margin: 0; font-size: 1.0625rem; font-weight: 700; }
+.tour-text { margin: 4px 0 0; color: var(--accs-ink-2); font-size: 0.875rem; line-height: 1.5; }
+.tour-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.tour-actions__gap { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }

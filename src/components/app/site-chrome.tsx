@@ -6,6 +6,7 @@ import { SidebarSimpleIcon } from '@meetingat10/design-system/icons'
 import { AssistantCard, AssistantIcon, assistantIconName } from '@/components/app/assistant-icon'
 import logoKey from '@/components/app/shell-logo-key.svg'
 import { useRouter } from '@tanstack/react-router'
+import { replayOnboarding } from '@/components/app/onboarding'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
 
@@ -43,7 +44,7 @@ export function NavLink({
     router.history.push(href)
   }
   return (
-    <a {...rest} href={router.history.createHref(href)} onClick={click}>
+    <a {...rest} href={router.history.createHref(href)} data-nav={href} onClick={click}>
       {children}
     </a>
   )
@@ -116,7 +117,7 @@ function SiteList({
             >
               {isPage && <motion.span layoutId={`${layoutId}-pill`} className="shell-nav-item__pill" transition={slide} aria-hidden />}
               <Icon name={site.icon as never} size={20} />
-              {site.label}
+              <span className="shell-nav-item__label">{site.label}</span>
             </NavLink>
             {open && (
               <div className="shell-sub" id={subId}>
@@ -154,8 +155,28 @@ export function SitePanel({
       return false
     }
   })
+  // Folded rail opens while the pointer rests on it (the page moves over with it) and folds again when it leaves.
+  const [peek, setPeek] = useState(false)
+  const peekTimer = useRef<number | undefined>(undefined)
+  // After a click folds the panel, the pointer is still on it: wait for it to leave before peeking again.
+  const peekArmed = useRef(true)
+  useEffect(() => () => window.clearTimeout(peekTimer.current), [])
+  function onPointerEnter(event: { pointerType: string }) {
+    if (!collapsed || !peekArmed.current || event.pointerType !== 'mouse') return
+    peekTimer.current = window.setTimeout(() => setPeek(true), 150)
+  }
+  function onPointerLeave() {
+    window.clearTimeout(peekTimer.current)
+    peekArmed.current = true
+    setPeek(false)
+  }
+  const folded = collapsed && !peek
   function toggle() {
-    const next = !collapsed
+    // Clicking the logo while peeking pins the panel open.
+    const next = peek ? false : !collapsed
+    window.clearTimeout(peekTimer.current)
+    setPeek(false)
+    peekArmed.current = !next
     setCollapsed(next)
     try {
       localStorage.setItem(sideKey, next ? 'collapsed' : 'open')
@@ -164,16 +185,23 @@ export function SitePanel({
     }
   }
   return (
-    <aside className="shell-side" aria-label="Main navigation" data-collapsed={collapsed || undefined}>
+    <aside
+      className="shell-side"
+      aria-label="Main navigation"
+      data-collapsed={folded || undefined}
+      data-peek={peek || undefined}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
       <div className="shell-side__head">
         {/* The logo folds the panel to an icon rail and opens it again. */}
         <button
           type="button"
           className="shell-side__toggle"
-          aria-expanded={!collapsed}
+          aria-expanded={!folded}
           aria-controls="shell-side-nav"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed && !peek ? 'Expand sidebar' : peek ? 'Keep sidebar open' : 'Collapse sidebar'}
+          title={collapsed && !peek ? 'Expand sidebar' : peek ? 'Keep sidebar open' : 'Collapse sidebar'}
           onClick={toggle}
         >
           <ShellBrand />
@@ -292,6 +320,10 @@ export function AccountMenu({
                 {link.label}
               </NavLink>
             ))}
+            <button type="button" className="shell-menu__item" onClick={() => { setOpen(false); replayOnboarding() }}>
+              <Icon name="info" size={16} />
+              Replay walkthrough
+            </button>
             <button type="button" className="shell-menu__item shell-menu__item--danger" onClick={onSignOut}>
               <Icon name="sign-out" size={16} />
               Sign out
@@ -338,7 +370,7 @@ export function SiteNav({
                 {entry.icon && (entry.icon === assistantIconName
                   ? <AssistantIcon size={20} />
                   : <Icon name={entry.icon as never} size={20} />)}
-                {entry.label}
+                <span className="shell-nav-item__label">{entry.label}</span>
               </NavLink>
             )
           })}
