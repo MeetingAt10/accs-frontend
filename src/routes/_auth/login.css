@@ -25,7 +25,17 @@ html:has(.lg) { background: var(--accs-paper); }
   overflow: hidden;
   isolation: isolate;
   color: #fff;
-  background: linear-gradient(180deg, var(--lg-navy) 0%, var(--lg-navy-deep) 100%);
+  /* The landing hero's night sky (access-ccs.com), stopping at its cobalt band so the white copy keeps its contrast. */
+  background: linear-gradient(180deg, #040824 0%, #0b1a6b 42%, #2a4bf0 100%);
+}
+/* The landing starfield (1440 x 420), centred across the top of the panel. */
+.lg-brand__stars {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: 420px;
+  background: no-repeat center top;
+  pointer-events: none;
 }
 /* Faint building photo: 10% opacity, 134px from the top of an 844px panel, cropped as in the frame. */
 .lg-brand__photo {
@@ -38,27 +48,61 @@ html:has(.lg) { background: var(--accs-paper); }
   overflow: hidden;
   opacity: 0.1;
   pointer-events: none;
+  /* Fades out at the foot so the photo has no hard edge against the sky. */
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
 }
 .lg-brand__photo img { position: absolute; top: -0.1%; left: -39.57%; width: 192.99%; height: 105.64%; max-width: none; }
-/* Lion: 440.59 x 417.95 at 844px tall, rotated -10.55deg, centred 53px from the right and 163px from the bottom. */
-.lg-brand__lion {
-  --lion-w: 150px;
-  position: absolute;
-  z-index: -1;
-  right: calc(var(--lion-w) * -0.3793);
-  bottom: calc(var(--lion-w) * -0.1038);
-  width: var(--lion-w);
-  height: auto;
+/* The form card (the landing's card: 20px radius, layered shadow) with the mascots peeking over its top edge. The
+   perch overlaps the card by --sink, and the card is painted above it, so the card hides their lower bodies. */
+.lg-col { position: relative; }
+.lg-perch {
+  --lion-w: 132px;
+  --sink: 34px;
+  position: relative;
+  z-index: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 0;
+  height: calc(var(--lion-w) * 0.982);
+  margin: 0 18px calc(var(--sink) * -1);
   pointer-events: none;
 }
+.lg-perch__lion { width: var(--lion-w); }
+.lg-perch__cub { width: calc(var(--lion-w) * 0.74); margin-right: -6px; }
+.lg-card {
+  position: relative;
+  z-index: 1;
+  padding: 28px 24px 26px;
+  border-radius: 20px;
+  background: var(--accs-surface);
+  box-shadow: 0 0 0 1px var(--accs-line), 0 1px 2px rgb(12 23 48 / 5%), 0 18px 40px -18px rgb(12 23 48 / 28%);
+}
+.lg .lg-card .lg-note { margin-top: 26px; }
 
-/* Narrow screens: logo and headline on the left, the lion peeking in from the right. */
-.lg-brand__inner { display: flex; flex-direction: column; align-items: flex-start; padding: 24px 132px 28px 24px; }
+/* Mascots (-mascot.tsx). Three layers: .mascot leans, sways, nods and reacts; .mascot__breath breathes;
+   .mascot__face shows one face from the sheet (or plays the wave strip). Every body movement is a transform from
+   the feet (50% 97% of the cell), eased by the browser at the display's frame rate. */
+.mascot,
+.mascot__breath { display: block; transform-origin: 50% 97%; }
+.mascot { transition: transform 520ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+.mascot__face { display: block; width: 100%; background-repeat: no-repeat; }
+.mascot__face[data-waving] {
+  animation: mascot-wave var(--wave-duration) steps(var(--wave-frames), jump-none) var(--wave-delay) 1 both;
+}
+@keyframes mascot-wave {
+  from { background-position: 0% 0; }
+  to { background-position: 100% 0; }
+}
+
+/* Narrow screens: logo and headline on the left. */
+.lg-brand__inner { display: flex; flex-direction: column; align-items: flex-start; padding: 24px 24px 28px; }
 .lg-brand__logo { display: block; width: 172px; max-width: 100%; height: auto; }
 .lg-brand__headline {
   margin: 12px 0 0;
+  font-family: 'Poppins', var(--accs-font-body);
   font-size: 1.375rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.072;
   letter-spacing: -0.02em;
   text-align: left;
@@ -73,7 +117,7 @@ html:has(.lg) { background: var(--accs-paper); }
 .lg .au-title {
   margin: 0 0 13px;
   color: var(--lg-accent);
-  font-family: inherit;
+  font-family: 'Poppins', var(--accs-font-body);
   font-size: 2rem;
   font-weight: 600;
   line-height: 1.072;
@@ -144,21 +188,24 @@ html:has(.lg) { background: var(--accs-paper); }
 }
 .lg .au-link {
   min-height: 24px;
-  color: var(--lg-navy);
+  color: var(--lg-accent);
   font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
+/* The landing CTA shape: 12px radius, a lift and shadow on hover, a slight press. */
 .lg .au-submit {
-  min-height: 37px;
-  border-radius: 5px;
+  min-height: 46px;
+  border-radius: 12px;
   background: var(--lg-navy);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   box-shadow: none;
+  transition: transform 200ms var(--accs-ease), box-shadow 200ms var(--accs-ease), background 150ms var(--accs-ease);
 }
-.lg .au-submit:hover:not(:disabled) { background: #0a3a9e; box-shadow: 0 8px 18px -8px rgb(3 46 135 / 60%); }
+.lg .au-submit:hover:not(:disabled) { background: #0a3a9e; box-shadow: 0 10px 24px rgb(4 8 36 / 30%); transform: translateY(-1px); }
+.lg .au-submit:active:not(:disabled) { transform: scale(0.98); }
 .lg .au-foot { color: var(--lg-muted); }
 .lg-note {
   margin: 40px 0 0;
@@ -174,7 +221,6 @@ html:has(.lg) { background: var(--accs-paper); }
   .lg { grid-template-columns: 45.56% 1fr; }
   .lg-brand { min-height: 100dvh; }
   .lg-brand__photo { top: 15.88%; }
-  .lg-brand__lion { --lion-w: min(440.59px, 52.2dvh); }
   /* Logo 96px from the top at 844px tall; headline 47px under it; facts 29px under the headline. */
   .lg-brand__inner {
     position: sticky;
@@ -206,4 +252,62 @@ html:has(.lg) { background: var(--accs-paper); }
   /* The form sits 17px above the vertical centre and 4px left of the horizontal centre, as in the frame. */
   .lg-main { align-items: center; padding: 48px 40px 88px 32px; }
   .lg .au-title { font-size: 2.5rem; }
+  .lg-col { max-width: 445px; }
+  .lg-card { padding: 34px 24px 28px; }
+  .lg-perch { --lion-w: 150px; --sink: 38px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lg-brand__stars { animation: lg-twinkle 5s ease-in-out infinite alternate; }
+  @keyframes lg-twinkle { to { opacity: 0.55; } }
+}
+/* Reduced motion: no body motion and no wave; the face still changes with the form. */
+@media (prefers-reduced-motion: reduce) {
+  .mascot { transition: none; }
+  .mascot__face[data-waving] { animation: none; background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A slow breath: the body squashes a little on the exhale. Lion and cub breathe out of step. */
+  .mascot__breath { animation: mascot-breathe 3.6s ease-in-out infinite; }
+  .mascot[data-mascot='cub'] .mascot__breath { animation-duration: 3.1s; animation-delay: -1.2s; }
+  @keyframes mascot-breathe {
+    0%, 100% { transform: none; }
+    50% { transform: translateY(0.4%) scale(1.012, 0.982); }
+  }
+  /* Glancing: the body leans toward the look. Pointing at the form leans toward it too. */
+  .mascot[data-lean='left'] { transform: translateX(-1.5%) rotate(-2.5deg); }
+  .mascot[data-lean='right'],
+  .mascot[data-mood='typing'] { transform: translateX(1.5%) rotate(2.5deg); }
+  /* Hidden password: they duck behind the card, eyes shut. */
+  .mascot[data-mood='peek'] { transform: translateY(34%); }
+  .mascot[data-mood='error'] { transform: translateY(2%) rotate(-2deg) scale(0.985); }
+  .mascot[data-sway] { animation: mascot-sway 2.4s ease-in-out 2; }
+  .mascot[data-mood='busy'] { animation: mascot-ponder 1.8s ease-in-out infinite; }
+  .mascot[data-mood='doze'] { animation: mascot-nod 3.4s ease-in-out infinite; }
+  .mascot[data-mood='success'] { animation: mascot-hop 560ms cubic-bezier(0.3, 0, 0.3, 1) 2; }
+  .mascot[data-mood='wake'] { animation: mascot-startle 520ms cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  @keyframes mascot-sway {
+    0%, 100% { transform: none; }
+    25% { transform: rotate(1.8deg); }
+    75% { transform: rotate(-1.8deg); }
+  }
+  @keyframes mascot-ponder {
+    0%, 100% { transform: rotate(1.5deg); }
+    50% { transform: rotate(3deg) translateY(-0.5%); }
+  }
+  @keyframes mascot-nod {
+    0%, 100% { transform: rotate(1deg); }
+    50% { transform: translateY(1.8%) rotate(4deg); }
+  }
+  @keyframes mascot-hop {
+    0%, 100% { transform: none; }
+    40% { transform: translateY(-7%) scale(0.98, 1.03); }
+    70% { transform: translateY(0) scale(1.03, 0.97); }
+  }
+  @keyframes mascot-startle {
+    0% { transform: none; }
+    35% { transform: translateY(-4%) scale(1.03); }
+    100% { transform: none; }
+  }
 }
