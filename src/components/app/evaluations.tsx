@@ -2387,7 +2387,7 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <PageLoading title={pageTitles[pageId] || "Evaluations"} />
+          <PageLoading pageId={pageId} title={pageTitles[pageId] || "Evaluations"} />
         ) : page.isError ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (

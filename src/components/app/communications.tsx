@@ -1311,17 +1311,20 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
               decide reports, restrictions, or outcomes, and it cannot see
               records you cannot.
             </small>
-            <Button
-              variant="tertiary"
-              size="sm"
-              onPress={() => {
-                setMessages([]);
-                action.reset();
-              }}
-              isDisabled={action.isPending || !messages.length}
-            >
-              Clear conversation
-            </Button>
+            {/* Only once there is something to clear; a disabled button under an empty chat was noise. */}
+            {messages.length > 0 && (
+              <Button
+                variant="tertiary"
+                size="sm"
+                onPress={() => {
+                  setMessages([]);
+                  action.reset();
+                }}
+                isDisabled={action.isPending}
+              >
+                Clear conversation
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1490,7 +1493,7 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
               </Panel>
             </div>
           ) : (
-            <PageLoading title={pageTitles[pageId] || "page"} />
+            <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />
           )
         ) : page.isError && !page.data ? (
           page.error instanceof ApiError &&

@@ -83,7 +83,7 @@ const entries: Entry[] = [
 ]
 
 /** The role whose modules Home shows, for people with two roles: the Dean before their professor duties, and so on. */
-const mainRoleOrder = ['dean', 'chair', 'guidance', 'osas', 'secretary', 'administrator', 'professor', 'organization', 'student']
+export const mainRoleOrder = ['dean', 'chair', 'guidance', 'osas', 'secretary', 'administrator', 'professor', 'organization', 'student']
 /** Home shows six main modules (QA 19 November: the Dean, who also teaches, had twelve); the menu still has the rest. */
 export const moduleLimit = 6
 

@@ -4,7 +4,7 @@ import { useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import { PageLoading } from '@/components/app/skeleton-page'
-import { pageAllowed, pageTitles, routePermission } from '@/lib/page-catalog'
+import { pageAllowed, pageTitles, recordPages, routePermission } from '@/lib/page-catalog'
 import { sessionQuery } from '@/lib/queries'
 import { authRedirectFor, isSessionExpired } from '@/lib/session-errors'
 import { canOpenSite, landingFor, roleLabel, siteById, siteForPath } from '@/lib/sites'
@@ -54,12 +54,11 @@ export function RestrictedView({ record = false }: { record?: boolean }) {
   )
 }
 
-const recordPages = ['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P27', 'P29', 'P31', 'P32', 'P34', 'P38', 'P47', 'P50']
 
 export function RequirePermission({ pageId, children }: { pageId: string; children: ReactNode }) {
   const session = useQuery(sessionQuery())
   if (session.isPending) {
-    return <PageLoading title={pageTitles[pageId] || "page"} />
+    return <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />
   }
   // An ended session is on its way to Sign in (main.tsx); a failed check is not a missing permission, so offer a retry.
   if (session.error && !session.data) {

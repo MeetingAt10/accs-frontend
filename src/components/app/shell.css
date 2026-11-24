@@ -364,7 +364,15 @@
 :root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 :root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog:focus-visible { outline: none; }
 /* The drawer body is auto-height, so the chat grew with its messages and .cm-chat__scroll (overscroll-behavior: contain) never overflowed, and the wheel went nowhere. A fixed height makes the message list the scroller. */
-:root .shell-assist-drawer .cm-chat { height: calc(100dvh - 12rem); }
+/* The assistant drawer is solid like the chat it holds: the glass let the page show through above an opaque composer.
+   The body has no padding and the chat fills it, so the composer sits on the drawer's bottom edge. */
+:root .ds-drawer.shell-assist-drawer { background: var(--accs-surface); backdrop-filter: none; }
+:root .shell-assist-drawer .ds-drawer__title { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+:root .shell-assist-drawer .shell-assist-drawer__page { font-family: var(--accs-font-body, inherit); font-size: 0.8125rem; font-weight: 600; letter-spacing: normal; }
+:root .shell-assist-drawer .ds-drawer__body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+:root .shell-assist-drawer .cm-chat { flex: 1; height: auto; min-height: 0; }
+:root .shell-assist-drawer .cm-chat__scroll { padding: 20px; }
+:root .shell-assist-drawer .cm-chat__foot { padding: 12px 20px 16px; }
 
 /* Skip link: brand navy with white text in both themes (the ink fill turned light in dark mode, under white text). */
 :root .shell .shell-skip { background: var(--accs-brand-800); color: var(--accs-on-brand); box-shadow: var(--accs-shadow-pop); }
@@ -381,7 +389,8 @@
 
 /* ---------- Collapsed sidebar ----------
    Clicking the logo folds the panel to a 72px icon rail; clicking it again opens it. Labels hide, icons stay, and each
-   link keeps its title as a tooltip. The choice is saved in localStorage (accs.sidebar). */
+   link keeps its title as a tooltip. The choice is saved in localStorage (accs.sidebar). Resting the mouse on the folded
+   rail opens it (data-peek) until the pointer leaves; the page moves over with it, as when clicking. */
 @media (min-width: 1024px) {
   .shell-frame { transition: grid-template-columns 220ms var(--accs-ease-out, ease); }
   .shell-frame:has(> .shell-side[data-collapsed]) { --shell-side-w: 72px; }
@@ -415,7 +424,6 @@
   transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease);
   pointer-events: none;
 }
-:root .shell .shell-side[data-collapsed] .shell-side__hint { left: 50%; }
 :root .shell-side__toggle .shell-brand__key { transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease); }
 :root .shell-side__toggle:is(:hover, :focus-visible) .shell-brand__key { opacity: 0; transform: scale(0.6); }
 :root .shell-side__toggle:is(:hover, :focus-visible) .shell-side__hint { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -423,15 +431,31 @@
   :root .shell-side__toggle :is(.shell-brand__key, .shell-side__hint) { transition: none; }
 }
 :root .shell .shell-side { overflow: hidden; }
-:root .shell .shell-side[data-collapsed] { padding-inline: 18px; }
-:root .shell .shell-side[data-collapsed] :is(.shell-brand__text, .shell-side__label, .shell-sub, .shell-fold, .shell-assist__body, .shell-assist__ask) { display: none; }
-:root .shell .shell-side[data-collapsed] .shell-brand__key { width: 40px; height: 25px; }
-:root .shell .shell-side[data-collapsed] .shell-nav-item { justify-content: center; gap: 0; padding: 0; font-size: 0; }
-:root .shell .shell-side[data-collapsed] .shell-group > .shell-nav-item.shell-nav-item { padding-inline-end: 0; }
-:root .shell .shell-side[data-collapsed] .shell-assist { grid-template-columns: 1fr; justify-items: center; padding: 6px 0; }
+/* Folding animates instead of snapping: the rail narrows while labels and text fade out, and every icon keeps its place.
+   The folded rail shows every link the open panel shows, icons only; the small site headings fold away. */
+@media (min-width: 1024px) {
+  .shell-frame > .shell-side { box-sizing: border-box; width: var(--shell-side-w); transition: width 220ms var(--accs-ease-out, ease), padding 220ms var(--accs-ease-out, ease); }
+}
+:root .shell .shell-side .shell-nav-item { overflow: hidden; }
+:root .shell .shell-side .shell-nav-item__label { min-width: 0; white-space: nowrap; transition: opacity 160ms var(--accs-ease); }
+:root .shell .shell-side :is(.shell-brand__text, .shell-assist__body) { transition: opacity 160ms var(--accs-ease); }
+:root .shell .shell-side[data-collapsed] .shell-assist__body { overflow: hidden; white-space: nowrap; }
+:root .shell .shell-side .shell-assist { overflow: hidden; transition: padding 220ms var(--accs-ease), gap 220ms var(--accs-ease), background-color 160ms var(--accs-ease), border-color 160ms var(--accs-ease); }
+:root .shell .shell-side .shell-assist__mascot { transition: width 220ms var(--accs-ease), height 220ms var(--accs-ease); }
+:root .shell .shell-side .shell-assist__ask { overflow: hidden; max-height: 34px; white-space: nowrap; transition: max-height 220ms var(--accs-ease), min-height 220ms var(--accs-ease), opacity 160ms var(--accs-ease); }
+:root .shell .shell-side[data-collapsed] { padding-inline: 16px; }
+:root .shell .shell-side[data-collapsed] :is(.shell-side__label, .shell-fold) { display: none; }
+:root .shell .shell-side[data-collapsed] :is(.shell-nav-item__label, .shell-brand__text, .shell-assist__body) { opacity: 0; }
+/* Same side padding and icon inset as the open panel, so icons stay put when it opens or folds: 16 + 12 + 20 + 8 + 16 = 72. */
+:root .shell .shell-side[data-collapsed] .shell-group > .shell-nav-item.shell-nav-item,
+:root .shell .shell-side[data-collapsed] .shell-sub .shell-nav-item { padding-inline: 12px 8px; }
+:root .shell .shell-side[data-collapsed] .shell-assist { gap: 0; padding: 3px; }
 :root .shell .shell-side[data-collapsed] .shell-assist__mascot { width: 36px !important; height: 35px !important; }
-/* With the sub-links hidden, the current site carries the highlight itself. */
-:root .shell .shell-side[data-collapsed] .shell-nav-item[data-section] { background: rgb(255 255 255 / 12%); color: var(--accs-on-brand); }
+:root .shell .shell-side[data-collapsed] .shell-assist__ask { min-height: 0; max-height: 0; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .shell-frame > .shell-side,
+  :root .shell .shell-side :is(.shell-nav-item, .shell-nav-item__label, .shell-brand__text, .shell-brand__key, .shell-assist, .shell-assist__body, .shell-assist__mascot, .shell-assist__ask) { transition: none; }
+}
 
 /* Go to (Ctrl+K): sit near the top so the results list has room to open downward under the input. */
 .ds-modal-overlay:has(> .quick-jump) { place-items: start center; padding-top: 12dvh; }
@@ -448,8 +472,11 @@
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) + .shell-group:has(> .shell-sub) { border-top: 0; }
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { color: rgb(255 255 255 / 50%); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; min-height: 28px; }
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child svg { display: none; }
-/* The folded rail keeps each site as an icon (the links are hidden there). */
-:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) { padding-block: 0; border-block: 0; }
-:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { min-height: 40px; color: rgb(255 255 255 / 72%); }
-:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child svg { display: block; }
+/* The folded rail keeps every link as an icon. The text-only site heading above them only fades and keeps its height,
+   so the icons sit at the same height open or folded (folding it to nothing moved every icon when the rail opened on hover). */
+:root .shell .shell-side .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { max-height: 28px; transition: opacity 160ms var(--accs-ease), visibility 160ms; }
+:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  :root .shell .shell-side .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { transition: none; }
+}
 :root .shell .shell-side__label { display: none; }

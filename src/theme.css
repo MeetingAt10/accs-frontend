@@ -361,7 +361,8 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
   :root .communications-messages__thread > :last-child:not(.ds-empty) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
   :root .communications-messages__thread > :last-child:not(.ds-empty) > :last-child { margin-top: auto; }
   :root .communications-messages__thread:has(> .ds-empty) { justify-content: center; }
-  :root .cm-chat-panel { height: calc(100dvh - 12rem); max-height: none; }
+  /* Room for the page heading above, so the card and its note end inside the window. */
+  :root .cm-chat-panel { height: calc(100dvh - 18rem); min-height: 28rem; max-height: none; }
 }
 /* Settings: the password fields fill their column. */
 :root .pa-pw { max-width: none; }

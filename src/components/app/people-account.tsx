@@ -931,7 +931,7 @@ export function PeopleAccountScreen({
     ...pageQuery(pageId, record, filters),
     placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
   });
-  if (page.isPending) return <PageLoading title={pageTitles[pageId] || "page"} />;
+  if (page.isPending) return <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />;
   if (page.isError)
     return page.error instanceof ApiError &&
       [403, 404].includes(page.error.status) ? (

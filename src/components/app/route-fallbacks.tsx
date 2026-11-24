@@ -8,7 +8,7 @@ import { sessionQuery } from '@/lib/queries'
 import { landingFor } from '@/lib/sites'
 import { titleForPath } from '@/lib/page-catalog'
 import { AppChrome } from './navigation'
-import { PageLoading, PageSkeleton } from './skeleton-page'
+import { PageLoading, ShellSkeleton } from './skeleton-page'
 
 import './sites.css'
 
@@ -102,11 +102,7 @@ export function RoutePending({ shell }: { shell?: boolean }) {
     const content = <PageLoading title={title} />
     return shell ? <AppChrome session={session} title={title}>{content}</AppChrome> : content
   }
-  return (
-    <div className="pg-skel-page">
-      <PageSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />
-    </div>
-  )
+  return <ShellSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />
 }
 
 /** The `/_app` route's pending view. */

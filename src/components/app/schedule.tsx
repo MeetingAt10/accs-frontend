@@ -2528,7 +2528,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 export function SchedulePage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <PageLoading title={pageTitles[page.pageId] || 'page'} />
+    return <PageLoading pageId={page.pageId} title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P13')
     return <CalendarPage page={page} session={session.data} />
   if (page.pageId === 'P14')
