@@ -2,7 +2,7 @@ import { Alert } from '@meetingat10/design-system/react'
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { AnimatePresence } from 'motion/react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { ApiError, forgotPassword, resetPassword, signIn } from '@/lib/api'
 
@@ -25,6 +25,7 @@ import {
   validateAuthSearch,
 } from './-auth-shell'
 import { LoginShell } from './-login-shell'
+import { useMascot, useMascotStatus } from './-mascot'
 
 export const Route = createFileRoute('/_auth/sign-in')({
   validateSearch: validateAuthSearch,
@@ -67,6 +68,7 @@ function SignInPage() {
 
   return (
     <LoginShell>
+      <ViewMood view={view} />
       <AnimatePresence mode="wait">
         <Stage key={view}>
           {view === 'sign-in' && (
@@ -106,6 +108,13 @@ function SignInPage() {
   )
 }
 
+/** The mascots think on the forgot-password view and hold a document on the reset-code view. */
+function ViewMood({ view }: { view: View }) {
+  const { setView } = useMascot()
+  useEffect(() => setView(view === 'sign-in' ? null : view), [view, setView])
+  return null
+}
+
 function SignInForm({
   redirectTo,
   emailOrId,
@@ -133,15 +142,20 @@ function SignInForm({
       finish(session)
     },
   })
+  const { signal } = useMascot()
+  useMascotStatus(mutation.status, { cheer: true })
 
   function submit(event: FormEvent) {
     event.preventDefault()
     const next = {
-      emailOrId: emailOrId.trim() ? undefined : 'Enter your username.',
+      emailOrId: emailOrId.trim() ? undefined : 'Enter your username or email.',
       password: password ? undefined : 'Enter your password.',
     }
     setErrors(next)
-    if (next.emailOrId || next.password) return focusFirstInvalid(form.current)
+    if (next.emailOrId || next.password) {
+      signal('error', 2500)
+      return focusFirstInvalid(form.current)
+    }
     mutation.mutate({ emailOrId: emailOrId.trim(), password, remember })
   }
 
@@ -159,7 +173,7 @@ function SignInForm({
           <Alert tone="danger" title={mutation.error ? signInMessage(mutation.error) : ''} />
         </Reveal>
         <TextInput
-          label="Username"
+          label="Username or email"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
@@ -206,6 +220,7 @@ function ForgotForm({
   const form = useRef<HTMLFormElement>(null)
   const [error, setError] = useState<string>()
   const mutation = useMutation({ mutationFn: forgotPassword, onSuccess: onSent })
+  useMascotStatus(mutation.status)
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -264,6 +279,7 @@ function ResetForm({ emailOrId, onDone, onBack }: { emailOrId: string; onDone: (
       focusFirstInvalid(form.current)
     },
   })
+  useMascotStatus(mutation.status)
 
   function submit(event: FormEvent) {
     event.preventDefault()
