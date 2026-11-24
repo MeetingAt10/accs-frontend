@@ -167,6 +167,9 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
   const withClasses = faculty.filter((person) => items(person.classes).length)
   const conflicts = faculty.reduce((total, person) => total + items(person.conflicts).length, 0)
   const showTerm = (value: string) => replaceFilters(router, location.pathname, new URLSearchParams(value ? { period: value } : {}))
+  // The chosen term shows at once; the page on screen is still the previous term's while the new one loads.
+  const period = new URLSearchParams(location.searchStr).get('period') ?? ''
+  const chosen = terms.some((entry) => text(entry.term) === period) ? period : text(term.term)
   return (
     <div className="accs-stack">
       <PageHeader
@@ -176,7 +179,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
       <UploadLoad onSaved={showTerm} />
       {terms.length > 1 && (
         <div className="fl-term">
-          <Select label="Term" selectedKey={text(term.term) || null} onSelectionChange={(key) => showTerm(String(key ?? ''))}>
+          <Select label="Term" selectedKey={chosen || null} onSelectionChange={(key) => showTerm(String(key ?? ''))}>
             {terms.map((entry) => <SelectOption id={text(entry.term)} key={text(entry.term)}>{text(entry.term)}</SelectOption>)}
           </Select>
         </div>

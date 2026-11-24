@@ -1590,7 +1590,10 @@ function StudentRecord({
     (role) => role === "guidance" || role === "osas",
   );
   const accessHistory = Array.isArray(record.accessHistory)
-    ? items(record.accessHistory)
+    ? items(record.accessHistory).sort(
+        (left, right) =>
+          Date.parse(word(right.at)) - Date.parse(word(left.at)),
+      )
     : undefined;
   const tabs: TabDef[] = [
     { id: "overview", label: "Overview" },
