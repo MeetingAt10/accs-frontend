@@ -1,11 +1,13 @@
-import { Icon } from '@meetingat10/design-system/react'
-import { SparkleIcon } from '@meetingat10/design-system/icons'
+import { AssistantMascot } from '@/components/app/assistant-mascot'
 
-// The assistant's icon is a sparkle, the usual sign for an AI helper (QA 19 November). A question mark read as Help, and a
-// chat bubble read as Messages (QA 17 November).
-export const assistantIcon = SparkleIcon
+// The assistant's face is the ACCS lion mascot. It replaced the sparkle (QA 19 November), which had replaced a question mark
+// that read as Help and a chat bubble that read as Messages (QA 17 November).
+/** The mascot at icon size, for navigation entries and lists. */
+export function AssistantIcon({ size = 20 }: { size?: number }) {
+  return <AssistantMascot still="neutral" size={size} />
+}
 
-/** "assistant" in a navigation entry stands for the sparkle, which is not in the design system's named icons. */
+/** "assistant" in a navigation entry stands for the mascot, which is not in the design system's named icons. */
 export const assistantIconName = 'assistant'
 
 /** The Assistant card at the foot of the navigation panel (and the phone menu). It opens the Assistant drawer. */
@@ -13,7 +15,7 @@ export function AssistantCard({ onPress }: { onPress: () => void }) {
   return (
     <button type="button" className="shell-assist" aria-haspopup="dialog" onClick={onPress}>
       <span className="shell-assist__head">
-        <Icon icon={assistantIcon} size={16} weight="fill" className="shell-assist__icon" />
+        <AssistantMascot size={28} className="shell-assist__mascot" />
         ACCS Assistant
       </span>
       <span className="shell-assist__text">Ask where things are or how a request moves.</span>

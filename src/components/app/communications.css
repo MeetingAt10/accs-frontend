@@ -83,3 +83,11 @@
 .cm-group-people li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 2px 2px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); color: var(--accs-ink); font-size: 0.875rem; font-weight: 500; }
 .cm-hint { margin: 0; font-size: 0.8125rem; color: var(--accs-muted); }
 .cm-notice-body { margin: 0; line-height: 1.55; white-space: pre-wrap; }
+
+/* Assistant mascot (assistant-mascot.tsx) */
+.accs-mascot { display: inline-block; flex: none; background-repeat: no-repeat; }
+.accs-mascot--breathe { animation: accs-mascot-breathe 1.6s steps(var(--mascot-frames), jump-none) infinite; }
+@keyframes accs-mascot-breathe { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+@media (prefers-reduced-motion: reduce) { .accs-mascot--breathe { animation: none; background-position-x: 0%; } }
+.cm-msg__avatar { margin-top: 2px; }
+.cm-welcome__mascot { margin-bottom: 4px; }

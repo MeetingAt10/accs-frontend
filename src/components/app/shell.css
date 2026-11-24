@@ -79,6 +79,7 @@
 :root .shell-assist:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 2px; }
 :root .shell-assist__head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
 :root .shell-assist__icon { flex: none; color: #aab3ff; }
+:root .shell-assist__mascot { margin: -6px 0; }
 :root .shell-assist__text { max-width: 180px; font-size: 12px; line-height: 17px; opacity: 0.65; }
 
 /* ---------- Sidebar (1024px and up) ---------- */

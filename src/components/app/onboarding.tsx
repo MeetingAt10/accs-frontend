@@ -1,7 +1,7 @@
 import { Button, Icon, Modal, ModalActions, ModalBody, type IconName } from '@meetingat10/design-system/react'
 import { useState } from 'react'
 
-import { assistantIcon } from '@/components/app/assistant-icon'
+import { AssistantIcon } from '@/components/app/assistant-icon'
 import { moduleTiles } from '@/components/app/module-picker'
 import { NavLink, type Destination } from '@/components/app/site-chrome'
 import type { Session } from '@/lib/api'
@@ -126,7 +126,7 @@ export function Onboarding({ session, destinations }: { session: Session; destin
               {places.map(({ icon, title, text }) => (
                 <li key={title}>
                   <span className="ob-icon" aria-hidden>
-                    {icon === 'assistant' ? <Icon icon={assistantIcon} size={20} weight="fill" /> : <Icon name={icon} size={20} />}
+                    {icon === 'assistant' ? <AssistantIcon size={20} /> : <Icon name={icon} size={20} />}
                   </span>
                   <span className="ob-item">
                     <span className="ob-item__title">{title}</span>
