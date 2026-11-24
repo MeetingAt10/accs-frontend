@@ -47,6 +47,8 @@ import {
   toneFor,
   DateTile,
 } from '@/components/app/page-shell'
+import { PageLoading } from '@/components/app/skeleton-page'
+import { pageTitles } from '@/lib/page-catalog'
 import {
   EventCalendar,
   ToneDate,
@@ -2526,7 +2528,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 export function SchedulePage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <ViewState kind="loading" title="Loading" />
+    return <PageLoading title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P13')
     return <CalendarPage page={page} session={session.data} />
   if (page.pageId === 'P14')

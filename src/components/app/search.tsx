@@ -1,9 +1,10 @@
-import { Icon, Link, ViewState, type IconName } from '@meetingat10/design-system/react'
+import { Icon, Link, type IconName } from '@meetingat10/design-system/react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useRouterState } from '@tanstack/react-router'
 
 import { searchAll, type SearchHit, type SearchResults } from '@/lib/api'
 import { Empty, PageHeader, Panel } from '@/components/app/page-shell'
+import { SkeletonRows } from '@/components/app/skeleton-rows'
 import './search.css'
 
 // The top search (decided 16 November 2026): posts, class spaces, people, cases and student records in one place. The
@@ -47,7 +48,7 @@ export function SearchScreen() {
       {q.length < 2 ? (
         <Panel><Empty title="Type at least two letters">Use the search box at the top of the page.</Empty></Panel>
       ) : results.isPending ? (
-        <ViewState kind="loading" title="Searching" />
+        <Panel flush title="Results"><SkeletonRows /></Panel>
       ) : results.isError ? (
         <Panel><Empty title="Search didn't work">Try again in a moment.</Empty></Panel>
       ) : found.length ? (

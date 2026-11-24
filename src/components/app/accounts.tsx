@@ -29,6 +29,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 
 import { RequirePermission } from '@/components/app/guards'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
+import { SkeletonRows } from '@/components/app/skeleton-rows'
 import { PagedList, Pager, usePaged } from '@/components/app/paging'
 import {
   chunk,
@@ -135,7 +136,7 @@ type Loadable = { isPending: boolean; isError: boolean; error: unknown; data: un
 /** Loading, failed and ready states for the queries a view needs. A failed refresh keeps showing the data it already has. */
 function Gate({ queries, what, children }: { queries: Loadable[]; what: string; children: ReactNode }) {
   const failed = queries.find((query) => query.isError && !query.data)
-  if (queries.some((query) => query.isPending)) return <ViewState kind="loading" title={`Loading ${what}`} />
+  if (queries.some((query) => query.isPending)) return <div aria-busy="true"><span className="pg-skel__sr" role="status">{`Loading ${what}`}</span><Panel flush><SkeletonRows /></Panel></div>
   if (failed) {
     return (
       <ViewState

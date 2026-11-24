@@ -32,7 +32,6 @@ import {
   Tabs,
   TextArea,
   TextField,
-  ViewState,
   toast,
   EmptyState,
 } from '@meetingat10/design-system/react'
@@ -53,6 +52,8 @@ import {
   StatusChip,
   toneFor,
 } from '@/components/app/page-shell'
+import { PageLoading } from '@/components/app/skeleton-page'
+import { pageTitles } from '@/lib/page-catalog'
 import { Comment, CommentThread } from '@/components/ds-next'
 import { SubjectList, SubjectMaterials } from '@/components/app/materials'
 import { QueryProblem } from '@/components/app/query-problem'
@@ -2644,7 +2645,7 @@ function OrganizationPage({
 export function CommunityPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <ViewState kind="loading" title="Loading account context" />
+    return <PageLoading title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P04')
     return <FeedPage page={page} session={session.data} />
   if (page.pageId === 'P05')

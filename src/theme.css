@@ -38,7 +38,7 @@
   --accs-brand-800: #232e87;
   --accs-brand-600: #2f3bd6;
   --accs-brand-500: #3a47e0;
-  --accs-sidebar: linear-gradient(180deg, #141b5c 0%, #0a0f2e 100%);
+  --accs-sidebar: var(--accs-brand-900);
   --accs-hero: linear-gradient(170deg, #2f3bd6 0%, #141b5c 71%);
   --accs-on-brand: #ffffff;
 }
@@ -295,12 +295,6 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .au-brand__facts li { border-inline-start-color: rgb(250 250 250 / 30%); }
 
 /* ---------- Home: short and scannable ---------- */
-/* Getting started is one line that opens. */
-:root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 16px; }
-:root .getting-started-box > summary { cursor: pointer; color: var(--accs-muted); font-size: 0.875rem; font-weight: 500; list-style-position: inside; }
-:root .getting-started-box > summary:hover { color: var(--accs-ink); }
-:root .getting-started-box__count { margin-inline-start: 6px; color: var(--accs-faint); font-weight: 400; }
-:root .getting-started-box[open] > .getting-started { margin-top: 10px; }
 /* Student and faculty home head: greeting as the title, the date under it, actions beside it on wide screens. */
 :root .ch-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
 :root .ch-head__title { margin: 0; font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }

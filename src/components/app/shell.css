@@ -4,26 +4,15 @@
    The panel and the phone menu are brand navy in both themes; the top bar and tab bar follow the theme tokens. */
 
 /* ---------- Brand block (panel, phone top bar, phone menu) ---------- */
-:root .shell-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
-:root .shell-brand .shell-mark {
-  position: relative;
-  display: block;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 10.08px;
-  overflow: hidden;
-  background: linear-gradient(127deg, var(--accs-brand-500) 0%, var(--accs-brand-900) 71.4%);
-  box-shadow: none;
-}
-:root .shell-brand .shell-mark img { position: absolute; top: 6.84px; left: 6.84px; width: 22.32px; height: 22.32px; }
+:root .shell-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--accs-on-brand); }
+:root .shell-brand[data-tone='page'] { color: var(--accs-ink); }
+/* The key is a mask filled with the text colour (see ShellBrand). */
+:root .shell-brand__key { display: block; flex: none; width: 46px; height: 29px; background: currentColor; mask: no-repeat center / contain; -webkit-mask: no-repeat center / contain; }
 :root .shell-brand__text { display: grid; min-width: 0; white-space: nowrap; }
-:root .shell-brand__name { font-family: var(--accs-font-title); font-size: 18px; font-weight: 700; line-height: 21.6px; color: var(--accs-on-brand); }
-:root .shell-brand__sub { font-size: 10px; font-weight: 500; line-height: 1.2; color: var(--accs-on-brand); opacity: 0.6; }
-:root .shell-brand[data-tone='page'] .shell-brand__name { color: var(--accs-ink); }
+:root .shell-brand__name { font-family: var(--accs-font-title); font-size: 18px; font-weight: 700; line-height: 21.6px; }
+:root .shell-brand__sub { font-size: 10px; font-weight: 500; line-height: 1.2; opacity: 0.6; }
 :root .shell-brand[data-tone='page'] .shell-brand__sub { color: var(--accs-muted); opacity: 1; }
-:root .shell-brand[data-size='sm'] .shell-mark { width: 28px; height: 28px; border-radius: 7.84px; }
-:root .shell-brand[data-size='sm'] .shell-mark img { top: 5.32px; left: 5.32px; width: 17.36px; height: 17.36px; }
+:root .shell-brand[data-size='sm'] .shell-brand__key { width: 35px; height: 22px; }
 :root .shell-brand[data-size='sm'] .shell-brand__name { font-size: 14px; line-height: 16.8px; }
 
 /* ---------- Navigation items on navy (panel and phone menu) ---------- */
@@ -49,6 +38,29 @@
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-group { gap: 2px; }
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item { min-height: 36px; gap: 10px; padding: 0 10px; font-size: 13px; }
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item svg { width: 18px; height: 18px; }
+/* The caret at the end of a site row folds that site's links. */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group { position: relative; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-fold) > .shell-nav-item { padding-inline-end: 44px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgb(255 255 255 / 55%);
+  cursor: pointer;
+  transition: color 160ms var(--accs-ease), background-color 160ms var(--accs-ease);
+}
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold:hover { background: rgb(255 255 255 / 8%); color: var(--accs-on-brand); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -2px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold svg { transition: transform 160ms var(--accs-ease); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold[aria-expanded='false'] svg { transform: rotate(-90deg); }
 :root :is(.shell .shell-side, .shell-nav-drawer) .shell-group__label {
   margin: 0 0 2px;
   padding: 0 10px;
@@ -63,24 +75,41 @@
 /* ---------- Assistant card ---------- */
 :root .shell-assist {
   display: grid;
-  gap: 6px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 12px;
   width: 100%;
-  padding: 14px;
-  border: 0;
-  border-radius: 12px;
-  background: rgb(255 255 255 / 12%);
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 8%);
   color: var(--accs-on-brand);
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: background-color 160ms var(--accs-ease);
+  transition: background-color 160ms var(--accs-ease), border-color 160ms var(--accs-ease);
 }
-:root .shell-assist:hover { background: rgb(255 255 255 / 18%); }
+:root .shell-assist:hover { border-color: rgb(255 255 255 / 24%); background: rgb(255 255 255 / 12%); }
 :root .shell-assist:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 2px; }
-:root .shell-assist__head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-:root .shell-assist__icon { flex: none; color: #aab3ff; }
-:root .shell-assist__mascot { margin: -6px 0; }
-:root .shell-assist__text { max-width: 180px; font-size: 12px; line-height: 17px; opacity: 0.65; }
+:root .shell-assist__mascot { border-radius: 12px; background-color: rgb(255 255 255 / 10%); }
+:root .shell-assist__body { display: grid; gap: 2px; min-width: 0; }
+:root .shell-assist__title { font-size: 13px; font-weight: 600; line-height: 18px; }
+:root .shell-assist__text { font-size: 11.5px; line-height: 16px; opacity: 0.65; }
+:root .shell-assist__ask {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px 0 12px;
+  border-radius: 9px;
+  background: var(--accs-on-brand);
+  color: var(--accs-brand-900);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+:root .shell-assist__ask svg { transition: transform 160ms var(--accs-ease); }
+:root .shell-assist:hover .shell-assist__ask svg { transform: translateX(2px); }
 
 /* ---------- Sidebar (1024px and up) ---------- */
 :root .shell .shell-side {
@@ -274,8 +303,6 @@
 }
 :root .shell-nav-drawer .ds-drawer__head { min-height: 0; padding: 0; border: 0; }
 :root .shell-nav-drawer .ds-drawer__title { font: inherit; letter-spacing: normal; }
-:root .shell-nav-drawer .shell-brand .shell-mark { width: 34px; height: 34px; border-radius: 9.52px; }
-:root .shell-nav-drawer .shell-brand .shell-mark img { top: 6.46px; left: 6.46px; width: 21.08px; height: 21.08px; }
 :root .shell-nav-drawer .shell-brand__name { font-size: 17px; line-height: 20.4px; }
 :root .shell-nav-drawer .ds-drawer__head .ds-icon-btn { color: var(--accs-on-brand); }
 :root .shell-nav-drawer .ds-drawer__head .ds-icon-btn:hover { background: rgb(255 255 255 / 10%); color: var(--accs-on-brand); }
@@ -375,14 +402,34 @@
   cursor: pointer;
 }
 :root .shell-side__toggle:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 4px; }
-:root .shell-side__toggle:hover .shell-mark { filter: brightness(1.15); }
+:root .shell-side__toggle { position: relative; }
+/* On hover or focus the key crossfades into a sidebar glyph in the same spot, open or folded. */
+:root .shell-side__hint {
+  position: absolute;
+  top: 50%;
+  left: 23px;
+  display: grid;
+  color: var(--accs-on-brand);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease);
+  pointer-events: none;
+}
+:root .shell .shell-side[data-collapsed] .shell-side__hint { left: 50%; }
+:root .shell-side__toggle .shell-brand__key { transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease); }
+:root .shell-side__toggle:is(:hover, :focus-visible) .shell-brand__key { opacity: 0; transform: scale(0.6); }
+:root .shell-side__toggle:is(:hover, :focus-visible) .shell-side__hint { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  :root .shell-side__toggle :is(.shell-brand__key, .shell-side__hint) { transition: none; }
+}
 :root .shell .shell-side { overflow: hidden; }
 :root .shell .shell-side[data-collapsed] { padding-inline: 18px; }
-:root .shell .shell-side[data-collapsed] :is(.shell-brand__text, .shell-side__label, .shell-sub, .shell-assist__text) { display: none; }
+:root .shell .shell-side[data-collapsed] :is(.shell-brand__text, .shell-side__label, .shell-sub, .shell-fold, .shell-assist__body, .shell-assist__ask) { display: none; }
+:root .shell .shell-side[data-collapsed] .shell-brand__key { width: 40px; height: 25px; }
 :root .shell .shell-side[data-collapsed] .shell-nav-item { justify-content: center; gap: 0; padding: 0; font-size: 0; }
-:root .shell .shell-side[data-collapsed] .shell-assist { justify-items: center; padding: 10px 0; }
-:root .shell .shell-side[data-collapsed] .shell-assist__head { gap: 0; font-size: 0; }
-:root .shell .shell-side[data-collapsed] .shell-assist__icon { width: 20px; height: 20px; }
+:root .shell .shell-side[data-collapsed] .shell-group > .shell-nav-item.shell-nav-item { padding-inline-end: 0; }
+:root .shell .shell-side[data-collapsed] .shell-assist { grid-template-columns: 1fr; justify-items: center; padding: 6px 0; }
+:root .shell .shell-side[data-collapsed] .shell-assist__mascot { width: 36px !important; height: 35px !important; }
 /* With the sub-links hidden, the current site carries the highlight itself. */
 :root .shell .shell-side[data-collapsed] .shell-nav-item[data-section] { background: rgb(255 255 255 / 12%); color: var(--accs-on-brand); }
 
@@ -392,3 +439,17 @@
   .ds-modal-overlay:has(> .quick-jump) { place-items: start stretch; padding-top: 0; }
   .quick-jump { border-radius: 0 0 var(--ds-radius-overlay) var(--ds-radius-overlay); }
 }
+
+/* No trees: a site's links sit at the site's own level, and a hairline separates each site that has links. */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub { margin: 0; padding: 0; border: 0; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item { min-height: 40px; gap: 12px; padding: 0 12px; font-size: 14px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item svg { width: 20px; height: 20px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) { padding-block: 6px; border-block: 1px solid rgb(255 255 255 / 10%); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) + .shell-group:has(> .shell-sub) { border-top: 0; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { color: rgb(255 255 255 / 50%); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; min-height: 28px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child svg { display: none; }
+/* The folded rail keeps each site as an icon (the links are hidden there). */
+:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) { padding-block: 0; border-block: 0; }
+:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { min-height: 40px; color: rgb(255 255 255 / 72%); }
+:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child svg { display: block; }
+:root .shell .shell-side__label { display: none; }

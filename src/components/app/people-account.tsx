@@ -37,8 +37,9 @@ import {
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
-import { pageIdForPath } from "@/lib/page-catalog";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { pageIdForPath, pageTitles } from "@/lib/page-catalog";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
 import "./people-account.css";
 
 type Item = Record<string, unknown>;
@@ -925,10 +926,12 @@ export function PeopleAccountScreen({
   const filters = useRouterState({
     select: (state) => state.location.searchStr.slice(1),
   });
-  const page = useQuery(
-    pageQuery(pageId, pageId === "P38" ? recordId : undefined, filters),
-  );
-  if (page.isPending) return <ViewState kind="loading" title="Loading page" />;
+  const record = pageId === "P38" ? recordId : undefined;
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  });
+  if (page.isPending) return <PageLoading title={pageTitles[pageId] || "page"} />;
   if (page.isError)
     return page.error instanceof ApiError &&
       [403, 404].includes(page.error.status) ? (

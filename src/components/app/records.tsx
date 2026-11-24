@@ -52,6 +52,8 @@ import {
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { personMatches } from "@/lib/person-search";
 import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { pageTitles } from "@/lib/page-catalog";
 import { replaceFilters } from "@/lib/url-filters";
 import { TypedSearch, typingPause } from "@/components/app/typed-search";
 
@@ -329,17 +331,6 @@ function PersonCell({
         )}
         {sub && <p className="rc-person__sub">{sub}</p>}
       </div>
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div className="rc-skel" role="status" aria-busy="true">
-      <span className="rc-sr">Loading</span>
-      <div className="accs-skeleton rc-skel__title" />
-      <div className="accs-skeleton rc-skel__line" style={{ width: "40%" }} />
-      <div className="accs-skeleton rc-skel__block" />
     </div>
   );
 }
@@ -2633,7 +2624,7 @@ export function OversightScreen({ pageId }: { pageId: string }) {
     placeholderData: (previous, previousQuery) =>
       keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
   });
-  if (page.isPending) return <Skeleton />;
+  if (page.isPending) return <PageLoading title={pageTitles[pageId] || "page"} />;
   if (page.isError)
     return page.error instanceof ApiError &&
       [403, 404].includes(page.error.status) ? (

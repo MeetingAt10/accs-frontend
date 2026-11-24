@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { pageQuery } from '@/lib/queries'
 import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
+import { SidebarSimpleIcon } from '@meetingat10/design-system/icons'
 import { AssistantCard, AssistantIcon, assistantIconName } from '@/components/app/assistant-icon'
-import logoMark from '@/components/app/shell-logo-mark.svg'
+import logoKey from '@/components/app/shell-logo-key.svg'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
@@ -48,13 +49,12 @@ export function NavLink({
   )
 }
 
-/** The ACCS mark and name. `tone="brand"` is white on the navy panel; `"page"` is ink on the white top bar. */
+/** The ACCS key mark (the sign-in logo's key, without the A and S) and the name. The mark is a mask filled with the text
+ *  colour, so it is white on the navy panel (`tone="brand"`) and ink on the top bar (`"page"`) in either theme. */
 export function ShellBrand({ tone = 'brand', size = 'md' }: { tone?: 'brand' | 'page'; size?: 'sm' | 'md' }) {
   return (
     <span className="shell-brand" data-tone={tone} data-size={size}>
-      <span className="shell-mark" aria-hidden>
-        <img src={logoMark} alt="" width={22.32} height={22.32} />
-      </span>
+      <span className="shell-brand__key" aria-hidden style={{ maskImage: `url(${logoKey})`, WebkitMaskImage: `url(${logoKey})` }} />
       <span className="shell-brand__text">
         <span className="shell-brand__name">ACCS</span>
         <span className="shell-brand__sub">College of Computer Studies</span>
@@ -68,18 +68,25 @@ export function accountLine(user: Session['user']) {
   return [user.roles[0] ? roleLabel(user.roles[0]) : '', user.program || user.office].filter(Boolean).join(' · ')
 }
 
-/** Site links with the current site's own links nested under it. Shared by the panel and the phone menu. */
+/** A site's links as one flat list, minus the ones that repeat the site row: a link with the site's own name and landing
+ *  page (Evaluations under Evaluations), or a lone link to the landing page (Calendar under Schedule). */
+function subEntries(groups: NavGroup[] | undefined, site: Site, href: string) {
+  const entries = (groups ?? []).flatMap((group) => group.entries).filter((entry) => !(entry.href === href && entry.label === site.label))
+  return entries.length === 1 && entries[0].href === href ? [] : entries
+}
+
+/** Every site the person may open, each with its own links nested under it and open by default; a caret folds them. */
 function SiteList({
   destinations,
   current,
-  groups,
+  siteGroups,
   currentHref,
   onNavigate,
   layoutId,
 }: {
   destinations: Destination[]
   current: SiteId
-  groups: NavGroup[]
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
   currentHref?: string
   onNavigate?: () => void
   layoutId: string
@@ -89,8 +96,14 @@ function SiteList({
     <LayoutGroup id={layoutId}>
       {destinations.map(({ site, href }) => {
         const isCurrent = site.id === current
-        // With a link under it highlighted, the site only reads as the section; otherwise it is the page.
-        const isPage = isCurrent && !currentHref
+        const links = subEntries(siteGroups[site.id], site, href)
+        // The site's own landing page heads its list when no link already goes there (Home above My standing).
+        const entries = links.length > 0 && !links.some((entry) => entry.href === href) ? [{ href, label: site.label, icon: site.icon }, ...links] : links
+        const open = entries.length > 0
+        // With a link under it highlighted, the site only reads as the section; otherwise (or folded) it is the page.
+        const subCurrent = isCurrent ? (currentHref ?? href) : undefined
+        const isPage = isCurrent && !(open && entries.some((entry) => entry.href === subCurrent))
+        const subId = `${layoutId}-sub-${site.id}`
         return (
           <div className="shell-group" key={site.id}>
             <NavLink
@@ -105,9 +118,9 @@ function SiteList({
               <Icon name={site.icon as never} size={20} />
               {site.label}
             </NavLink>
-            {isCurrent && groups.length > 0 && (
-              <div className="shell-sub">
-                <SiteNav groups={groups} current={currentHref} onNavigate={onNavigate} layoutId={`${layoutId}-sub`} />
+            {open && (
+              <div className="shell-sub" id={subId}>
+                <SiteNav groups={[{ label: site.label, entries }]} current={subCurrent} onNavigate={onNavigate} layoutId={`${layoutId}-sub`} labels={false} />
               </div>
             )}
           </div>
@@ -124,13 +137,13 @@ const sideKey = 'accs.sidebar'
 export function SitePanel({
   destinations,
   current,
-  groups,
+  siteGroups,
   currentHref,
   onAssistant,
 }: {
   destinations: Destination[]
   current: SiteId
-  groups: NavGroup[]
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
   currentHref?: string
   onAssistant: () => void
 }) {
@@ -164,13 +177,17 @@ export function SitePanel({
           onClick={toggle}
         >
           <ShellBrand />
+          {/* On hover or focus a sidebar glyph says the logo folds the panel; folded, it stands in for the key. */}
+          <span className="shell-side__hint" aria-hidden>
+            <Icon icon={SidebarSimpleIcon} size={20} />
+          </span>
         </button>
       </div>
       <nav className="shell-side__nav" id="shell-side-nav" aria-labelledby="shell-side-label">
         <p className="shell-side__label" id="shell-side-label">
           Workspace
         </p>
-        <SiteList destinations={destinations} current={current} groups={groups} currentHref={currentHref} layoutId="panel" />
+        <SiteList destinations={destinations} current={current} siteGroups={siteGroups} currentHref={currentHref} layoutId="panel" />
       </nav>
       <div className="shell-side__foot">
         <AssistantCard onPress={onAssistant} />
@@ -292,18 +309,21 @@ export function SiteNav({
   current,
   onNavigate,
   layoutId = 'side',
+  labels = true,
 }: {
   groups: NavGroup[]
   current?: string
   onNavigate?: () => void
   layoutId?: string
+  /** Group headings; off under a site row, where the site already names the links. */
+  labels?: boolean
 }) {
   const slide = useSlide()
   return (
     <LayoutGroup id={layoutId}>
       {groups.map((group, index) => (
         <div className="shell-group" key={group.label + index}>
-          {group.label !== 'Workspace' && <p className="shell-group__label">{group.label}</p>}
+          {labels && group.label !== 'Workspace' && <p className="shell-group__label">{group.label}</p>}
           {group.entries.map((entry) => {
             const isCurrent = entry.href === current
             return (
@@ -333,7 +353,7 @@ export function DrawerNav({
   session,
   destinations,
   current,
-  groups,
+  siteGroups,
   currentHref,
   accountLinks,
   onNavigate,
@@ -343,7 +363,7 @@ export function DrawerNav({
   session: Session
   destinations: Destination[]
   current: SiteId
-  groups: NavGroup[]
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
   currentHref?: string
   accountLinks: NavEntry[]
   onNavigate: () => void
@@ -365,7 +385,7 @@ export function DrawerNav({
         <SiteList
           destinations={destinations}
           current={current}
-          groups={groups}
+          siteGroups={siteGroups}
           currentHref={currentHref}
           onNavigate={onNavigate}
           layoutId="drawer"
