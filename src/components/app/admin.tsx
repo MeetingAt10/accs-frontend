@@ -404,7 +404,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                       <Button size="sm" onPress={() => setDeciding({ key, decision: "approve", words })}>Approve</Button>
                     </div>
                   ) : (
-                    <span className="acct-muted">"Waiting for the CCS Secretary."</span>
+                    <span className="acct-muted">Waiting for the CCS Secretary.</span>
                   )}
                 </li>
               );

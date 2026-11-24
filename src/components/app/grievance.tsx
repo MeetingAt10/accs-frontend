@@ -1096,7 +1096,7 @@ const reportedStudentText = (report: Item) => {
 type StudentReportDraft = { studentId: string; narrative: string; category: string; subcategory: string; categoryDetail: string; severity: SeverityLevel | ''; location: string; occurredOn: string; ongoing: boolean }
 const blankStudentReport: StudentReportDraft = { studentId: '', narrative: '', category: '', subcategory: '', categoryDetail: '', severity: '', location: '', occurredOn: '', ongoing: false }
 
-/** Faculty report a student from their classes (P21 `reportStudent`). It goes to the Program Chair, or to the Dean when the chair files it. */
+/** Faculty report a student from their classes (P21 `reportStudent`). It goes to the Program Chair, to the Dean when the chair files it, or to Guidance when the Dean files it. */
 function ReportStudent({ page }: { page: PageEnvelope }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<StudentReportDraft>(blankStudentReport)
@@ -1142,7 +1142,7 @@ function ReportStudent({ page }: { page: PageEnvelope }) {
       <Drawer title="Report a student" isOpen={open} onOpenChange={(state) => !state && close()}>
         {/* noValidate: the browser's own required-field check stopped the submit silently (custom lists show no bubble), so our message never appeared. */}
         <form className="gv-stack" noValidate onSubmit={(event) => { event.preventDefault(); send(event.currentTarget) }}>
-          <p className="gv-hint">Report a student in your scope: your classes, plus your program for a Chair or the whole college for the Dean. It goes to the Program Chair, or to the Dean if you are the chair. You can follow its status from your case queue.</p>
+          <p className="gv-hint">Report a student in your scope: your classes, plus your program for a Chair or the whole college for the Dean. It goes to the Program Chair, to the Dean if you are the chair, or to Guidance if you are the Dean. You can follow its status from your case queue.</p>
           <Select label="Student" placeholder="Choose a student" isRequired selectedKey={draft.studentId || null} onSelectionChange={(key) => update('studentId', String(key ?? ''))}
             isInvalid={Boolean(fieldError('studentId', draft.studentId ? undefined : 'Choose a student.'))} errorMessage={fieldError('studentId', draft.studentId ? undefined : 'Choose a student.')}
             description={students.length ? undefined : 'No students in your scope yet.'}>

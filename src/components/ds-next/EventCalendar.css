@@ -163,6 +163,23 @@
   cursor: pointer;
   transition: background 160ms var(--accs-ease), color 160ms var(--accs-ease);
 }
+.ec-add {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accs-tint);
+  color: var(--accs-link);
+  font: 600 0.9rem/1 var(--accs-font-body);
+  cursor: pointer;
+  opacity: 0;
+}
+.ec-table td:hover .ec-add, .ec-add:focus-visible { opacity: 1; }
+@media (max-width: 720px) { .ec-add { display: none; } }
 .ec-daybtn:hover { background: var(--accs-tint); color: var(--accs-link); }
 .ec-table td[data-outside] .ec-daybtn { color: var(--accs-muted); opacity: 0.6; }
 .ec-table td[data-today] .ec-daybtn { background: var(--ec-today); color: #fff; font-weight: 700; opacity: 1; }

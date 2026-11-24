@@ -90,6 +90,8 @@ export function RouteError({ error }: ErrorComponentProps) {
 /** Router-wide `defaultPendingComponent` (and the session check's): grey placeholders instead of a blank screen while a redirect or load settles. */
 export function RoutePending() {
   const path = useRouterState({ select: (state) => state.location.pathname })
+  // Sign-in and first-login are not app pages: show only the themed page background, no app-shaped skeleton.
+  if (path === '/sign-in' || path === '/first-login') return null
   return (
     <div className="pg-skel-page">
       <PageSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />

@@ -633,7 +633,17 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                   if (key === "copy-link")
                                     void navigator.clipboard
                                       ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)) + (words(file.contentType).startsWith("image/") ? "?inline=1" : ""), window.location.origin).toString()).join("\n"))
-                                      .then(() => toast(files.length === 1 ? "Link copied. Opening it downloads the file." : "Links copied. Opening them downloads the files."))
+                                      .then(() => {
+                                        const images = files.filter((file) => words(file.contentType).startsWith("image/")).length;
+                                        const one = files.length === 1;
+                                        toast(
+                                          images === files.length
+                                            ? one ? "Link copied. Opening it shows the image." : "Links copied. Opening them shows the images."
+                                            : images === 0
+                                              ? one ? "Link copied. Opening it downloads the file." : "Links copied. Opening them downloads the files."
+                                              : "Links copied. Images open in the browser; other files download.",
+                                        );
+                                      })
                                       .catch(() => toast("Copy is unavailable in this browser."));
                                   if (key === "report")
                                     setReportedMessage(message);

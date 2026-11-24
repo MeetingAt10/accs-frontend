@@ -241,10 +241,7 @@ function Month({
                       <button
                         type="button"
                         className="ec-daybtn"
-                        onClick={() => {
-                          onDateChange?.(value)
-                          if (value >= today) onDateClick?.(value)
-                        }}
+                        onClick={() => onDateChange?.(value)}
                         aria-current={value === today ? 'date' : undefined}
                         aria-label={`${longDay(day)}${
                           dayEvents.length
@@ -254,6 +251,16 @@ function Month({
                       >
                         <time dateTime={value}>{day.getDate()}</time>
                       </button>
+                      {onDateClick && value >= today && (
+                        <button
+                          type="button"
+                          className="ec-add"
+                          onClick={() => onDateClick(value)}
+                          aria-label={`Add on ${longDay(day)}`}
+                        >
+                          +
+                        </button>
+                      )}
                       {dayEvents.length > 0 && (
                         <ul className="ec-chips">
                           {shown.map((event) => (
