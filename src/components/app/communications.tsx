@@ -31,7 +31,6 @@ import {
   Tabs,
   TextArea,
   TextField,
-  ViewState,
   toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +43,7 @@ import {
   RestrictedView,
   RetryView,
 } from "@/components/app/guards";
+import { AssistantMascot } from "@/components/app/assistant-mascot";
 import {
   ApiError,
   apiErrorText,
@@ -53,7 +53,7 @@ import {
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
 import { messageFileLink, messageFilePath } from "@/lib/api";
 import { replaceFilters } from "@/lib/url-filters";
 import {
@@ -66,6 +66,8 @@ import {
 } from "@/components/ds-next";
 import { NotificationGroup } from "@/components/ds-next/notifications";
 import { Empty, PageHeader, Panel } from "@/components/app/page-shell";
+import { pageTitles } from "@/lib/page-catalog";
+import { PageLoading } from "@/components/app/skeleton-page";
 import { SlidePills, ease } from "@/components/app/portal-motion";
 import "./communications.css";
 
@@ -177,12 +179,12 @@ export function matchesPerson(name: string, input: string) {
 async function copyPicture(threadId: string, messageId: string, fileId: string) {
   try {
     if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("Clipboard pictures are not supported.");
-    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId))).blob();
+    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId), { mode: "cors" })).blob();
     const png = source.type === "image/png" ? source : await toPng(source);
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
     toast("Image copied.");
   } catch {
-    toast("This browser couldn't copy the image. Use Copy file link instead.");
+    toast("Couldn't copy the image (browser or file host blocked it). Use Copy file link instead.");
   }
 }
 
@@ -380,8 +382,22 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  const sendWhenReady = useRef(false);
+  useEffect(() => {
+    if (sendWhenReady.current && !filesBusy) {
+      sendWhenReady.current = false;
+      void sendMessage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filesBusy]);
   async function sendMessage() {
-    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending || sending.current) return;
+    if ((!body.trim() && !pendingFiles.length) || action.isPending || sending.current) return;
+    // Enter while a file is still uploading sends as soon as it is ready, so one Enter is enough (QA v5, D13).
+    if (filesBusy) {
+      sendWhenReady.current = true;
+      return;
+    }
+    if (!body.trim() && !readyFiles.length) return;
     sending.current = true;
     try {
       await draftSave.current;
@@ -573,13 +589,14 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                     .map((message, index, visibleMessages) => {
                       const sender = object(message.author);
                       const prior = visibleMessages[index - 1];
-                      const day = words(message.at).slice(0, 10);
+                      const day = campusDay(words(message.at));
                       return (
                         <Stack gap={16} key={words(message.id)}>
-                          {(!prior || day !== words(prior.at).slice(0, 10)) && (
+                          {(!prior || day !== campusDay(words(prior.at))) && (
                             <Divider
                               label={new Date(day).toLocaleDateString("en-PH", {
                                 dateStyle: "long",
+                                timeZone: "UTC",
                               })}
                             />
                           )}
@@ -617,8 +634,18 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                   }
                                   if (key === "copy-link")
                                     void navigator.clipboard
-                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)), window.location.origin).toString()).join("\n"))
-                                      .then(() => toast(files.length === 1 ? "File link copied. It opens for people in this conversation." : "File links copied. They open for people in this conversation."))
+                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)) + (words(file.contentType).startsWith("image/") ? "?inline=1" : ""), window.location.origin).toString()).join("\n"))
+                                      .then(() => {
+                                        const images = files.filter((file) => words(file.contentType).startsWith("image/")).length;
+                                        const one = files.length === 1;
+                                        toast(
+                                          images === files.length
+                                            ? one ? "Link copied. Opening it shows the image." : "Links copied. Opening them shows the images."
+                                            : images === 0
+                                              ? one ? "Link copied. Opening it downloads the file." : "Links copied. Opening them downloads the files."
+                                              : "Links copied. Images open in the browser; other files download.",
+                                        );
+                                      })
                                       .catch(() => toast("Copy is unavailable in this browser."));
                                   if (key === "report")
                                     setReportedMessage(message);
@@ -996,6 +1023,10 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
   const paged = usePaged(filtered, 10, filter);
   const visible = paged.shown;
   const rows: ReactNode[] = [];
+  // Day headings only help when the page holds both days; a lone "Earlier" band labels nothing.
+  const mixedDays =
+    visible.some((notice) => dayOf(notice.at) === today) &&
+    visible.some((notice) => dayOf(notice.at) !== today);
   visible.forEach((notice, index) => {
     const group = dayOf(notice.at) === today ? "Today" : "Earlier";
     const previous =
@@ -1004,7 +1035,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
           ? "Today"
           : "Earlier"
         : undefined;
-    if (group !== previous)
+    if (mixedDays && group !== previous)
       rows.push(<NotificationGroup key={"group-" + group} label={group} />);
     rows.push(
       <NotificationItem
@@ -1120,6 +1151,12 @@ type AssistantMessage = {
   sources?: Item[];
 };
 
+// The campus date (Manila) of a timestamp; the UTC date put late-night messages under the day before.
+const campusDay = (at: string) => new Date(new Date(at).getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+
+// Kept for the browser session so closing the drawer or changing pages keeps the chat; a different user starts empty.
+let kept: { uid?: string; messages: AssistantMessage[] } = { messages: [] };
+
 export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const session = useQuery(sessionQuery());
   const queryClient = useQueryClient();
@@ -1127,7 +1164,11 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState("");
   const askBox = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const uid = session.data?.user.id;
+  const [messages, setMessages] = useState<AssistantMessage[]>(() => (kept.uid === uid ? kept.messages : []));
+  useEffect(() => {
+    if (uid) kept = { uid, messages };
+  }, [uid, messages]);
   const proposed = suggestions ?? [
     "What can you help me with?",
     ...(session.data?.user.roles.includes("student")
@@ -1183,6 +1224,7 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ duration: reduce ? 0 : 0.34, ease }}
                   >
+                    {!message.own && <AssistantMascot still="happy" size={32} className="cm-msg__avatar" />}
                     <div className="cm-msg__bubble">
                       <span className="cm-msg__who">
                         {message.own ? "You" : "ACCS assistant"}
@@ -1208,12 +1250,14 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
             </ol>
           ) : (
             <div className="cm-welcome">
+              <AssistantMascot still="wave" size={96} className="cm-welcome__mascot" />
               <h2>Ask about ACCS</h2>
               <p>Pick a suggestion or type your own question.</p>
             </div>
           )}
           {action.isPending && (
             <div className="cm-typing" role="status">
+              <AssistantMascot still="thinking" size={32} />
               <span className="cm-dots" aria-hidden>
                 <i />
                 <i />
@@ -1267,17 +1311,20 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
               decide reports, restrictions, or outcomes, and it cannot see
               records you cannot.
             </small>
-            <Button
-              variant="tertiary"
-              size="sm"
-              onPress={() => {
-                setMessages([]);
-                action.reset();
-              }}
-              isDisabled={action.isPending || !messages.length}
-            >
-              Clear conversation
-            </Button>
+            {/* Only once there is something to clear; a disabled button under an empty chat was noise. */}
+            {messages.length > 0 && (
+              <Button
+                variant="tertiary"
+                size="sm"
+                onPress={() => {
+                  setMessages([]);
+                  action.reset();
+                }}
+                isDisabled={action.isPending}
+              >
+                Clear conversation
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1421,7 +1468,9 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
   const page = useQuery({
     ...pageQuery(pageId, recordId, filters),
     enabled: session.data?.allowedPages.includes(pageId) === true,
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, recordId) ? previous : undefined,
   });
+  // A failed background refetch (after a mute toggle) keeps the page and its open panel instead of swapping to the error (QA v5, D13).
   return (
     <RequirePermission pageId={pageId}>
       <div className="app-page">
@@ -1444,16 +1493,9 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
               </Panel>
             </div>
           ) : (
-            <ViewState
-              kind="loading"
-              title={
-                pageId === "P11" || pageId === "P12"
-                  ? "Loading conversations"
-                  : "Loading page"
-              }
-            />
+            <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />
           )
-        ) : page.isError ? (
+        ) : page.isError && !page.data ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (
             <RestrictedView record={pageId === "P12"} />

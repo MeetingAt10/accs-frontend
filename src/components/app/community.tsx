@@ -1,4 +1,5 @@
-import { campusToday } from '@/lib/campus-date'
+import { typedDateImpossible } from '@/lib/typed-date'
+import { campusNowLocal, campusToday } from '@/lib/campus-date'
 import { parseDate } from '@internationalized/date'
 import { FilePicker, PostFiles, useFileUploads } from '@/components/app/message-files'
 import type { MessageFile } from '@/lib/api'
@@ -31,10 +32,8 @@ import {
   Tabs,
   TextArea,
   TextField,
-  ViewState,
   toast,
   EmptyState,
-  type IconName,
 } from '@meetingat10/design-system/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker, useRouter, useRouterState } from '@tanstack/react-router'
@@ -53,10 +52,12 @@ import {
   StatusChip,
   toneFor,
 } from '@/components/app/page-shell'
+import { PageLoading } from '@/components/app/skeleton-page'
+import { pageTitles } from '@/lib/page-catalog'
 import { Comment, CommentThread } from '@/components/ds-next'
 import { SubjectList, SubjectMaterials } from '@/components/app/materials'
 import { QueryProblem } from '@/components/app/query-problem'
-import { ReactionBar, readReactions, topReactions } from '@/components/app/reactions'
+import { ReactionBar, readReactions, topReactions, type ReactionId } from '@/components/app/reactions'
 import {
   performPageAction,
   type PageAction,
@@ -64,7 +65,9 @@ import {
   type Session,
 } from '@/lib/api'
 import { formatDate, formatDateTime, initials, relativeTime } from '@/lib/format'
+import { useLocalDraft } from '@/lib/local-draft'
 import { pageQuery, sessionQuery } from '@/lib/queries'
+import { canOpenPath } from '@/lib/sites'
 import { replaceFilters } from '@/lib/url-filters'
 import { TypedSearch } from '@/components/app/typed-search'
 import './community.css'
@@ -109,6 +112,7 @@ export interface CommunityPost {
   owned: boolean
   reactionCount: number
   reacted: boolean
+  canReact?: boolean
   commentCount: number
   /** Pictures and files posted with it. */
   attachments?: MessageFile[]
@@ -149,6 +153,10 @@ export const isSectionGroup = (space: { title: string; subject: string }) => !sp
 /** A space's name: "SBIT3A" for a section group, "SBIT3A - CC 104 Data Structures" for one of its subjects. */
 export const spaceName = (space: { title: string; subject: string }) => isSectionGroup(space) ? sectionCode(space) : `${sectionCode(space)} - ${space.subject}`
 /** Spaces in one order: by section code, the section group first, then its subjects by name. */
+/** Newest comment or the post itself: the tie-break for "Most active". */
+const lastActivity = (post: CommunityPost) =>
+  post.comments.reduce((latest, comment) => (comment.at > latest ? comment.at : latest), post.at)
+
 export function sortBySection<T extends { title: string; subject: string }>(spaces: T[]) {
   return [...spaces].sort((a, b) => sectionCode(a).localeCompare(sectionCode(b)) || Number(isSectionGroup(b)) - Number(isSectionGroup(a)) || a.subject.localeCompare(b.subject))
 }
@@ -203,6 +211,7 @@ const roleNames: Record<string, string> = {
   dean: 'Dean',
   guidance: 'Guidance',
   osas: 'OSAS',
+  president: 'President’s Office',
   administrator: 'System Administrator',
 }
 
@@ -270,6 +279,39 @@ function useCommunityAction(pageId: string) {
   })
 }
 
+/**
+ * One reaction button for a post: the new reaction shows on the first press (held locally until the server answers,
+ * then the refetched data takes over); the button is disabled only while the request is in flight.
+ */
+function PostReactionBar({ post, disabled, size }: { post: CommunityPost; disabled: boolean; size?: "md" | "sm" }) {
+  const queryClient = useQueryClient()
+  const [held, setHeld] = useState<Record<string, unknown> | null>(null)
+  const react = useMutation({
+    mutationFn: (reaction: ReactionId) => performPageAction('P06', { action: 'react', recordId: post.id, payload: { reaction } }),
+    onMutate: (reaction) => {
+      const { counts, mine } = readReactions(post as unknown as Record<string, unknown>)
+      const next = { ...counts }
+      if (mine) next[mine] -= 1
+      if (reaction !== mine) next[reaction] += 1
+      setHeld({ ...post, reactionCounts: next, myReaction: reaction === mine ? null : reaction })
+    },
+    // Not awaited: the button re-enables when the server answers, not after the refetch.
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['page'] }).then(() => setHeld(null)) },
+  })
+  return (
+    <>
+      <ReactionBar
+        item={held ?? (post as unknown as Record<string, unknown>)}
+        size={size}
+        disabled={disabled}
+        pending={react.isPending}
+        onReact={(reaction) => react.mutate(reaction)}
+      />
+      {react.error && <span role="alert" className="fx-review">{react.error.message}</span>}
+    </>
+  )
+}
+
 function ActionError({ error }: { error: unknown }) {
   if (!error) return null
   return (
@@ -284,12 +326,18 @@ function ActionError({ error }: { error: unknown }) {
 const ease = [0.16, 1, 0.3, 1] as const
 const priorityRank = ['urgent', 'important', 'general']
 
-function Initials({ name, small, photo }: { name: string; small?: boolean; photo?: unknown }) {
+function Initials({ name, small, photo, anonymous }: { name: string; small?: boolean; photo?: unknown; anonymous?: boolean }) {
   return (
-    <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} aria-hidden>
-      <AvatarFill photo={photo} fallback={initials(name) || '?'} />
+    <span className={`accs-avatar fx-av${small ? ' fx-av--sm' : ''}`} data-anonymous={anonymous || undefined} aria-hidden>
+      <AvatarFill photo={photo} fallback={anonymous ? 'A' : initials(name) || '?'} />
     </span>
   )
+}
+
+/** The first role of a person, for the small chip beside their name ("Dean"). */
+function mainRole(person?: Person) {
+  const role = person?.roles?.[0]
+  return role ? roleLabelOf(role) || roleNames[role] || role : ''
 }
 
 function authorName(post: CommunityPost) {
@@ -357,105 +405,113 @@ function ThreadList({
   ]
 
   return (
-    <Panel flush className="fx-threads-panel">
-      <ul className="fx-threads" aria-label="Posts">
-        <AnimatePresence initial mode="popLayout">
-          {ordered.map((post, index) => {
-            const name = authorName(post)
-            const announcement = post.kind === 'announcement'
-            return (
-              <motion.li
-                key={post.id}
-                className="fx-thread"
-                layout={!reduce}
-                initial={reduce ? false : { opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? undefined : { opacity: 0, x: -16 }}
-                transition={{
-                  duration: 0.36,
-                  ease,
-                  delay: reduce ? 0 : Math.min(index, 8) * 0.04,
-                }}
-              >
-                <div className="fx-vote" title={`${readReactions(post as unknown as Record<string, unknown>).total} reactions`}>
-                  <span aria-hidden className="fx-vote__emoji">{topReactions(readReactions(post as unknown as Record<string, unknown>).counts, 1)[0]?.emoji ?? '👍'}</span>
-                  <span className="accs-num">{readReactions(post as unknown as Record<string, unknown>).total}</span>
-                  <span className="fx-sr">reactions</span>
-                </div>
-                <div className="fx-thread__body">
-                  <div className="fx-thread__tags">
-                    <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
-                      {announcement ? 'Announcement' : post.label}
-                    </span>
-                    <span className="accs-tag">
+    <ul className="fx-threads" aria-label="Posts">
+      <AnimatePresence initial mode="popLayout">
+        {ordered.map((post, index) => {
+          const name = authorName(post)
+          const announcement = post.kind === 'announcement'
+          const role = post.anonymous ? '' : mainRole(post.author)
+          const reactionsRead = readReactions(post as unknown as Record<string, unknown>)
+          const files = post.attachments?.length ?? 0
+          const general = !post.priority || post.priority === 'general'
+          return (
+            <motion.li
+              key={post.id}
+              className="fx-thread"
+              layout={!reduce}
+              initial={reduce ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduce ? undefined : { opacity: 0, x: -16 }}
+              transition={{
+                duration: 0.36,
+                ease,
+                delay: reduce ? 0 : Math.min(index, 8) * 0.04,
+              }}
+            >
+              <div className="fx-thread__head">
+                <Initials name={name} anonymous={post.anonymous} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
+                <div className="fx-thread__who">
+                  <p className="fx-thread__name">
+                    <span className="fx-thread__author">{name}</span>
+                    {role && <span className="fx-role">{role}</span>}
+                  </p>
+                  <p className="fx-thread__meta">
+                    <time dateTime={post.at} title={formatDateTime(post.at)}>
+                      {relativeTime(post.at)}
+                    </time>
+                    <span aria-hidden>·</span>
+                    <span>
                       {post.audience === 'college'
                         ? 'CCS'
                         : audienceName(post.audience, spaces, organizations)}
                     </span>
-                    {announcement && (
-                      <StatusChip tone={toneFor(post.priority || 'general')}>
-                        {priorityLabel(post.priority)}
-                      </StatusChip>
+                    {announcement && general && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>{priorityLabel(post.priority)}</span>
+                      </>
                     )}
-                  </div>
-                  <h3 className="fx-thread__title">
-                    <Link
-                      variant="quiet"
-                      className="fx-title-link"
-                      href={`/feed/${encodeURIComponent(post.id)}`}
-                    >
-                      {post.title}
-                    </Link>
-                  </h3>
-                  <p className="fx-thread__excerpt">{post.body}</p>
-                  {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
-                  <p className="fx-thread__meta">
-                    <Initials name={name} small photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
-                    <span className="fx-thread__author">{name}</span>
-                    <span aria-hidden>·</span>
-                    <time dateTime={post.at} title={formatDateTime(post.at)}>
-                      {relativeTime(post.at)}
-                    </time>
-                    {post.attachments?.length ? (
-                      <span className="fx-thread__replies" title={`${post.attachments.length} ${post.attachments.length === 1 ? 'file' : 'files'}`}>
-                        <Icon name="paperclip" size={16} />
-                        <span className="accs-num">{post.attachments.length}</span>
-                        <span className="fx-sr">{post.attachments.length === 1 ? 'file' : 'files'}</span>
-                      </span>
-                    ) : null}
-                    <span className="fx-thread__replies">
-                      <Icon name="chat" size={16} />
-                      <span className="accs-num">{post.commentCount}</span>
-                      <span className="fx-sr">replies</span>
-                    </span>
                   </p>
-                  {!post.removed && <RowComment post={post} />}
                 </div>
-              </motion.li>
-            )
-          })}
-        </AnimatePresence>
-      </ul>
-    </Panel>
+                <div className="fx-thread__tags">
+                  {announcement && !general && (
+                    <StatusChip tone={toneFor(post.priority)}>
+                      {priorityLabel(post.priority)}
+                    </StatusChip>
+                  )}
+                  <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
+                    {announcement ? 'Announcement' : post.label}
+                  </span>
+                </div>
+              </div>
+              <h3 className="fx-thread__title">
+                <Link
+                  variant="quiet"
+                  className="fx-title-link"
+                  href={`/feed/${encodeURIComponent(post.id)}`}
+                >
+                  {post.title}
+                </Link>
+              </h3>
+              {/* A removed post's title already reads "This content was removed.", so its body is not repeated under it. */}
+              {post.body && !post.removed && <p className="fx-thread__excerpt">{post.body}</p>}
+              {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
+              <div className="fx-thread__foot">
+                <span className="fx-stat" title={reactionsRead.total ? topReactions(reactionsRead.counts, 6).map((r) => `${r.label} ${reactionsRead.counts[r.id]}`).join(', ') : undefined}>
+                  <span aria-hidden className="fx-stat__emoji">
+                    {topReactions(reactionsRead.counts).map((r) => r.emoji).join('') || '👍'}
+                  </span>
+                  <span><span className="accs-num">{reactionsRead.total}</span>{reactionsRead.total === 1 ? ' reaction' : ' reactions'}</span>
+                </span>
+                <span className="fx-stat">
+                  <Icon name="chat" size={16} />
+                  <span><span className="accs-num">{post.commentCount}</span>{post.commentCount === 1 ? ' reply' : ' replies'}</span>
+                </span>
+                {files ? (
+                  <span className="fx-stat">
+                    <Icon name="paperclip" size={16} />
+                    <span><span className="accs-num">{files}</span>{files === 1 ? ' file' : ' files'}</span>
+                  </span>
+                ) : null}
+                {!post.removed && post.canReact === true && <PostReactionBar post={post} disabled={false} size="sm" />}
+                {!post.removed && <RowComment post={post} />}
+              </div>
+            </motion.li>
+          )
+        })}
+      </AnimatePresence>
+    </ul>
   )
 }
 
-/** A rail section's heading: its icon, its name and how many items it lists. */
-function RailTitle({ icon, children, count }: { icon: IconName; children: string; count?: number }) {
-  return (
-    <span className="fx-rail-title">
-      <span className="fx-rail-mark" aria-hidden><Icon name={icon} size={16} /></span>
-      {children}
-      {count ? <span className="fx-rail-count" aria-label={`${count} shown`}>{count}</span> : null}
-    </span>
-  )
-}
+/** Colours for the rail's space marks, in turn, so neighbouring spaces read apart. */
+const markTones = ['adviser', 'chair', 'guidance', 'dean', 'osas'] as const
 
-/** One rail row: a tinted icon, then the title and a line under it. */
-function RailRow({ href, icon, title, sub }: { href: string; icon: IconName; title: ReactNode; sub: ReactNode }) {
+/** One rail row: a mark (initials or an icon), then the title and a line under it. */
+function RailRow({ href, mark, tone, round, title, sub }: { href: string; mark: ReactNode; tone?: string; round?: boolean; title: ReactNode; sub: ReactNode }) {
   return (
     <Link variant="quiet" className="fx-mini__row" href={href}>
-      <span className="fx-mini__mark" aria-hidden><Icon name={icon} size={16} /></span>
+      <span className="fx-mini__mark" data-tone={tone} data-round={round || undefined} aria-hidden>{mark}</span>
       <span className="fx-mini__text">
         <span className="fx-mini__title">{title}</span>
         <span className="fx-mini__sub">{sub}</span>
@@ -468,6 +524,7 @@ function RailLink({ href, children }: { href: string; children: string }) {
   return (
     <Link variant="quiet" className="accs-panel__link fx-rail-link" href={href}>
       {children}
+      <Icon name="caret-right" size={16} />
     </Link>
   )
 }
@@ -488,7 +545,7 @@ function FeedRail({
   organizationsLoad?: Retry
 }) {
   const announcements = posts
-    .filter((post) => post.kind === 'announcement')
+    .filter((post) => post.kind === 'announcement' && !post.removed)
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 4)
   const orgs = [...organizations]
@@ -496,22 +553,6 @@ function FeedRail({
     .slice(0, 5)
   return (
     <aside className="fx-rail accs-stagger" aria-label="Forum sidebar">
-      {announcements.length > 0 && (
-        <Panel title={<RailTitle icon="megaphone" count={announcements.length}>Announcements</RailTitle>} flush className="fx-rail-sec" data-tone="warn">
-          <ul className="fx-mini">
-            {announcements.map((post) => (
-              <li key={post.id}>
-                <RailRow
-                  href={`/feed/${encodeURIComponent(post.id)}`}
-                  icon="megaphone"
-                  title={post.title}
-                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
-                />
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      )}
       {spacesLoad?.failed && (
         <Panel title="Your spaces">
           <QueryProblem what="your class spaces" onRetry={spacesLoad.retry} retrying={spacesLoad.retrying} />
@@ -524,23 +565,26 @@ function FeedRail({
       )}
       {spaces.length > 0 && (
         <Panel
-          title={<RailTitle icon="graduation-cap" count={Math.min(spaces.length, 5)}>Your spaces</RailTitle>}
+          title="Your spaces"
           flush
           className="fx-rail-sec"
-          data-tone="info"
           action={<RailLink href="/spaces">View all</RailLink>}
         >
           <ul className="fx-mini">
-            {spaces.slice(0, 5).map((space) => {
+            {spaces.slice(0, 5).map((space, index) => {
               // The section group is the whole class; a subject space is one subject of it, named by the subject.
               const group = isSectionGroup(space)
+              const students = studentTotal(space)
               return (
                 <li key={space.id}>
                   <RailRow
                     href={`/spaces/${encodeURIComponent(space.id)}`}
-                    icon={group ? 'chalkboard' : 'books'}
-                    title={spaceName(space)}
-                    sub={group ? 'Whole section' : 'Subject'}
+                    mark={(group ? sectionCode(space) : space.subject).replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase()}
+                    tone={markTones[index % markTones.length]}
+                    title={group ? sectionCode(space) : space.subject}
+                    sub={group
+                      ? <>Whole section{students ? <> · <span className="accs-num">{students}</span> {students === 1 ? 'student' : 'students'}</> : null}</>
+                      : <>Subject · {sectionCode(space)}</>}
                   />
                 </li>
               )
@@ -550,10 +594,9 @@ function FeedRail({
       )}
       {orgs.length > 0 && (
         <Panel
-          title={<RailTitle icon="users" count={orgs.length}>Organizations</RailTitle>}
+          title="Organizations"
           flush
           className="fx-rail-sec"
-          data-tone="ok"
           action={<RailLink href="/organizations">Browse</RailLink>}
         >
           <ul className="fx-mini">
@@ -563,16 +606,34 @@ function FeedRail({
                 <li key={organization.id}>
                   <RailRow
                     href={`/organizations/${encodeURIComponent(organization.id)}`}
-                    icon="users"
+                    mark={initials(organization.name) || '?'}
+                    round
                     title={organization.name}
                     sub={<>
-                      {count} {count === 1 ? 'member' : 'members'}
+                      <span className="accs-num">{count}</span> {count === 1 ? 'member' : 'members'}
                       {organization.member && <span className="fx-mini__badge">Member</span>}
                     </>}
                   />
                 </li>
               )
             })}
+          </ul>
+        </Panel>
+      )}
+      {announcements.length > 0 && (
+        <Panel title="Announcements" flush className="fx-rail-sec">
+          <ul className="fx-mini">
+            {announcements.map((post) => (
+              <li key={post.id}>
+                <RailRow
+                  href={`/feed/${encodeURIComponent(post.id)}`}
+                  mark={<Icon name="megaphone" size={16} />}
+                  tone="announcement"
+                  title={post.title}
+                  sub={<>{priorityLabel(post.priority)} · {relativeTime(post.at)}</>}
+                />
+              </li>
+            ))}
           </ul>
         </Panel>
       )}
@@ -651,7 +712,8 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     )
     .sort((a, b) =>
       sort === 'active'
-        ? b.commentCount + b.reactionCount - a.commentCount - a.reactionCount
+        ? b.commentCount + b.reactionCount - a.commentCount - a.reactionCount ||
+          lastActivity(b).localeCompare(lastActivity(a))
         : b.at.localeCompare(a.at),
     )
   const pageCount = Math.max(1, Math.ceil(posts.length / 10))
@@ -682,106 +744,106 @@ function FeedPage({ page, session }: { page: PageEnvelope; session: Session }) {
     <div className="fx-page accs-stack accs-stagger">
       <PageHeader
         title="Feed"
-        description="Posts and announcements from the audiences you belong to."
-        // One "Start a discussion": the bar above the feed when it shows (QA 17 November: it was there twice).
+        description="Posts and announcements from the groups you belong to."
+        // The composer card below is the one way to start a post (QA 17 and 24 November: it was there twice). The
+        // header button only shows, disabled, while posting is paused and there is no composer.
         actions={
-          canParticipate && !canPost && (
-            <Button
-              icon="plus"
-              href="/feed/new"
-              isDisabled={page.data.canPost !== true}
-            >
-              Start a discussion
-            </Button>
-          )
+          <div className="fx-head-actions">
+            <div className="fx-head-search">
+              <TypedSearch
+                label="Search posts"
+                placeholder="Search posts"
+                size="sm"
+                value={query}
+                onChange={(q) => update({ q })}
+              />
+            </div>
+            {canParticipate && !canPost && (
+              <Button icon="plus" href="/feed/new" isDisabled>
+                Start a discussion
+              </Button>
+            )}
+          </div>
         }
       />
       <div className="accs-split fx-split">
         <div className="fx-main">
-          {canPost && (
-            <Link href={composeHref} className="fx-compose" variant="quiet">
-              <Initials name={session.user.name} />
-              <span className="fx-compose__hint">Start a discussion…</span>
-              <span className="fx-compose__cta">
-                <Icon name="pencil" size={16} />
-                Write
-              </span>
-            </Link>
-          )}
-          <div className="fx-toolbar">
-            <div className="fx-toolbar__row">
-              <div className="fx-toolbar__search">
-                <TypedSearch
-                  label="Search posts"
-                  size="sm"
-                  value={query}
-                  onChange={(q) => update({ q })}
-                />
-              </div>
+          {(canPost || uniqueScopes.length > 1) && (
+            <div className="fx-composer" data-post={canPost || undefined}>
+              {canPost && (
+                <>
+                  <Initials name={session.user.name} />
+                  <Link href={composeHref} className="fx-composer__field" variant="quiet">
+                    Share an update with {scope === 'college' ? 'CCS' : audienceName(scope, spaces, organizations)}…
+                  </Link>
+                </>
+              )}
               {uniqueScopes.length > 1 && (
-                <Select
-                  label="Audience"
-                  selectedKey={scope}
-                  onSelectionChange={(key) => update({ scope: String(key) })}
-                >
-                  {uniqueScopes.map((option) => (
-                    <SelectOption id={option.id} key={option.id}>
-                      {option.label}
-                    </SelectOption>
-                  ))}
-                </Select>
+                <div className="fx-composer__audience">
+                  <Select
+                    label="Audience"
+                    selectedKey={scope}
+                    onSelectionChange={(key) => update({ scope: String(key) })}
+                  >
+                    {uniqueScopes.map((option) => (
+                      <SelectOption id={option.id} key={option.id}>
+                        {option.label}
+                      </SelectOption>
+                    ))}
+                  </Select>
+                </div>
               )}
             </div>
-            <div className="fx-toolbar__row fx-toolbar__row--pills">
-              <LayoutGroup id="fx-sort">
-                <div className="fx-seg" role="group" aria-label="Sort posts">
-                  {[
-                    { id: 'newest', label: 'Latest' },
-                    { id: 'active', label: 'Most active' },
-                  ].map((option) => (
-                    <button
-                      type="button"
-                      key={option.id}
-                      className="fx-seg__item"
-                      aria-pressed={sort === option.id}
-                      onClick={() => update({ sort: option.id })}
-                    >
-                      {sort === option.id && (
-                        <motion.span
-                          layoutId="fx-sort-indicator"
-                          className="fx-seg__thumb"
-                          transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-                        />
-                      )}
-                      <span className="fx-seg__label">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </LayoutGroup>
-              <div className="accs-pills fx-cats" role="group" aria-label="Post labels">
+          )}
+          <div className="fx-toolbar fx-filters">
+            <div className="accs-pills fx-cats" role="group" aria-label="Post labels">
+              <button
+                type="button"
+                className="accs-pill fx-cat"
+                aria-pressed={!labels.length}
+                onClick={() => update({ label: undefined })}
+              >
+                All
+              </button>
+              {['Announcements', ...postLabels].map((label) => (
                 <button
                   type="button"
+                  key={label}
                   className="accs-pill fx-cat"
-                  aria-pressed={!labels.length}
-                  onClick={() => update({ label: undefined })}
+                  data-label={labelKey(label)}
+                  data-included={!labels.length || undefined}
+                  aria-pressed={labels.includes(label)}
+                  onClick={() => toggleLabel(label)}
                 >
-                  All
+                  {label}
                 </button>
-                {['Announcements', ...postLabels].map((label) => (
+              ))}
+            </div>
+            <LayoutGroup id="fx-sort">
+              <div className="fx-seg" role="group" aria-label="Sort posts">
+                {[
+                  { id: 'newest', label: 'Latest' },
+                  { id: 'active', label: 'Most active' },
+                ].map((option) => (
                   <button
                     type="button"
-                    key={label}
-                    className="accs-pill fx-cat"
-                    data-label={labelKey(label)}
-                    data-included={!labels.length || undefined}
-                    aria-pressed={labels.includes(label)}
-                    onClick={() => toggleLabel(label)}
+                    key={option.id}
+                    className="fx-seg__item"
+                    aria-pressed={sort === option.id}
+                    onClick={() => update({ sort: option.id })}
                   >
-                    {label}
+                    {sort === option.id && (
+                      <motion.span
+                        layoutId="fx-sort-indicator"
+                        className="fx-seg__thumb"
+                        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                      />
+                    )}
+                    <span className="fx-seg__label">{option.label}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            </LayoutGroup>
           </div>
           {posts.length ? (
             <>
@@ -881,15 +943,20 @@ export function PostComposer({
   const [audience, setAudience] = useState(
     initialOptions.includes(requestedAudience) ? requestedAudience : '',
   )
-  const [label, setLabel] = useState('')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  // Text survives a reload; attachments do not.
+  const [text, setText, clearText] = useLocalDraft(`accs-post-draft-${session.user.id}`, { label: '', title: '', body: '' })
+  const { label, title, body } = text
+  const setLabel = (value: string) => setText((current) => ({ ...current, label: value }))
+  const setTitle = (value: string) => setText((current) => ({ ...current, title: value }))
+  const setBody = (value: string) => setText((current) => ({ ...current, body: value }))
   const uploads = useFileUploads(10)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
   // "Add event" on the calendar opens this form with its date (YYYY-MM-DD, today or later).
   const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') && (params.get('date') ?? '') >= campusToday().toString() ? params.get('date')! : ''
   const [eventDate, setEventDate] = useState(requestedDate)
+  // Set while the typed event date is a day that does not exist (02/31), which the picker would quietly change.
+  const [eventDateBad, setEventDateBad] = useState(false)
   const [eventTime, setEventTime] = useState('')
   const [eventPlace, setEventPlace] = useState('')
   const [eventContact, setEventContact] = useState('')
@@ -931,10 +998,13 @@ export function PostComposer({
     if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
     if (eventRequired || (eventShown && eventGiven)) {
-      if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
+      if (eventDateBad) nextErrors.eventDate = "That date doesn't exist."
+      else if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
       else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTime))
         nextErrors.eventTime = 'Enter a time as HH:MM.'
+      else if (eventDate === campusToday().toString() && eventTime <= campusNowLocal().slice(11))
+        nextErrors.eventTime = 'Choose a time that has not passed.'
     }
     if (eventRequired) {
       if (!eventPlace.trim()) nextErrors.eventPlace = 'Enter the event place.'
@@ -966,6 +1036,7 @@ export function PostComposer({
       })
       const created = record<CommunityPost>(result.record)
       allowLeave.current = true
+      clearText()
       router.history.push(
         created?.id ? `/feed/${encodeURIComponent(created.id)}` : '/feed',
       )
@@ -1129,7 +1200,11 @@ export function PostComposer({
                     isRequired={eventRequired}
                     defaultValue={requestedDate ? parseDate(requestedDate) : undefined}
                     minValue={campusToday()}
-                    onChange={(value) => setEventDate(value?.toString() ?? '')}
+                    onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setEventDateBad(bad) }}
+                    onChange={(value) => {
+                      setEventDate(value?.toString() ?? '')
+                      if (document.activeElement?.closest('.ds-date-picker__popover')) setEventDateBad(false)
+                    }}
                     isInvalid={Boolean(errors.eventDate)}
                     errorMessage={errors.eventDate}
                   />
@@ -1218,7 +1293,7 @@ export function PostComposer({
           <Button
             variant="destructive"
             onPress={() => {
-              if (blocker.status === 'blocked') blocker.proceed()
+              if (blocker.status === 'blocked') { clearText(); blocker.proceed() }
             }}
           >
             Discard post
@@ -1243,27 +1318,29 @@ export function PostView({
   const announcement = post.kind === 'announcement'
   return (
     <article className="fx-post">
-      <div className="fx-thread__tags">
-        <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
-          {announcement ? 'Announcement' : post.label}
-        </span>
-        <span className="accs-tag">
-          {audienceName(post.audience, spaces, organizations)}
-        </span>
-        {announcement && (
-          <StatusChip tone={toneFor(post.priority || 'general')}>
-            {priorityLabel(post.priority)}
-          </StatusChip>
-        )}
-        {post.private && <span className="accs-tag">Members only</span>}
-      </div>
-      <div className="fx-post__author">
-        <Initials name={name} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
-        <div className="fx-post__who">
-          <strong>{name}</strong>
-          <span>
-            {role && <>{role} · </>}
+      <div className="fx-thread__head fx-post__head">
+        <Initials name={name} anonymous={post.anonymous} photo={post.anonymous ? undefined : (post.author as { photo?: unknown } | undefined)?.photo} />
+        <div className="fx-thread__who">
+          <p className="fx-thread__name">
+            <span className="fx-thread__author">{name}</span>
+            {!post.anonymous && role && <span className="fx-role">{role}</span>}
+          </p>
+          <p className="fx-thread__meta">
             <time dateTime={post.at}>{formatDateTime(post.at)}</time>
+          </p>
+        </div>
+        <div className="fx-thread__tags">
+          {announcement && (
+            <StatusChip tone={toneFor(post.priority || 'general')}>
+              {priorityLabel(post.priority)}
+            </StatusChip>
+          )}
+          {post.private && <span className="accs-tag">Members only</span>}
+          <span className="accs-tag">
+            {audienceName(post.audience, spaces, organizations)}
+          </span>
+          <span className="accs-tag fx-tag--label" data-label={labelKey(announcement ? 'Announcement' : post.label)}>
+            {announcement ? 'Announcement' : post.label}
           </span>
         </div>
       </div>
@@ -1487,14 +1564,7 @@ function PostDetailPage({
         <Panel as="div" className="fx-post-panel">
           <PostView post={post} />
           <div className="fx-actions">
-            <ReactionBar
-              item={post as unknown as Record<string, unknown>}
-              disabled={page.data.canReact !== true}
-              pending={action.isPending && action.variables?.action === 'react'}
-              onReact={(reaction) =>
-                action.mutate({ action: 'react', recordId: post.id, payload: { reaction } })
-              }
-            />
+            <PostReactionBar post={post} disabled={page.data.canReact !== true} />
             {page.data.canComment === true && (
               <Button variant="tertiary" icon="chat" onPress={focusReply}>
                 Reply
@@ -1642,7 +1712,6 @@ function PostDetailPage({
                       label="Add a comment"
                       value={body}
                       onChange={setBody}
-                      isRequired
                       autoFocus
                       maxLength={4000}
                       showCount
@@ -1865,6 +1934,7 @@ function MemberList({
   /** The organization account manages its members and their positions (19 November 2026). */
   manage?: { organizationId: string; accountId?: string; students: StudentChoice[] }
 }) {
+  const session = useQuery(sessionQuery())
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const filtered = members.filter((member) =>
@@ -1908,7 +1978,7 @@ function MemberList({
                     <div className="fx-member__text">
                       {/* Opens their profile (QA 17 November: roster and member names did not). */}
                       <p className="accs-row__title">
-                        {member.id ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
+                        {member.id && session.data && canOpenPath(session.data, `/people/${encodeURIComponent(member.id)}`) ? <Link variant="quiet" href={`/people/${encodeURIComponent(member.id)}`}>{member.name}</Link> : member.name}
                       </p>
                       {academic && (
                         <p className="accs-row__sub">
@@ -2021,6 +2091,7 @@ function SpacesPage({
             <div className="fx-toolbar__search">
               <TypedSearch
                 label="Find a section"
+                placeholder="Find a section"
                 size="sm"
                 value={query}
                 onChange={(q) => update({ q })}
@@ -2251,7 +2322,9 @@ function SpacePage({
               </div>
             </div>
             {discussions.length ? (
-              <ThreadList posts={discussions} spaces={[space]} />
+              <PagedList items={discussions} noun="posts" resetKey={query}>
+                {(shown) => <ThreadList posts={shown} spaces={[space]} />}
+              </PagedList>
             ) : (
               <Panel>
                 <Empty
@@ -2339,6 +2412,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
         <div className="fx-toolbar__search">
           <TypedSearch
             label="Find an organization"
+            placeholder="Find an organization"
             size="sm"
             value={query}
             onChange={(q) => update({ q })}
@@ -2352,7 +2426,8 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
             <ul className="accs-rows" aria-label="Organizations">
               {organizations.map((organization) => (
                 <li key={organization.id}>
-                  <div className="accs-row fx-row">
+                  <div className="accs-row fx-row fx-row--mark">
+                    <span className="fx-mini__mark" data-round aria-hidden>{initials(organization.name) || '?'}</span>
                     <div>
                       <p className="accs-row__title">
                         <Link
@@ -2368,7 +2443,7 @@ function OrganizationsPage({ page }: { page: PageEnvelope }) {
                     <span className="fx-count-label">
                       <span className="accs-num">{organization.memberCount ?? 0}</span>{' '}
                       members
-                      {organization.member ? ' · Member' : ''}
+                      {organization.member && <>{' '}<StatusChip tone="ok">Member</StatusChip></>}
                     </span>
                   </div>
                 </li>
@@ -2570,7 +2645,7 @@ function OrganizationPage({
 export function CommunityPage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <ViewState kind="loading" title="Loading account context" />
+    return <PageLoading pageId={page.pageId} title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P04')
     return <FeedPage page={page} session={session.data} />
   if (page.pageId === 'P05')

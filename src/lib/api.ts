@@ -8,6 +8,7 @@ export type Role =
   | 'administrator'
   | 'guidance'
   | 'osas'
+  | 'president'
   | 'secretary'
 
 export interface SessionUser {
@@ -118,7 +119,7 @@ export const changePassword = (input: { currentPassword: string; password: strin
   post<Done>('/auth/change-password', input)
 
 /** Replaces the temporary username and password. Answers with the new session. */
-export const completeFirstLogin = (input: { currentPassword: string; username: string; password: string }) =>
+export const completeFirstLogin = (input: { password: string; currentPassword?: string; username?: string }) =>
   post<Session>('/auth/complete-first-login', input)
 
 export const signOut = () =>
@@ -231,6 +232,10 @@ export const activateSecretary = (input: { name?: string; email?: string }) =>
 
 export const setAccountActive = (id: string, active: boolean) =>
   post<Recorded<{ id: string; active: boolean }>>('/accounts/' + encodeURIComponent(id) + '/active', { active })
+
+/** Year level and/or section for many students; the server checks each one and changes all or none. */
+export const enrollStudents = (input: { ids: string[]; year?: number; section?: string }) =>
+  post<Recorded<{ ids: string[] }>>('/accounts/students/enroll', input)
 
 /** The first 200 matches; `total` is the full count. */
 export const listAccounts = (filters: { role?: Role; q?: string } = {}) =>

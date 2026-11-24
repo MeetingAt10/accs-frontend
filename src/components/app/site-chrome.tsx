@@ -2,14 +2,17 @@ import { useQuery } from '@tanstack/react-query'
 import { pageQuery } from '@/lib/queries'
 import { AvatarFill } from '@/components/app/photo'
 import { Icon } from '@meetingat10/design-system/react'
-import { assistantIcon, assistantIconName } from '@/components/app/assistant-icon'
+import { SidebarSimpleIcon } from '@meetingat10/design-system/icons'
+import { AssistantCard, AssistantIcon, assistantIconName } from '@/components/app/assistant-icon'
+import logoKey from '@/components/app/shell-logo-key.svg'
 import { useRouter } from '@tanstack/react-router'
+import { replayOnboarding } from '@/components/app/onboarding'
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
 
 import type { Session } from '@/lib/api'
 import { initials } from '@/lib/format'
-import { roleLabel, siteById, type Site, type SiteId } from '@/lib/sites'
+import { roleLabel, type Site, type SiteId } from '@/lib/sites'
 
 import './sites.css'
 
@@ -41,64 +44,201 @@ export function NavLink({
     router.history.push(href)
   }
   return (
-    <a {...rest} href={router.history.createHref(href)} onClick={click}>
+    <a {...rest} href={router.history.createHref(href)} data-nav={href} onClick={click}>
       {children}
     </a>
   )
 }
 
-/** The primary navigation panel: the sites the person may open, with the current site's own links nested under it.
- *  Account and utility links (profile, settings, help) live in the top bar, not here. */
-export function SitePanel({
+/** The ACCS key mark (the sign-in logo's key, without the A and S) and the name. The mark is a mask filled with the text
+ *  colour, so it is white on the navy panel (`tone="brand"`) and ink on the top bar (`"page"`) in either theme. */
+export function ShellBrand({ tone = 'brand', size = 'md' }: { tone?: 'brand' | 'page'; size?: 'sm' | 'md' }) {
+  return (
+    <span className="shell-brand" data-tone={tone} data-size={size}>
+      <span className="shell-brand__key" aria-hidden style={{ maskImage: `url(${logoKey})`, WebkitMaskImage: `url(${logoKey})` }} />
+      <span className="shell-brand__text">
+        <span className="shell-brand__name">ACCS</span>
+        <span className="shell-brand__sub">College of Computer Studies</span>
+      </span>
+    </span>
+  )
+}
+
+/** "Program Chair · BSIT": the first role and the program or office it covers, for the account block and the phone menu. */
+export function accountLine(user: Session['user']) {
+  return [user.roles[0] ? roleLabel(user.roles[0]) : '', user.program || user.office].filter(Boolean).join(' · ')
+}
+
+/** A site's links as one flat list, minus the ones that repeat the site row: a link with the site's own name and landing
+ *  page (Evaluations under Evaluations), or a lone link to the landing page (Calendar under Schedule). */
+function subEntries(groups: NavGroup[] | undefined, site: Site, href: string) {
+  const entries = (groups ?? []).flatMap((group) => group.entries).filter((entry) => !(entry.href === href && entry.label === site.label))
+  return entries.length === 1 && entries[0].href === href ? [] : entries
+}
+
+/** Every site the person may open, each with its own links nested under it and open by default; a caret folds them. */
+function SiteList({
   destinations,
   current,
-  groups,
+  siteGroups,
   currentHref,
+  onNavigate,
+  layoutId,
 }: {
   destinations: Destination[]
   current: SiteId
-  groups: NavGroup[]
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
   currentHref?: string
+  onNavigate?: () => void
+  layoutId: string
 }) {
   const slide = useSlide()
   return (
-    <aside className="shell-side" aria-label="Main navigation">
-      <div className="shell-side__head">
-        <span className="shell-mark" aria-hidden>
-          A
-        </span>
-        <p className="shell-side__name">ACCS</p>
-      </div>
-      <nav className="shell-side__nav" aria-label="ACCS sites">
-        <LayoutGroup id="panel">
-          {destinations.map(({ site, href }) => {
-            const isCurrent = site.id === current
-            // With a link under it highlighted, the site only reads as the section; otherwise it is the page.
-            const isPage = isCurrent && !currentHref
-            return (
-              <div className="shell-group" key={site.id}>
-                <NavLink
-                  href={href}
-                  className="shell-nav-item"
-                  title={`${site.label}. ${site.purpose}`}
-                  data-section={isCurrent || undefined}
-                  aria-current={isPage ? 'page' : undefined}
-                >
-                  {isPage && <motion.span layoutId="panel-pill" className="shell-nav-item__pill" transition={slide} aria-hidden />}
-                  <Icon name={site.icon as never} size={20} weight={isCurrent ? 'fill' : 'regular'} />
-                  {site.label}
-                </NavLink>
-                {isCurrent && groups.length > 0 && (
-                  <div className="shell-sub">
-                    <SiteNav groups={groups} current={currentHref} />
-                  </div>
-                )}
+    <LayoutGroup id={layoutId}>
+      {destinations.map(({ site, href }) => {
+        const isCurrent = site.id === current
+        const links = subEntries(siteGroups[site.id], site, href)
+        // The site's own landing page heads its list when no link already goes there (Home above My standing).
+        const entries = links.length > 0 && !links.some((entry) => entry.href === href) ? [{ href, label: site.label, icon: site.icon }, ...links] : links
+        const open = entries.length > 0
+        // With a link under it highlighted, the site only reads as the section; otherwise (or folded) it is the page.
+        const subCurrent = isCurrent ? (currentHref ?? href) : undefined
+        const isPage = isCurrent && !(open && entries.some((entry) => entry.href === subCurrent))
+        const subId = `${layoutId}-sub-${site.id}`
+        return (
+          <div className="shell-group" key={site.id}>
+            <NavLink
+              href={href}
+              className="shell-nav-item"
+              title={`${site.label}. ${site.purpose}`}
+              data-section={isCurrent || undefined}
+              aria-current={isPage ? 'page' : undefined}
+              onNavigate={onNavigate}
+            >
+              {isPage && <motion.span layoutId={`${layoutId}-pill`} className="shell-nav-item__pill" transition={slide} aria-hidden />}
+              <Icon name={site.icon as never} size={20} />
+              <span className="shell-nav-item__label">{site.label}</span>
+            </NavLink>
+            {open && (
+              <div className="shell-sub" id={subId}>
+                <SiteNav groups={[{ label: site.label, entries }]} current={subCurrent} onNavigate={onNavigate} layoutId={`${layoutId}-sub`} labels={false} />
               </div>
-            )
-          })}
-        </LayoutGroup>
+            )}
+          </div>
+        )
+      })}
+    </LayoutGroup>
+  )
+}
+
+const sideKey = 'accs.sidebar'
+
+/** The primary navigation panel: the sites the person may open, with the current site's own links nested under it,
+ *  and the Assistant card at the foot. Account and utility links (profile, settings, help) live in the top bar. */
+export function SitePanel({
+  destinations,
+  current,
+  siteGroups,
+  currentHref,
+  onAssistant,
+}: {
+  destinations: Destination[]
+  current: SiteId
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
+  currentHref?: string
+  onAssistant: () => void
+}) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(sideKey) === 'collapsed'
+    } catch {
+      return false
+    }
+  })
+  // Folded rail opens while the pointer rests on it (the page moves over with it) and folds again when it leaves.
+  const [peek, setPeek] = useState(false)
+  const peekTimer = useRef<number | undefined>(undefined)
+  // After a click folds the panel, the pointer is still on it: wait for it to leave before peeking again.
+  const peekArmed = useRef(true)
+  useEffect(() => () => window.clearTimeout(peekTimer.current), [])
+  function onPointerEnter(event: { pointerType: string }) {
+    if (!collapsed || !peekArmed.current || event.pointerType !== 'mouse') return
+    peekTimer.current = window.setTimeout(() => setPeek(true), 150)
+  }
+  function onPointerLeave() {
+    window.clearTimeout(peekTimer.current)
+    peekArmed.current = true
+    setPeek(false)
+  }
+  const folded = collapsed && !peek
+  function toggle() {
+    // Clicking the logo while peeking pins the panel open.
+    const next = peek ? false : !collapsed
+    window.clearTimeout(peekTimer.current)
+    setPeek(false)
+    peekArmed.current = !next
+    setCollapsed(next)
+    try {
+      localStorage.setItem(sideKey, next ? 'collapsed' : 'open')
+    } catch {
+      // Private mode: the choice lasts until the page reloads.
+    }
+  }
+  return (
+    <aside
+      className="shell-side"
+      aria-label="Main navigation"
+      data-collapsed={folded || undefined}
+      data-peek={peek || undefined}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
+      <div className="shell-side__head">
+        {/* The logo folds the panel to an icon rail and opens it again. */}
+        <button
+          type="button"
+          className="shell-side__toggle"
+          aria-expanded={!folded}
+          aria-controls="shell-side-nav"
+          aria-label={collapsed && !peek ? 'Expand sidebar' : peek ? 'Keep sidebar open' : 'Collapse sidebar'}
+          title={collapsed && !peek ? 'Expand sidebar' : peek ? 'Keep sidebar open' : 'Collapse sidebar'}
+          onClick={toggle}
+        >
+          <ShellBrand />
+          {/* On hover or focus a sidebar glyph says the logo folds the panel; folded, it stands in for the key. */}
+          <span className="shell-side__hint" aria-hidden>
+            <Icon icon={SidebarSimpleIcon} size={20} />
+          </span>
+        </button>
+      </div>
+      <nav className="shell-side__nav" id="shell-side-nav" aria-labelledby="shell-side-label">
+        <p className="shell-side__label" id="shell-side-label">
+          Workspace
+        </p>
+        <SiteList destinations={destinations} current={current} siteGroups={siteGroups} currentHref={currentHref} layoutId="panel" />
       </nav>
+      <div className="shell-side__foot">
+        <AssistantCard onPress={onAssistant} />
+      </div>
     </aside>
+  )
+}
+
+/** Phone tab bar (below 768px): the role's first four sites, then More, which opens the menu drawer. */
+export function TabBar({ destinations, current, onMore }: { destinations: Destination[]; current: SiteId; onMore: () => void }) {
+  return (
+    <nav className="shell-tabs" aria-label="Main sections">
+      {destinations.slice(0, 4).map(({ site, href }) => (
+        <NavLink key={site.id} href={href} className="shell-tab" aria-current={site.id === current ? 'page' : undefined}>
+          <Icon name={site.icon as never} size={24} weight={site.id === current ? 'fill' : 'regular'} />
+          <span>{site.label}</span>
+        </NavLink>
+      ))}
+      <button type="button" className="shell-tab" aria-haspopup="dialog" onClick={onMore}>
+        <Icon name="list" size={24} />
+        <span>More</span>
+      </button>
+    </nav>
   )
 }
 
@@ -136,14 +276,21 @@ export function AccountMenu({
     <div className="shell-account" ref={root} data-paused={paused ? true : undefined}>
       <button
         type="button"
-        className="shell-avatar"
+        className="shell-account__button"
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={`Account menu, ${session.user.name}${paused ? ', some features paused' : ''}`}
         title={session.user.name}
         onClick={() => setOpen((value) => !value)}
       >
-        <AvatarFill photo={ownPhoto} fallback={initials(session.user.name)} />
+        <span className="shell-avatar">
+          <AvatarFill photo={ownPhoto} fallback={initials(session.user.name)} />
+        </span>
+        <span className="shell-account__who" aria-hidden>
+          <span className="shell-account__name">{session.user.name}</span>
+          <span className="shell-account__line">{accountLine(session.user)}</span>
+        </span>
+        <Icon name="caret-down" size={16} className="shell-account__caret" />
       </button>
       <AnimatePresence>
         {open && (
@@ -173,6 +320,10 @@ export function AccountMenu({
                 {link.label}
               </NavLink>
             ))}
+            <button type="button" className="shell-menu__item" onClick={() => { setOpen(false); replayOnboarding() }}>
+              <Icon name="info" size={16} />
+              Replay walkthrough
+            </button>
             <button type="button" className="shell-menu__item shell-menu__item--danger" onClick={onSignOut}>
               <Icon name="sign-out" size={16} />
               Sign out
@@ -190,18 +341,21 @@ export function SiteNav({
   current,
   onNavigate,
   layoutId = 'side',
+  labels = true,
 }: {
   groups: NavGroup[]
   current?: string
   onNavigate?: () => void
   layoutId?: string
+  /** Group headings; off under a site row, where the site already names the links. */
+  labels?: boolean
 }) {
   const slide = useSlide()
   return (
     <LayoutGroup id={layoutId}>
       {groups.map((group, index) => (
         <div className="shell-group" key={group.label + index}>
-          {group.label !== 'Workspace' && <p className="shell-group__label">{group.label}</p>}
+          {labels && group.label !== 'Workspace' && <p className="shell-group__label">{group.label}</p>}
           {group.entries.map((entry) => {
             const isCurrent = entry.href === current
             return (
@@ -214,9 +368,9 @@ export function SiteNav({
               >
                 {isCurrent && <motion.span layoutId="side-pill" className="shell-nav-item__pill" transition={slide} aria-hidden />}
                 {entry.icon && (entry.icon === assistantIconName
-                  ? <Icon icon={assistantIcon} size={20} weight={isCurrent ? 'fill' : 'regular'} />
-                  : <Icon name={entry.icon as never} size={20} weight={isCurrent ? 'fill' : 'regular'} />)}
-                {entry.label}
+                  ? <AssistantIcon size={20} />
+                  : <Icon name={entry.icon as never} size={20} />)}
+                <span className="shell-nav-item__label">{entry.label}</span>
               </NavLink>
             )
           })}
@@ -226,20 +380,22 @@ export function SiteNav({
   )
 }
 
-/** Mobile drawer body: sites, current site nav, account. */
+/** Phone menu body (frame 09): who is signed in, the sites with the current site's links, the Assistant, then account. */
 export function DrawerNav({
+  session,
   destinations,
   current,
-  groups,
+  siteGroups,
   currentHref,
   accountLinks,
   onNavigate,
   onSignOut,
   footer,
 }: {
+  session: Session
   destinations: Destination[]
   current: SiteId
-  groups: NavGroup[]
+  siteGroups: Partial<Record<SiteId, NavGroup[]>>
   currentHref?: string
   accountLinks: NavEntry[]
   onNavigate: () => void
@@ -248,37 +404,38 @@ export function DrawerNav({
 }) {
   return (
     <div className="shell-drawer" data-site={current}>
-      <nav aria-label="ACCS sites" className="shell-drawer__sites">
-        {destinations.map(({ site, href }) => (
-          <NavLink
-            key={site.id}
-            href={href}
-            className="shell-drawer__site"
-            aria-current={site.id === current ? 'page' : undefined}
-            onNavigate={onNavigate}
-          >
-            <Icon name={site.icon as never} size={24} weight={site.id === current ? 'fill' : 'regular'} />
-            {site.label}
-          </NavLink>
-        ))}
+      <div className="shell-drawer__who">
+        <span className="shell-drawer__avatar" aria-hidden>
+          {initials(session.user.name)}
+        </span>
+        <span className="shell-drawer__id">
+          <strong>{session.user.name}</strong>
+          <span>{accountLine(session.user)}</span>
+        </span>
+      </div>
+      <nav aria-label="ACCS sites" className="shell-drawer__nav">
+        <SiteList
+          destinations={destinations}
+          current={current}
+          siteGroups={siteGroups}
+          currentHref={currentHref}
+          onNavigate={onNavigate}
+          layoutId="drawer"
+        />
       </nav>
-      <nav aria-label={`${siteById[current].label} navigation`} className="shell-side__nav" style={{ padding: 0, overflow: 'visible' }}>
-        <SiteNav groups={groups} current={currentHref} onNavigate={onNavigate} layoutId="drawer" />
-      </nav>
-      <div className="shell-group">
-        <p className="shell-group__label">Account</p>
+      {footer}
+      <nav aria-label="Account" className="shell-drawer__account">
         {accountLinks.map((link) => (
-          <NavLink key={link.href} href={link.href} className="shell-nav-item" onNavigate={onNavigate}>
-            {link.icon && <Icon name={link.icon as never} size={20} />}
+          <NavLink key={link.href} href={link.href} className="shell-drawer__link" onNavigate={onNavigate}>
+            {link.icon && <Icon name={link.icon as never} size={16} />}
             {link.label}
           </NavLink>
         ))}
-        <button type="button" className="shell-nav-item shell-nav-item--danger" onClick={onSignOut}>
-          <Icon name="sign-out" size={20} />
+        <button type="button" className="shell-drawer__link" onClick={onSignOut}>
+          <Icon name="sign-out" size={16} />
           Sign out
         </button>
-      </div>
-      {footer}
+      </nav>
     </div>
   )
 }

@@ -15,6 +15,8 @@ export interface ChartDatum {
   suppressed?: boolean;
   /** Colors the bar: red, yellow or green by severity (QA 19 November). */
   tone?: "danger" | "warn" | "ok";
+  /** CSS color for the bar, such as a case stage color (var(--accs-stage-chair)). */
+  color?: string;
   [key: string]: unknown;
 }
 
@@ -32,6 +34,10 @@ export interface ChartProps {
   series?: ChartSeries[];
   /** Keep the title for assistive tech only, for charts that sit under a Panel title. */
   hideTitle?: boolean;
+  /** Unit after each value, such as "days". */
+  unit?: string;
+  /** Shown instead of a value when a bar has none (default "No data"). */
+  emptyLabel?: string;
 }
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -72,6 +78,52 @@ export function CountUp({
   return <motion.span className="accs-num">{text}</motion.span>;
 }
 
+/** The chart's values as a table, for readers who want exact numbers or use assistive tech. */
+export function DataTable({
+  data,
+  series,
+  rowLabel = "Category",
+}: {
+  data: ChartDatum[];
+  series: ChartSeries[];
+  /** Heading of the first column, naming what each row is. */
+  rowLabel?: string;
+}) {
+  return (
+    <div className="rc-scroll">
+      <table className="accs-table">
+        <caption className="rc-sr">Chart values</caption>
+        <thead>
+          <tr>
+            <th scope="col">{rowLabel}</th>
+            {series.map((entry) => (
+              <th scope="col" className="accs-num" key={entry.key}>
+                {entry.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((entry, index) => (
+            <tr key={entry.label + index}>
+              <th scope="row">{entry.label}</th>
+              {series.map((column) => (
+                <td key={column.key} className="accs-num">
+                  {entry.suppressed
+                    ? "Suppressed"
+                    : entry[column.key] == null
+                      ? "No data"
+                      : String(entry[column.key])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ChartTable({
   data,
   series,
@@ -82,37 +134,7 @@ function ChartTable({
   return (
     <details className="ch-data">
       <summary>View as table</summary>
-      <div className="rc-scroll">
-        <table className="accs-table">
-          <caption className="rc-sr">Chart values</caption>
-          <thead>
-            <tr>
-              <th scope="col">Category</th>
-              {series.map((entry) => (
-                <th scope="col" className="accs-num" key={entry.key}>
-                  {entry.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((entry, index) => (
-              <tr key={entry.label + index}>
-                <th scope="row">{entry.label}</th>
-                {series.map((column) => (
-                  <td key={column.key} className="accs-num">
-                    {entry.suppressed
-                      ? "Suppressed"
-                      : entry[column.key] == null
-                        ? "No data"
-                        : String(entry[column.key])}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable data={data} series={series} />
     </details>
   );
 }
@@ -140,9 +162,12 @@ export function BarChart({
   reference,
   referenceLabel = "Scope average",
   hideTitle,
+  unit,
+  emptyLabel = "No data",
 }: ChartProps) {
   const titleId = useId();
   const reduce = useReducedMotion();
+  const suffix = unit ? ` ${unit}` : "";
   const upper = Math.max(
     1,
     max ?? Math.max(0, ...data.map((entry) => number(entry.value))),
@@ -164,7 +189,12 @@ export function BarChart({
                   ? Math.min(100, (entry.reference / upper) * 100)
                   : null;
               return (
-                <li className="ch-bar" key={entry.label + index} data-tone={entry.tone}>
+                <li
+                  className="ch-bar"
+                  key={entry.label + index}
+                  data-tone={entry.tone}
+                  style={entry.color ? ({ "--bar": entry.color } as CSSProperties) : undefined}
+                >
                   <span className="ch-bar__label">{entry.label}</span>
                   {entry.suppressed ? (
                     <>
@@ -177,9 +207,13 @@ export function BarChart({
                     <>
                       <span className="ch-bar__value">
                         {entry.value == null ? (
-                          "No data"
+                          <span className="ch-bar__value--muted">{emptyLabel}</span>
                         ) : (
-                          <CountUp value={number(entry.value)} />
+                          <CountUp
+                            value={number(entry.value)}
+                            decimals={Number.isInteger(number(entry.value)) ? 0 : 1}
+                            suffix={suffix}
+                          />
                         )}
                         {typeof entry.reference === "number" && (
                           <span className="ch-bar__ref-text">
@@ -195,7 +229,7 @@ export function BarChart({
                         aria-valuemax={upper}
                         aria-valuenow={number(entry.value)}
                         aria-valuetext={
-                          entry.value == null ? "No data" : String(entry.value)
+                          entry.value == null ? emptyLabel : String(entry.value) + suffix
                         }
                       >
                         <motion.span
@@ -241,6 +275,57 @@ export function BarChart({
         </>
       ) : (
         <p className="ch__empty">No data for these filters.</p>
+      )}
+    </figure>
+  );
+}
+
+/** Vertical columns: the count above each column, its label below (Figma "Open cases by stage"). `asTable` shows the
+ *  same values as a table instead, for a "View as table" switch outside the chart. */
+export function ColumnChart({
+  title,
+  data,
+  hideTitle,
+  asTable,
+  id,
+  rowLabel,
+}: ChartProps & { asTable?: boolean; id?: string; rowLabel?: string }) {
+  const titleId = useId();
+  const reduce = useReducedMotion();
+  const upper = Math.max(1, ...data.map((entry) => number(entry.value)));
+  return (
+    <figure className="ch" id={id} aria-labelledby={titleId}>
+      <Caption id={titleId} title={title} hidden={hideTitle} />
+      {!data.length ? (
+        <p className="ch__empty">No data for these filters.</p>
+      ) : asTable ? (
+        <DataTable data={data} rowLabel={rowLabel} series={[{ key: "value", label: "Cases" }]} />
+      ) : (
+        <ul className="ch-cols">
+          {data.map((entry, index) => (
+            <li
+              className="ch-col"
+              key={entry.label + index}
+              style={entry.color ? ({ "--bar": entry.color } as CSSProperties) : undefined}
+            >
+              {/* Label first for screen readers ("Adviser, 1"); CSS stacks the count on top. */}
+              <span className="ch-col__label">{entry.label}</span>
+              <span className="ch-col__track" aria-hidden>
+                <motion.span
+                  className="ch-col__fill"
+                  style={{ height: `${(number(entry.value) / upper) * 100}%` }}
+                  initial={reduce ? false : { scaleY: 0 }}
+                  whileInView={{ scaleY: 1 }}
+                  viewport={view}
+                  transition={{ duration: 0.7, ease, delay: Math.min(index, 8) * 0.06 }}
+                />
+              </span>
+              <span className="ch-col__value">
+                {entry.value == null ? "No data" : <CountUp value={number(entry.value)} />}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </figure>
   );

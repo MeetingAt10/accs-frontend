@@ -37,8 +37,9 @@ import {
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
-import { pageIdForPath } from "@/lib/page-catalog";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { pageIdForPath, pageTitles } from "@/lib/page-catalog";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
 import "./people-account.css";
 
 type Item = Record<string, unknown>;
@@ -143,7 +144,10 @@ export function DirectoryPage({ page }: { page: PageEnvelope }) {
           <Select
             label="Office"
             selectedKey={office}
-            onSelectionChange={(key) => setOffice(String(key))}
+            onSelectionChange={(key) => {
+              setOffice(String(key));
+              if (key === "Guidance" || key === "OSAS") setProgram("All");
+            }}
           >
             <SelectOption id="All">All offices</SelectOption>
             <SelectOption id="CCS">CCS</SelectOption>
@@ -406,6 +410,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
   // Save once something changed, and never an all-blank profile (QA 17 November).
   const changed = title !== word(record.title) || about !== word(record.bio) || education !== word(record.education) || officeHours !== word(record.officeHours);
   const blank = ![title, about, education, officeHours].some((value) => value.trim());
+  // About and Office hours cannot be emptied once set (QA v5, E6).
+  const aboutMissing = Boolean(word(record.bio)) && !about.trim();
+  const hoursMissing = !student && Boolean(word(record.officeHours)) && !officeHours.trim();
   const roles = strings(record.roles);
   return (
     <div className="accs-stack">
@@ -429,7 +436,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
               maxLength={100}
             />
             <TextArea
-              label="About"
+              label={<span className="ds-visually-hidden">About</span>}
+              isInvalid={aboutMissing}
+              errorMessage="About cannot be left blank."
               value={about}
               onChange={setAbout}
               maxLength={1000}
@@ -439,7 +448,9 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
           {!student && (
             <Panel title="Office hours">
               <TextField
-                label="Office hours"
+                label={<span className="ds-visually-hidden">Office hours</span>}
+                isInvalid={hoursMissing}
+                errorMessage="Office hours cannot be left blank."
                 value={officeHours}
                 onChange={setOfficeHours}
                 maxLength={200}
@@ -485,7 +496,7 @@ export function MyProfilePage({ page }: { page: PageEnvelope }) {
         {blank && <span className="pa-muted">Fill in at least one field.</span>}
         <Button
           loading={action.isPending}
-          isDisabled={!changed || blank}
+          isDisabled={!changed || blank || aboutMissing || hoursMissing}
           onPress={() =>
             action.mutate({
               action: "saveProfile",
@@ -513,10 +524,17 @@ const topicFor = (faq: Item) => {
 };
 
 function FaqRow({ faq, canOpen }: { faq: Item; canOpen: boolean }) {
-  const [open, setOpen] = useState(false);
+  const anchor = faq.id ? `faq-${word(faq.id).replace(/^FAQ-/i, "")}` : undefined;
+  // Deep link (/help#faq-8): open and scroll to this entry on arrival.
+  const linked = !!anchor && typeof window !== "undefined" && window.location.hash === `#${anchor}`;
+  const [open, setOpen] = useState(linked);
+  const rowRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (linked) rowRef.current?.scrollIntoView({ block: "center" });
+  }, [linked]);
   const panelId = useId();
   return (
-    <li className="pa-faq" data-open={open || undefined}>
+    <li id={anchor} ref={rowRef} className="pa-faq" data-open={open || undefined}>
       <button
         type="button"
         className="pa-faq__q"
@@ -889,7 +907,7 @@ export function SettingsPage({ page }: { page: PageEnvelope }) {
           <Panel title="Shortcuts">
             <div className="pa-links">
               <Link href="/settings/notifications">Notification priorities</Link>
-              <Link href="/help">How roles are assigned</Link>
+              <Link href="/help#faq-8">How roles are assigned</Link>
             </div>
           </Panel>
         </aside>
@@ -908,10 +926,12 @@ export function PeopleAccountScreen({
   const filters = useRouterState({
     select: (state) => state.location.searchStr.slice(1),
   });
-  const page = useQuery(
-    pageQuery(pageId, pageId === "P38" ? recordId : undefined, filters),
-  );
-  if (page.isPending) return <ViewState kind="loading" title="Loading page" />;
+  const record = pageId === "P38" ? recordId : undefined;
+  const page = useQuery({
+    ...pageQuery(pageId, record, filters),
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
+  });
+  if (page.isPending) return <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />;
   if (page.isError)
     return page.error instanceof ApiError &&
       [403, 404].includes(page.error.status) ? (

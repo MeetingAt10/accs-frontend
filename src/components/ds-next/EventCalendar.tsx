@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react'
 import { Fragment, useId, useState, type CSSProperties } from 'react'
 
-import { DateTile, Empty } from '@/components/app/page-shell'
+import { Empty } from '@/components/app/page-shell'
 import { dateParts, formatDate } from '@/lib/format'
 import './EventCalendar.css'
 
@@ -27,6 +27,8 @@ export interface EventCalendarProps {
   events: CalendarEvent[]
   onDateChange?: (date: string) => void
   onEventPress?: (event: CalendarEvent) => void
+  /** Month view: a day was clicked (empty area or its number). Past days are not offered. */
+  onDateClick?: (date: string) => void
   label?: string
   startHour?: number
   endHour?: number
@@ -104,7 +106,7 @@ function groupByDate(events: CalendarEvent[]) {
 type Press = (event: CalendarEvent) => void
 
 function Chip({ event, onPress }: { event: CalendarEvent; onPress?: Press }) {
-  const clock = event.allDay ? '' : formatClock(event.start)
+  const clock = event.allDay ? 'All day' : formatClock(event.start)
   return (
     <button
       type="button"
@@ -113,9 +115,21 @@ function Chip({ event, onPress }: { event: CalendarEvent; onPress?: Press }) {
       onClick={() => onPress?.(event)}
       title={event.time ? `${event.title} · ${event.time}` : event.title}
     >
-      {clock && <span className="ec-chip__time">{clock}</span>}
       <span className="ec-chip__title">{event.title}</span>
+      {clock && <span className="ec-chip__time">{clock}</span>}
     </button>
+  )
+}
+
+/** Day and month in a tile tinted with the event's color family (Coming up, list rows). */
+export function ToneDate({ value, tone }: { value: string; tone?: string }) {
+  const parts = dateParts(value)
+  if (!parts) return null
+  return (
+    <span className="ec-date" data-etone={tone} aria-hidden>
+      <b>{parts.day}</b>
+      <small>{parts.month}</small>
+    </span>
   )
 }
 
@@ -133,7 +147,7 @@ function AgendaRows({
       {events.map((event) => (
         <li key={event.id}>
           <div className="accs-row ec-row">
-            <DateTile value={event.date} />
+            <ToneDate value={event.date} tone={event.tone} />
             <button
               type="button"
               className="ec-row__main"
@@ -164,7 +178,8 @@ function Month({
   label,
   onDateChange,
   onEventPress,
-}: Pick<EventCalendarProps, 'date' | 'events' | 'onDateChange' | 'onEventPress'> & {
+  onDateClick,
+}: Pick<EventCalendarProps, 'date' | 'events' | 'onDateChange' | 'onEventPress' | 'onDateClick'> & {
   label: string
 }) {
   const [expanded, setExpanded] = useState<string>()
@@ -215,6 +230,10 @@ function Month({
                       key={value}
                       data-today={value === today || undefined}
                       data-selected={value === date || undefined}
+                      data-addable={(onDateClick && value >= today) || undefined}
+                      onClick={(event) => {
+                        if (event.target === event.currentTarget && value >= today) onDateClick?.(value)
+                      }}
                       data-outside={
                         day.getMonth() !== selected.getMonth() || undefined
                       }
@@ -232,6 +251,16 @@ function Month({
                       >
                         <time dateTime={value}>{day.getDate()}</time>
                       </button>
+                      {onDateClick && value >= today && (
+                        <button
+                          type="button"
+                          className="ec-add"
+                          onClick={() => onDateClick(value)}
+                          aria-label={`Add on ${longDay(day)}`}
+                        >
+                          +
+                        </button>
+                      )}
                       {dayEvents.length > 0 && (
                         <ul className="ec-chips">
                           {shown.map((event) => (
@@ -509,6 +538,7 @@ export function EventCalendar({
   events,
   onDateChange,
   onEventPress,
+  onDateClick,
   label = 'Events calendar',
   startHour = 7,
   endHour = 19,
@@ -550,6 +580,7 @@ export function EventCalendar({
               label={label}
               onDateChange={onDateChange}
               onEventPress={onEventPress}
+              onDateClick={onDateClick}
             />
           )}
           {view === 'week' && (

@@ -102,9 +102,17 @@ a.accs-kpi {
   animation: accs-shimmer 1.4s linear infinite;
 }
 
+/* A page drawn before its data: real chrome at full strength at once, only the placeholders move. */
+.accs-loading-layout *:not(.accs-skeleton) { animation: none !important; }
+
 /* Route changes (TanStack defaultViewTransition) */
 ::view-transition-old(root) { animation: accs-fade 160ms ease-in reverse both; }
 ::view-transition-new(root) { animation: accs-rise 360ms var(--accs-ease-out) both; }
+/* Theme switch (ThemeToggle): the new theme fades in over the old one everywhere, shell included, instead of the route
+   animation. The class is on <html> only while the switch runs. */
+:root.accs-theme-swap::view-transition-group(*), :root.accs-theme-swap::view-transition-old(*) { animation: none; }
+:root.accs-theme-swap::view-transition-new(*) { animation: accs-theme-in 320ms var(--accs-ease-out) both; }
+@keyframes accs-theme-in { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   .accs-page-head, .accs-reveal, .accs-stagger > *, .accs-rows > *, .accs-table tbody tr, .accs-grid > *,

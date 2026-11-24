@@ -1,5 +1,7 @@
 import { featureLabels, filterRestrictions, newestFirst, type RestrictionFilters } from "@/lib/restrictions";
+import { canOpenPath } from "@/lib/sites";
 import { campusToday } from "@/lib/campus-date";
+import { useFocusDialogOnOpen } from "@/components/app/dialog-focus";
 import { PagedList } from '@/components/app/paging'
 import { StudentStrikes, strikeStatus } from '@/components/app/strikes'
 import {
@@ -39,7 +41,8 @@ import {
   toneFor,
   type Tone,
 } from "@/components/app/page-shell";
-import { BarChart, CountUp, TrendChart } from "@/components/ds-next/charts";
+import { BarChart, ColumnChart, CountUp, TrendChart } from "@/components/ds-next/charts";
+import { StageChip } from "@/components/app/stage-chip";
 import {
   ApiError,
   performPageAction,
@@ -49,6 +52,8 @@ import {
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { personMatches } from "@/lib/person-search";
 import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { pageTitles } from "@/lib/page-catalog";
 import { replaceFilters } from "@/lib/url-filters";
 import { TypedSearch, typingPause } from "@/components/app/typed-search";
 
@@ -110,16 +115,24 @@ function useAction(pageId: string) {
 function Screen({
   header,
   children,
+  className,
 }: {
   header: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="accs-stack">
+    <div className={"accs-stack rc-screen" + (className ? " " + className : "")}>
       {header}
       <div className="accs-stack accs-stagger">{children}</div>
     </div>
   );
+}
+
+/** The server's own field messages when it sends them (too long, missing), else its general message. */
+function errorText(error: Error) {
+  const fields = error instanceof ApiError ? error.fields?.map((field) => field.message) : undefined;
+  return fields?.length ? fields.join(" ") : error.message;
 }
 
 function Note({ children }: { children: ReactNode }) {
@@ -318,17 +331,6 @@ function PersonCell({
         )}
         {sub && <p className="rc-person__sub">{sub}</p>}
       </div>
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div className="rc-skel" role="status" aria-busy="true">
-      <span className="rc-sr">Loading</span>
-      <div className="accs-skeleton rc-skel__title" />
-      <div className="accs-skeleton rc-skel__line" style={{ width: "40%" }} />
-      <div className="accs-skeleton rc-skel__block" />
     </div>
   );
 }
@@ -589,6 +591,11 @@ function ClusterList({ page }: { page: PageEnvelope }) {
         A person reviews every suggestion. The system never groups reports
         into a case by itself.
       </Note>
+      {page.data.threshold != null && (
+        <Alert tone="neutral" title="Draft grouping threshold">
+          Grouping uses a draft threshold ({word(page.data.threshold)}%) that hasn't been approved.
+        </Alert>
+      )}
       {clusters.length ? (
         <Panel flush>
           <PagedList items={clusters} noun="groups">
@@ -742,7 +749,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
               />
               {action.error && (
                 <Alert tone="danger" title="The review wasn't saved">
-                  {action.error.message}
+                  {errorText(action.error)}
                 </Alert>
               )}
               <div className="rc-actions-row">
@@ -774,9 +781,9 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 
 /* ---------- Analytics ---------- */
 
-const stages = ["adviser", "chair", "dean", "guidance", "osas"];
+const stages = ["adviser", "chair", "dean", "guidance", "osas", "executive"];
 /** Office names for case stages ("Chair" and "Osas" read as typos; QA 17 November, V3). */
-const stageOffice: Record<string, string> = { adviser: "Adviser", chair: "Program Chair", dean: "Dean", guidance: "Guidance Office", osas: "OSAS" };
+const stageOffice: Record<string, string> = { adviser: "Adviser", chair: "Program Chair", dean: "Dean", guidance: "Guidance Office", osas: "OSAS", executive: "President's Office" };
 /** Case analytics periods: days back from today, counting today. */
 const analyticsPeriods = [
   { id: "7", label: "Last 7 days" },
@@ -789,6 +796,51 @@ const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 /** Severity colors in analytics: High red, Medium yellow, Low green (QA 19 November). */
 const analyticsSeverityTone: Record<string, "danger" | "warn" | "ok" | undefined> = { high: "danger", medium: "warn", low: "ok" };
+
+/** The stage key for an office name from the API ("Guidance Office" is guidance), else the stage at that position. */
+const stageOf = (label: string, index: number) =>
+  stages.find((stage) => stageOffice[stage] === label) ?? stages[index] ?? "";
+const stageColor = (stage: string) => (stages.includes(stage) ? `var(--accs-stage-${stage})` : undefined);
+const chartColors = ["var(--accs-chart-1)", "var(--accs-chart-2)", "var(--accs-chart-3)", "var(--accs-chart-4)"];
+const listWords = (words: string[]) =>
+  words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+
+/** Categories as one bar split by count, with a legend; categories with too few cases are named but not counted. */
+function CategoryStrip({ categories }: { categories: Item[] }) {
+  const shown = categories.filter((row) => row.suppressed !== true && typeof row.value === "number" && row.value > 0);
+  const hidden = categories.filter((row) => row.suppressed === true).map((row) => word(row.label));
+  if (!categories.length) return <p className="ch__empty">No data for these filters.</p>;
+  return (
+    <>
+      {shown.length > 0 && (
+        <>
+          <div className="an-strip" aria-hidden>
+            {shown.map((row, index) => (
+              <span
+                key={word(row.label)}
+                style={{ flexGrow: Number(row.value), background: chartColors[index % chartColors.length] }}
+              />
+            ))}
+          </div>
+          <ul className="an-legend" aria-label="Cases by category">
+            {shown.map((row, index) => (
+              <li key={word(row.label)}>
+                <span className="an-legend__swatch" style={{ background: chartColors[index % chartColors.length] }} />
+                {word(row.label)}
+                <span className="an-legend__value accs-num">{word(row.value)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="rc-policy">
+        {hidden.length
+          ? `${listWords(hidden)} ${hidden.length === 1 ? "has" : "have"} too few cases to show, so ${hidden.length === 1 ? "it is" : "they are"} hidden.`
+          : "Categories with too few cases are hidden to protect privacy."}
+      </p>
+    </>
+  );
+}
 
 function Analytics({ page }: { page: PageEnvelope }) {
   const router = useRouter();
@@ -813,6 +865,8 @@ function Analytics({ page }: { page: PageEnvelope }) {
   // What is typed in From and To; it reaches the address (and the API) only when it makes a valid range.
   const [rangeDraft, setRangeDraft] = useState<{ from?: string; to?: string }>({});
   const [rangeProblem, setRangeProblem] = useState<"" | "from" | "to">("");
+  const [stageTable, setStageTable] = useState(false);
+  const stageChartId = useId();
   // Arrow keys in a date field change it once per press: apply the range after a short pause, not on every press
   // (QA 17 November: each press loaded the page again).
   const rangeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -852,11 +906,12 @@ function Analytics({ page }: { page: PageEnvelope }) {
   };
   return (
     <Screen
+      className="an"
       header={
         <PageHeader
           crumbs={[siteCrumb("/analytics"), { label: "Case analytics" }]}
           title="Case analytics"
-          description="Case counts for the programs you can see."
+          description={`Concern volume and waiting times for ${page.scope ? "the " + page.scope : "the programs you can see"}. Small categories are hidden to protect privacy.`}
           actions={
             filtered ? (
               <Button
@@ -952,7 +1007,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           value={rangeDraft.from ?? search.get("from") ?? ""}
           onChange={(value) => changeRange("from", value)}
           isInvalid={rangeProblem === "from"}
-          errorMessage={rangeProblem === "from" ? "Choose a date on or before the To date." : undefined}
+          errorMessage={rangeProblem === "from" ? "Start date must be on or before the end date." : undefined}
         />
         <TextField
           type="date"
@@ -960,7 +1015,7 @@ function Analytics({ page }: { page: PageEnvelope }) {
           value={rangeDraft.to ?? search.get("to") ?? ""}
           onChange={(value) => changeRange("to", value)}
           isInvalid={rangeProblem === "to"}
-          errorMessage={rangeProblem === "to" ? "Choose a date on or after the From date." : undefined}
+          errorMessage={rangeProblem === "to" ? "End date must be on or after the start date." : undefined}
         />
         </div>
       </div>
@@ -974,15 +1029,70 @@ function Analytics({ page }: { page: PageEnvelope }) {
           />
         ))}
       </Kpis>
-      <div className="rc-cols">
-        <Panel title="Cases by stage">
-          <BarChart
+      <div className="an-grid">
+        <Panel
+          title="Cases by stage"
+          action={
+            stageRows.length > 0 && (
+              <button
+                type="button"
+                className="an-link"
+                aria-controls={stageChartId}
+                onClick={() => setStageTable((value) => !value)}
+              >
+                {stageTable ? "View as chart" : "View as table"}
+                <Icon name="caret-right" size={16} />
+              </button>
+            )
+          }
+        >
+          <ColumnChart
+            id={stageChartId}
             title="Cases by stage"
             hideTitle
-            data={stageRows.map((row) => ({
+            asTable={stageTable}
+            rowLabel="Stage"
+            data={stageRows.map((row, index) => ({
               label: word(row.label),
               value: Number(row.value ?? 0),
+              color: stageColor(stageOf(word(row.label), index)),
             }))}
+          />
+        </Panel>
+        {waiting.length > 0 && (
+          <Panel title="Median days waiting">
+            <p className="an-sub">Days since each open case reached its current stage, as the median for that stage.</p>
+            <BarChart
+              title="Median days waiting by stage"
+              hideTitle
+              unit="days"
+              emptyLabel="None waiting"
+              data={waiting.map((row, index) => ({
+                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
+                value: Number(row.count ?? 0) > 0 ? Number(row.value ?? 0) : null,
+                color: stageColor(stageOf(word(row.label), index)),
+              }))}
+            />
+          </Panel>
+        )}
+      </div>
+      <Panel title="By category">
+        <CategoryStrip categories={categories} />
+      </Panel>
+      <div className="an-grid">
+        <Panel title="Opened and resolved reports">
+          <TrendChart
+            title="Opened and resolved reports"
+            hideTitle
+            data={trend.map((row) => ({
+              label: word(row.label),
+              opened: Number(row.opened ?? 0),
+              resolved: Number(row.resolved ?? 0),
+            }))}
+            series={[
+              { key: "opened", label: "Opened" },
+              { key: "resolved", label: "Resolved" },
+            ]}
           />
         </Panel>
         {severities.length > 0 && (
@@ -998,50 +1108,6 @@ function Analytics({ page }: { page: PageEnvelope }) {
             />
           </Panel>
         )}
-        <Panel title="Category counts">
-          <BarChart
-            title="Category counts"
-            hideTitle
-            data={categories.map((row) => ({
-              label: word(row.label),
-              value: typeof row.value === "number" ? row.value : null,
-              suppressed: row.suppressed === true,
-            }))}
-          />
-          <p className="rc-policy">
-            Categories with too few cases show as suppressed.
-          </p>
-        </Panel>
-        {waiting.length > 0 && (
-          <Panel title="Median days waiting by stage" className="rc-span">
-            <BarChart
-              title="Median days waiting by stage"
-              hideTitle
-              data={waiting.map((row) => ({
-                label: `${word(row.label)} (${Number(row.count ?? 0)} waiting)`,
-                value: Number(row.value ?? 0),
-              }))}
-            />
-            <p className="rc-policy">
-              Days since each open concern reached its current stage, as the median for that stage.
-            </p>
-          </Panel>
-        )}
-        <Panel title="Opened and resolved reports" className="rc-span">
-          <TrendChart
-            title="Opened and resolved reports"
-            hideTitle
-            data={trend.map((row) => ({
-              label: word(row.label),
-              opened: Number(row.opened ?? 0),
-              resolved: Number(row.resolved ?? 0),
-            }))}
-            series={[
-              { key: "opened", label: "Opened" },
-              { key: "resolved", label: "Resolved" },
-            ]}
-          />
-        </Panel>
       </div>
       <Panel
         flush
@@ -1075,7 +1141,9 @@ function Analytics({ page }: { page: PageEnvelope }) {
                         </Link>
                       </td>
                       <td>
-                        {stageOffice[word(entry.stage)] ?? cap(word(entry.stage, "—"))}
+                        {word(entry.stage) ? (
+                          <StageChip stage={word(entry.stage)} label={stageOffice[word(entry.stage)]} />
+                        ) : "—"}
                       </td>
                       <td>
                         {analyticsSeverityTone[word(entry.severity)] ? (
@@ -1129,6 +1197,8 @@ function RecordList({ page }: { page: PageEnvelope }) {
         : role === "guidance"
           ? "Students in Guidance cases"
           : "Students under OSAS authority";
+  // Guidance and OSAS see a student only once a case reaches their office (offense records stay restricted).
+  const caseScoped = role === "guidance" || role === "osas";
   // Every CCS program for readers who see the whole college (BSIS was missing while no BSIS student was listed); a
   // Program Chair sees only their program, so they get no program filter.
   const programs = role === "chair"
@@ -1232,7 +1302,7 @@ function RecordList({ page }: { page: PageEnvelope }) {
         <PagedList items={matching} noun="students">
           {(matching) => (
           <div className="accs-table-wrap rc-table-wrap">
-            <table className="accs-table rc-table">
+            <table className="accs-table rc-table rc-stack">
               <caption className="rc-sr">Student records</caption>
               <thead>
                 <tr>
@@ -1272,21 +1342,22 @@ function RecordList({ page }: { page: PageEnvelope }) {
                             href={"/records/" + encodeURIComponent(word(student.id))}
                           />
                         </td>
-                        <td className="accs-mono">{word(student.studentId, "—")}</td>
-                        <td>
+                        <td className="accs-mono" data-label="Student ID">{word(student.studentId, "—")}</td>
+                        <td data-label="Program">
                           <span className="rc-tags">
                             <span className="accs-tag">{word(student.program, "—")}</span>
                             <span className="rc-muted">{word(student.sectionName, "Section " + word(student.section, "—"))}</span>
+                            {student.irregular === true && <StatusChip tone="neutral">Irregular</StatusChip>}
                           </span>
                         </td>
-                        <td>
+                        <td data-label="Standing">
                           {isPaused(student.standing) ? (
                             <StandingBadge standing={student.standing} />
                           ) : (
                             <span className="rc-muted">Good standing</span>
                           )}
                         </td>
-                        <td className="accs-num">
+                        <td className="accs-num" data-label="Restrictions">
                           {count ? (
                             count
                           ) : hasRestrictions(student) ? (
@@ -1316,7 +1387,11 @@ function RecordList({ page }: { page: PageEnvelope }) {
               ) : undefined
             }
           >
-            {filtered ? "Change the search or clear a filter." : undefined}
+            {filtered
+              ? "Change the search or clear a filter."
+              : caseScoped
+                ? "Students appear here once a case reaches your office. Other students are not listed."
+                : undefined}
           </Empty>
         </Panel>
       )}
@@ -1428,6 +1503,7 @@ function GoodMoralReview({
           isRequired
           value={source}
           onChange={setSource}
+          maxLength={200}
         />
         <TextArea
           label="Notes"
@@ -1437,7 +1513,7 @@ function GoodMoralReview({
         />
         {action.error && (
           <Alert tone="danger" title="The review wasn't saved">
-            {action.error.message}
+            {errorText(action.error)}
           </Alert>
         )}
         <div className="rc-actions-row">
@@ -1505,7 +1581,10 @@ function StudentRecord({
     (role) => role === "guidance" || role === "osas",
   );
   const accessHistory = Array.isArray(record.accessHistory)
-    ? items(record.accessHistory)
+    ? items(record.accessHistory).sort(
+        (left, right) =>
+          Date.parse(word(right.at)) - Date.parse(word(left.at)),
+      )
     : undefined;
   const tabs: TabDef[] = [
     { id: "overview", label: "Overview" },
@@ -1577,6 +1656,7 @@ function StudentRecord({
               <span className="accs-tag">{word(record.program, "—")}</span>
               <span>{word(record.sectionName, "Section " + word(record.section, "—"))}</span>
               <span>Year {word(record.year, "—")}</span>
+              {record.irregular === true && <StatusChip tone="neutral">Irregular</StatusChip>}
             </span>
           }
           actions={
@@ -1693,6 +1773,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
   const [requesting, setRequesting] = useState(false);
   const opened = restrictions.find((restriction) => word(restriction.id) === openId);
   const openedRequest = referrals.find((request) => word(request.id) === openRequestId);
+  useFocusDialogOnOpen(Boolean(opened) || Boolean(openedRequest) || applyOpen || Boolean(confirmId));
   const active = restrictions.filter((restriction) => restriction.active === true);
   const ended = restrictions.filter((restriction) => restriction.active !== true);
   const shown = filterRestrictions(tab === "ended" ? ended : active, filters);
@@ -1721,8 +1802,19 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
     setOpenRequestId("");
     setOpenId(id);
   };
-  const studentLink = (student: Item) =>
-    admin ? `/admin/users/${encodeURIComponent(word(student.id))}` : `/records?q=${encodeURIComponent(word(student.name))}`;
+  // Same record route as the records list when the viewer may open it (P34); administrators otherwise keep their user page.
+  const studentLink = (student: Item) => {
+    const id = encodeURIComponent(word(student.id));
+    const data = session.data;
+    if (!data) return undefined;
+    if (canOpenPath(data, "/records/" + id)) return "/records/" + id;
+    return canOpenPath(data, "/admin/users/" + id) ? "/admin/users/" + id : undefined;
+  };
+  const studentName = (student: Item) => {
+    const href = studentLink(student);
+    const name = word(student.name, "—");
+    return href ? <Link variant="quiet" href={href}>{name}</Link> : name;
+  };
   const submitApply = () =>
     action.mutate(
       {
@@ -1865,7 +1957,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             <Facts
               stacked
               rows={[
-                ["Student", <Link key="s" variant="quiet" href={studentLink(object(opened.student))}>{word(object(opened.student).name, "—")}</Link>],
+                ["Student", studentName(object(opened.student))],
                 ["Paused", features(opened).join(", ") || "—"],
                 ["Basis", word(opened.basis, "—")],
                 ["Decision reference", <span key="d" className="accs-mono">{word(opened.decisionReference, "—")}</span>],
@@ -1879,7 +1971,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                 <div className="accs-stack">
                   <DatePicker label="New end date" minValue={campusToday().add({ days: 1 })} description={`It ends ${formatDate(opened.until)}. Pick a later date to extend it or an earlier one to shorten it, tomorrow or later.`} onChange={(value) => setNewEnd(value?.toString() ?? "")} />
                   <TextArea label="Reason" isRequired value={changeReason} onChange={setChangeReason} maxLength={500} />
-                  {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                  {action.error && <Alert tone="danger" title="The change wasn't saved">{errorText(action.error)}</Alert>}
                   <div className="rc-form__actions">
                     <Button
                       loading={action.isPending}
@@ -1907,7 +1999,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             <Facts
               stacked
               rows={[
-                ["Student", <Link key="s" variant="quiet" href={studentLink(object(openedRequest.student))}>{word(object(openedRequest.student).name, "—")}</Link>],
+                ["Student", studentName(object(openedRequest.student))],
                 ["Requested change", word(openedRequest.change, "—")],
                 ["Reason", word(openedRequest.reason, "—")],
                 ["Requested by", word(object(openedRequest.actor).name, "—")],
@@ -1923,7 +2015,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
                   <Note>This student has no active restriction now.</Note>
                 )}
                 <TextArea label="Reason for declining" value={declineReason} onChange={setDeclineReason} maxLength={500} />
-                {action.error && <Alert tone="danger" title="The change wasn't saved">{action.error.message}</Alert>}
+                {action.error && <Alert tone="danger" title="The change wasn't saved">{errorText(action.error)}</Alert>}
                 <div>
                   <Button
                     variant="secondary"
@@ -1987,7 +2079,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             Only the selected features are paused. The restriction starts today.
             {basis ? "" : " Describe the basis for this restriction."}
           </p>
-          {action.error && <Alert tone="danger" title="The restriction wasn't applied">{action.error.message}</Alert>}
+          {action.error && <Alert tone="danger" title="The restriction wasn't applied">{errorText(action.error)}</Alert>}
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setApplyOpen(false)}>Cancel</Button>
@@ -2014,7 +2106,7 @@ function RestrictionManagement({ page }: { page: PageEnvelope }) {
             and a new restriction can be applied later.
           </p>
           <TextArea label="Reason" isRequired value={reason} onChange={setReason} maxLength={500} />
-          {action.error && <Alert tone="danger" title="The restriction wasn't lifted">{action.error.message}</Alert>}
+          {action.error && <Alert tone="danger" title="The restriction wasn't lifted">{errorText(action.error)}</Alert>}
         </ModalBody>
         <ModalActions>
           <Button variant="secondary" onPress={() => setConfirmId("")}>Cancel</Button>
@@ -2052,7 +2144,7 @@ function RestrictionRows({
 }: {
   rows: Item[];
   filtered: boolean;
-  studentLink: (student: Item) => string;
+  studentLink: (student: Item) => string | undefined;
   onOpen: (id: string) => void;
   onApply?: () => void;
 }) {
@@ -2072,7 +2164,7 @@ function RestrictionRows({
     <PagedList items={rows} noun="restrictions">
       {(rows) => (
       <div className="accs-table-wrap rc-table-wrap">
-        <table className="accs-table rc-table">
+        <table className="accs-table rc-table rc-stack">
           <caption className="rc-sr">Restrictions</caption>
           <thead>
             <tr>
@@ -2097,15 +2189,15 @@ function RestrictionRows({
                       href={studentLink(object(restriction.student))}
                     />
                   </td>
-                  <td>{features(restriction).join(", ") || "—"}</td>
-                  <td className="rc-wrap">
+                  <td data-label="Paused">{features(restriction).join(", ") || "—"}</td>
+                  <td className="rc-wrap" data-label="Basis">
                     {word(restriction.basis, "—")}
                     <p className="rc-person__sub accs-mono">{word(restriction.decisionReference, "—")}</p>
                   </td>
-                  <td className="accs-mono">
+                  <td className="accs-mono" data-label="Period">
                     {formatDate(restriction.starts)} to {formatDate(restriction.until)}
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <StatusChip tone={isActive ? "warn" : "neutral"}>{isActive ? "Active" : "Ended"}</StatusChip>
                   </td>
                   <td className="rc-actions">
@@ -2157,10 +2249,10 @@ function RestrictionRequestForm({
           onChange={setDecisionReference}
         />
       )}
-      <TextArea label="Reason" isRequired value={reason} onChange={setReason} />
+      <TextArea label="Reason" isRequired value={reason} onChange={setReason} maxLength={2000} />
       {action.error && (
         <Alert tone="danger" title="The request wasn't saved">
-          {action.error.message}
+          {errorText(action.error)}
         </Alert>
       )}
       <div className="rc-form__actions">
@@ -2532,7 +2624,7 @@ export function OversightScreen({ pageId }: { pageId: string }) {
     placeholderData: (previous, previousQuery) =>
       keepFilteredPage(previousQuery?.queryKey, pageId, record) ? previous : undefined,
   });
-  if (page.isPending) return <Skeleton />;
+  if (page.isPending) return <PageLoading pageId={pageId} title={pageTitles[pageId] || "page"} />;
   if (page.isError)
     return page.error instanceof ApiError &&
       [403, 404].includes(page.error.status) ? (

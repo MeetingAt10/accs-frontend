@@ -589,3 +589,74 @@ select {
 /* A select or combo box list scrolls by itself; its popover must not scroll too, or two scroll bars show (QA 17 November,
    V3: the Assign role list had two). */
 .ds-popover:has(> .ds-listbox) { overflow: hidden; }
+
+/* ==========================================================================
+   Navy redesign: shared page pieces (Figma "Components").
+   Scoped under :root so they win over theme.css, which loads after this file.
+   ========================================================================== */
+
+/* Page title in Poppins. */
+:root .accs-page-title { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
+
+/* Stat card: separate white cards (border, 14px corners, tile shadow), 13px label, Poppins 32px value, 12px hint. */
+:root .accs-kpis {
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+:root .accs-kpis > .accs-kpi,
+:root .ds-next-stat {
+  gap: 6px;
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-tile);
+  background: var(--accs-surface);
+  box-shadow: var(--accs-shadow-tile);
+}
+:root .accs-kpis > a.accs-kpi:hover { border-color: var(--accs-line-strong); background: var(--accs-surface); box-shadow: var(--accs-shadow-hover); }
+:root .accs-kpis > a.accs-kpi:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 2px; }
+:root .accs-kpi__label { font-size: 13px; font-weight: 500; line-height: normal; color: var(--accs-muted); }
+:root .accs-kpi__value {
+  font-family: var(--accs-font-title);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: -0.01em;
+  color: var(--accs-ink);
+}
+:root .accs-kpi__note { font-size: 12px; line-height: normal; color: var(--accs-muted); }
+/* Two stat cards to a row on phones, as in the phone home frame. */
+@media (max-width: 479px) {
+  :root .accs-kpis { gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .accs-kpis > .accs-kpi { padding: 14px 16px; }
+  :root .accs-kpi__value { font-size: 24px; line-height: 30px; }
+}
+
+/* Status chip: the same pill as the stage chip (6px dot, 4/10 padding, 12px semibold), no outline ring. */
+:root .accs-status { gap: 6px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; line-height: 1.33; }
+:root .accs-status::before { flex: none; width: 6px; height: 6px; }
+:root .accs-status.accs-status[data-tone] { box-shadow: none; }
+:root .accs-status.accs-status[data-tone]::before { width: 6px; height: 6px; }
+/* Office chips take the stage colors, so "With Program Chair" matches the stage chip everywhere. */
+:root .accs-status[data-office] { --office: var(--accs-stage-adviser); background: color-mix(in srgb, var(--office) 12%, transparent); color: var(--office); }
+:root .accs-status[data-office='adviser'] { --office: var(--accs-stage-adviser); }
+:root .accs-status[data-office='chair'] { --office: var(--accs-stage-chair); }
+:root .accs-status[data-office='dean'] { --office: var(--accs-stage-dean); }
+:root .accs-status[data-office='guidance'] { --office: var(--accs-stage-guidance); }
+:root .accs-status[data-office='osas'] { --office: var(--accs-stage-osas); }
+:root .accs-status[data-closed] { background: var(--accs-sunken); color: var(--accs-muted); }
+
+/* Buttons: primary navy, secondary white with a border, ghost (tertiary) in ink; 10px corners, 14px semibold. */
+:root .ds-btn { border-radius: var(--accs-radius-control); font-size: 14px; }
+:root .ds-btn--primary { box-shadow: none; }
+:root .ds-btn--secondary:not(:disabled, [data-disabled], .ds-section--plate *) { border-color: var(--accs-line); background: var(--accs-surface); color: var(--accs-ink); }
+:root .ds-btn--tertiary:not(.ds-section--plate *) { color: var(--accs-ink); }
+:root .ds-btn--secondary:not(:disabled, [data-disabled], .ds-section--plate *):is(:hover, [data-hovered]) { border-color: var(--accs-line-strong); background: var(--accs-sunken); }
+
+/* Date pickers: always reserve 6 week rows so the popover (which opens above the field) keeps one height and the month arrows do not jump. */
+:root .ds-calendar { align-content: start; min-height: calc(var(--ds-size-control-sm) + var(--ds-space-12) + 2px + 1rem + 6px + 6 * (2.5rem + 2px)); }
+@media (pointer: coarse) { :root .ds-calendar { min-height: calc(var(--ds-size-control-sm) + var(--ds-space-12) + 2px + 1rem + 6px + 6 * (var(--ds-size-touch-min) + 2px)); } }

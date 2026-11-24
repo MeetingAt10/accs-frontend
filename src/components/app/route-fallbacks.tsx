@@ -1,11 +1,14 @@
 import { Button, Icon, Row, type IconName } from '@meetingat10/design-system/react'
-import { useQuery } from '@tanstack/react-query'
-import { type ErrorComponentProps, useRouter } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { type ErrorComponentProps, useRouter, useRouterState } from '@tanstack/react-router'
 import { type ReactNode, useEffect } from 'react'
 
 import { reportError } from '@/lib/observability'
 import { sessionQuery } from '@/lib/queries'
 import { landingFor } from '@/lib/sites'
+import { titleForPath } from '@/lib/page-catalog'
+import { AppChrome } from './navigation'
+import { PageLoading, ShellSkeleton } from './skeleton-page'
 
 import './sites.css'
 
@@ -85,3 +88,22 @@ export function RouteError({ error }: ErrorComponentProps) {
     </FallbackScreen>
   )
 }
+
+/** Router-wide `defaultPendingComponent` (and the session check's): grey placeholders instead of a blank screen while a redirect or load settles. */
+export function RoutePending({ shell }: { shell?: boolean }) {
+  const path = useRouterState({ select: (state) => state.location.pathname })
+  const session = useQueryClient().getQueryData(sessionQuery().queryKey)
+  // Sign-in and first-login are not app pages: show only the themed page background, no app-shaped skeleton.
+  if (path === '/sign-in' || path === '/first-login') return null
+  // With the session cached the real shell (sidebar, top bar) shows and only the page content is a placeholder; a route
+  // inside the shell (no `shell`) is already under it, so it draws the content alone.
+  if (session) {
+    const title = titleForPath(path)
+    const content = <PageLoading title={title} />
+    return shell ? <AppChrome session={session} title={title}>{content}</AppChrome> : content
+  }
+  return <ShellSkeleton pageId={path.startsWith('/feed') ? 'P04' : 'P03'} />
+}
+
+/** The `/_app` route's pending view. */
+export const AppPending = () => <RoutePending shell />

@@ -1,0 +1,27 @@
+/* Stage chip and stage progress, from the Figma components page. */
+.stage-chip {
+  --stage: var(--accs-stage-adviser);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--stage) 12%, transparent);
+  color: var(--stage);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.33;
+  white-space: nowrap;
+}
+.stage-chip::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.stage-chip[data-stage='chair'] { --stage: var(--accs-stage-chair); }
+.stage-chip[data-stage='dean'] { --stage: var(--accs-stage-dean); }
+.stage-chip[data-stage='guidance'] { --stage: var(--accs-stage-guidance); }
+.stage-chip[data-stage='osas'] { --stage: var(--accs-stage-osas); }
+.stage-chip[data-stage='executive'] { --stage: var(--accs-stage-osas); }
+.stage-chip[data-stage='resolved'] { --stage: var(--accs-stage-done); }
+.stage-chip:is([data-stage='submitted'], [data-stage='closed']) { --stage: var(--accs-muted); }
+
+.stage-progress { display: inline-flex; flex: none; gap: 3px; align-items: center; }
+.stage-progress > span { width: 12px; height: 6px; border-radius: 3px; background: var(--accs-line); }
+.stage-progress > span[data-on] { background: var(--accs-link); }

@@ -7,7 +7,7 @@ import { ApiError } from './api'
  */
 export function authRedirectFor(error: unknown): 'sign-in' | 'first-login' | undefined {
   if (!(error instanceof ApiError)) return undefined
-  if (error.status === 401 && error.code === 'UNAUTHENTICATED') return 'sign-in'
+  if (error.status === 401 && (error.code === 'UNAUTHENTICATED' || error.code === 'SESSION_EXPIRED')) return 'sign-in'
   if (error.status === 403 && error.code === 'CREDENTIALS_CHANGE_REQUIRED') return 'first-login'
   return undefined
 }
@@ -15,10 +15,19 @@ export function authRedirectFor(error: unknown): 'sign-in' | 'first-login' | und
 /** Pages that must not bounce to Sign in when a request there finds no session: they are where that leads. */
 export const signedOutPaths = ['/sign-in', '/first-login']
 
-/** The Sign in address for a person whose session ended on `here`, so they come back to the same page. */
-export function sessionEndedHref(here: string) {
+/** Whether the server found an old session cookie that no longer works, as opposed to no session at all (a first visit). */
+export function isSessionExpired(error: unknown) {
+  return error instanceof ApiError && error.status === 401 && error.code === 'SESSION_EXPIRED'
+}
+
+/**
+ * The Sign in address for a person turned away on `here`, so they come back to the same page. Only a session that
+ * really ended (`ended`) adds the "Your session ended" notice; a first visit just signs in.
+ */
+export function sessionEndedHref(here: string, ended = true) {
   const back = here.startsWith('/') && !here.startsWith('//') && !signedOutPaths.some((path) => here.startsWith(path)) ? here : ''
-  return '/sign-in?ended=1' + (back ? '&redirect=' + encodeURIComponent(back) : '')
+  const params = [ended ? 'ended=1' : '', back ? 'redirect=' + encodeURIComponent(back) : ''].filter(Boolean).join('&')
+  return '/sign-in' + (params ? '?' + params : '')
 }
 
 /**

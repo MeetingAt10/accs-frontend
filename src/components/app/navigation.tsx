@@ -1,6 +1,6 @@
 import { formatDate } from "@/lib/format";
 import { featureWords } from "@/lib/restrictions";
-import { AssistantIconButton, assistantIconName } from "@/components/app/assistant-icon";
+import { AssistantCard, assistantIconName } from "@/components/app/assistant-icon";
 import { isQuickJumpKey, jumpItems, matchesJump } from "@/lib/quick-jump";
 import {
   Alert,
@@ -8,6 +8,7 @@ import {
   Button,
   ComboBox,
   Drawer,
+  Icon,
   IconButton,
   Link,
   Modal,
@@ -32,7 +33,9 @@ import {
 import {
   AccountMenu,
   DrawerNav,
+  ShellBrand,
   SitePanel,
+  TabBar,
   type Destination,
   type NavEntry,
   type NavGroup,
@@ -57,6 +60,10 @@ import {
   sites,
   type SiteId,
 } from "@/lib/sites";
+
+import { Onboarding } from "@/components/app/onboarding";
+import { useFocusNewDialogs } from "@/components/app/dialog-focus";
+import "./shell.css";
 
 type RoleEntry = NavEntry & { pageId?: string };
 type RoleGroup = { label: string; entries: RoleEntry[] };
@@ -474,6 +481,27 @@ const roleNavigation: Record<Role, RoleGroup[]> = {
       ],
     },
   ],
+  // President's Office (restored 2026-11-24): receives only executive-level cases from OSAS.
+  president: [
+    {
+      label: "Workspace",
+      entries: [
+        { label: "Home", href: "/home", pageId: "P03", icon: "house" },
+        { label: "Feed", href: "/feed", pageId: "P04", icon: "chats" },
+      ],
+    },
+    {
+      label: "Cases",
+      entries: [
+        {
+          label: "Executive cases",
+          href: "/cases",
+          pageId: "P21",
+          icon: "tray",
+        },
+      ],
+    },
+  ],
   osas: [
     {
       label: "Workspace",
@@ -633,9 +661,23 @@ function resolvedTheme(theme: string) {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+/** The new theme fades in over the old one (shell included) through a view transition; at once without one. */
+let themeSwaps = 0;
+function swapTheme(apply: () => void) {
+  const root = document.documentElement;
+  if (!document.startViewTransition || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return apply();
+  const swap = ++themeSwaps;
+  root.classList.add("accs-theme-swap");
+  document.startViewTransition(apply).finished.finally(() => {
+    // A newer press may have started its own fade; only the last one clears the class.
+    if (swap === themeSwaps) root.classList.remove("accs-theme-swap");
+  });
+}
+
 /**
  * Light / dark switch in the top bar. It applies at once and saves the choice with the same settings action as the
- * Settings page (Settings keeps "Match my device" for following the device again).
+ * Settings page (Settings keeps "Match my device" for following the device again). The switch stays live while a save
+ * runs: presses in quick succession only save the last choice, once the presses stop.
  */
 function ThemeToggle() {
   const queryClient = useQueryClient();
@@ -653,29 +695,58 @@ function ThemeToggle() {
     media.addEventListener("change", follow);
     return () => media.removeEventListener("change", follow);
   }, [saved]);
+  const latest = useRef<string>(undefined);
+  const timer = useRef<number>(undefined);
+  // Saves run one at a time, so the server cannot store them out of order; one a later press replaced is skipped.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const save = useMutation({
-    mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
-    // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
-    onError: (error) => {
-      const restored = resolvedTheme(saved);
-      if (saved === "system") document.documentElement.removeAttribute("data-theme");
-      else document.documentElement.setAttribute("data-theme", restored);
-      setCurrent(restored);
-      toast(apiErrorText(error));
+    mutationFn: (theme: string) => {
+      const run = queue.current
+        .catch(() => undefined)
+        .then(() => (theme === latest.current ? performPageAction("P43", { action: "saveSettings", payload: { theme, density } }) : undefined));
+      queue.current = run;
+      return run;
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
+    // A failed save reloads the stored settings (the shell applies the stored theme) and says so, instead of showing a
+    // choice that is gone on reload. A save that a later press has overtaken does neither.
+    onError: (error, theme) => {
+      if (theme !== latest.current) return;
+      toast(apiErrorText(error));
+      void queryClient.invalidateQueries({ queryKey: ["page", "P43"] });
+    },
+    onSettled: (_data, _error, theme) => {
+      if (theme === latest.current) void queryClient.invalidateQueries({ queryKey: ["page", "P43"] });
+    },
   });
+  const mutate = save.mutate;
+  // Leaving the page (signing out) still saves a choice that was waiting for the presses to stop.
+  useEffect(() => () => {
+    if (timer.current === undefined) return;
+    window.clearTimeout(timer.current);
+    if (latest.current) mutate(latest.current);
+  }, [mutate]);
   const next = current === "dark" ? "light" : "dark";
   return (
     <IconButton
       icon={current === "dark" ? "sun" : "moon"}
       label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
       // Off until the saved settings are known, so saving the theme never replaces the saved density with a default.
-      isDisabled={!appearance.isSuccess || save.isPending}
+      isDisabled={!appearance.isSuccess}
       onPress={() => {
-        document.documentElement.setAttribute("data-theme", next);
+        swapTheme(() => document.documentElement.setAttribute("data-theme", next));
         setCurrent(next);
-        save.mutate(next);
+        latest.current = next;
+        // The settings cache takes the choice now, and a settings reply already on its way is dropped, so a reply that
+        // left the server before this press cannot switch the theme back.
+        void queryClient.cancelQueries({ queryKey: ["page", "P43"] });
+        queryClient.setQueryData(pageQuery("P43").queryKey, (old) =>
+          old && { ...old, data: { ...old.data, settings: { ...(old.data.settings as object), theme: next } } },
+        );
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => {
+          timer.current = undefined;
+          mutate(next);
+        }, 500);
       }}
     />
   );
@@ -701,7 +772,6 @@ function Topbar({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [assistantOpen, setAssistantOpen] = useState(false);
   // Checked every 15 seconds while the tab is open, so new messages and updates show up without reloading.
   const notifications = useQuery({ ...pageQuery("P40"), refetchInterval: 15_000, enabled: session.allowedPages.includes("P40") });
   const notificationAction = useMutation({
@@ -785,6 +855,9 @@ function Topbar({
           tooltip={false}
           onPress={onMenu}
         />
+        <span className="shell-top__brand">
+          <ShellBrand tone="page" size="sm" />
+        </span>
         <nav className="shell-top__crumb" aria-label="Breadcrumb">
           {title !== siteLabel && (
             <>
@@ -794,6 +867,8 @@ function Topbar({
           )}
           <strong>{title}</strong>
         </nav>
+        {/* Pages put page-wide controls here through a portal (Home's role views). Empty elsewhere. */}
+        <div className="shell-top__slot" id="shell-top-slot" />
         <div className="shell-top__tools">
           <form
             className="shell-top__search"
@@ -812,10 +887,25 @@ function Topbar({
               value={search}
               onChange={setSearch}
             />
+            {/* Ctrl+K (Cmd+K on a Mac) opens Go to; the hint hides while there is text, where the clear button sits. */}
+            {!search && (
+              <kbd className="shell-top__kbd" aria-hidden>
+                {isMac ? "⌘K" : "Ctrl K"}
+              </kbd>
+            )}
           </form>
-          <ThemeToggle />
-          {/* A sparkle: a chat bubble read as Messages (17 November), a question mark as Help (19 November). */}
-          <AssistantIconButton onPress={() => setAssistantOpen(true)} />
+          {/* Phones have no room for the field: the button opens the search page. */}
+          <NavLink href="/search" className="ds-icon-btn shell-top__icon shell-top__search-link" aria-label="Search" title="Search">
+            <Icon name="search" size={20} />
+          </NavLink>
+          <span className="shell-top__wide">
+            <ThemeToggle />
+          </span>
+          {session.allowedPages.includes("P11") && (
+            <NavLink href="/messages" className="ds-icon-btn shell-top__icon shell-top__wide" aria-label="Messages" title="Messages">
+              <Icon name="chat" size={20} />
+            </NavLink>
+          )}
           <Popover
             trigger={
               <IconButton
@@ -851,6 +941,13 @@ function Topbar({
             ) : recentNotifications.length ? (
               <Stack gap={12}>
                 <BellCloser closeRef={closeBell} />
+                {unreadCount > 0 && (
+                  <div className="shell-bell__head">
+                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
+                      Mark all as read
+                    </Button>
+                  </div>
+                )}
                 <NotificationList>
                   {recentNotifications.map((notification) => (
                     <NotificationItem
@@ -869,18 +966,14 @@ function Topbar({
                   ))}
                 </NotificationList>
                 <div className="shell-bell__foot">
-                  <Link href="/notifications">View all notifications</Link>
-                  {unreadCount > 0 && (
-                    <Button variant="tertiary" size="sm" loading={markAllRead.isPending} onPress={() => markAllRead.mutate()}>
-                      Mark all as read
-                    </Button>
-                  )}
+                  <Link href="/notifications" onPress={() => closeBell.current?.()}>View all notifications</Link>
                 </div>
               </Stack>
             ) : (
               <Stack gap={12}>
+                <BellCloser closeRef={closeBell} />
                 <p>No new notifications.</p>
-                <Link href="/notifications">Open notifications</Link>
+                <Link href="/notifications" onPress={() => closeBell.current?.()}>Open notifications</Link>
               </Stack>
             )}
           </Popover>
@@ -888,27 +981,18 @@ function Topbar({
         </div>
       </header>
       <NoticeDialog notice={shownNotice} onClose={() => setShownNotice(undefined)} />
-      <Drawer
-        title="Assistant"
-        side="end"
-        isOpen={assistantOpen}
-        onOpenChange={setAssistantOpen}
-      >
-        <Stack gap={16}>
-          <AssistantPanel />
-          <Link href="/assistant">Open the assistant page</Link>
-        </Stack>
-      </Drawer>
     </>
   );
 }
+
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 /** Search the pages and actions the role may open, and go there. Opened with Ctrl+K or Cmd+K. */
 function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter();
   const items = jumpItems(visibleEntries(session).map((entry) => ({ label: entry.label, href: entry.href })), session.allowedPages);
   return (
-    <Modal title="Go to" isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal title="Go to" className="quick-jump" isOpen={isOpen} onOpenChange={onOpenChange}>
       <ModalBody>
         <ComboBox
           label="Page or action"
@@ -936,6 +1020,24 @@ function QuickJump({ session, isOpen, onOpenChange }: { session: Session; isOpen
   );
 }
 
+// Suggestions for the Assistant drawer that match the page open behind it. Other pages keep the general ones.
+// Suggestions for the page the person is on. On a report page they name the report, so the assistant answers about that report only.
+const pageSuggestions: [RegExp, string[] | ((match: RegExpMatchArray) => string[])][] = [
+  [/^\/reports\/(RPT-[0-9A-Z]+)/, ([, id]) => [`Explain the stage of ${id}`, `What happens next with ${id}?`, "Who can see this report?"]],
+  [/^\/reports/, ["Explain my report milestones", "How do I file a new report?"]],
+  [/^\/consultations/, ["How do I book a consultation?", "Show my schedule"]],
+  [/^\/feed/, ["How do I post to the feed?", "What is the difference between a post and an announcement?"]],
+  [/^\/messages/, ["How do I send a message?", "How do I report a message?"]],
+  [/^\/spaces/, ["What can I do in this space?", "Where are the class materials?"]],
+]
+export function assistantSuggestions(path: string) {
+  for (const [pattern, suggestions] of pageSuggestions) {
+    const match = path.match(pattern);
+    if (match) return typeof suggestions === "function" ? suggestions(match) : suggestions;
+  }
+  return undefined;
+}
+
 export function AppChrome({
   session,
   title,
@@ -948,8 +1050,17 @@ export function AppChrome({
   const path = useRouterState({ select: (state) => state.location.pathname });
   const site = siteForPath(path);
   const destinations = siteDestinations(session);
+  // The design-system dialogs leave focus on the page; move it into each new dialog so Escape closes it.
+  useFocusNewDialogs();
   const { groups, current } = siteNav(session, path, site);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The Assistant drawer opens from the panel's Assistant card (and the same card in the phone menu).
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  // On the Assistant page itself the sheet would only repeat the page, so the card does nothing there.
+  const onAssistantPage = path === "/assistant";
+  const openAssistant = () => {
+    if (!onAssistantPage) setAssistantOpen(true);
+  };
   const signOutAction = useSignOut();
   const onSignOut = () => signOutAction.mutate();
   const allowed = new Set(session.allowedPages);
@@ -962,12 +1073,18 @@ export function AppChrome({
   // The top bar already has the bell, so its account menu leaves Notifications out. The drawer lists everything.
   const menuLinks = accountLinks.filter((link) => link.href !== "/notifications");
   // These live in the top bar (Assistant, Notifications, the account menu) or are Home itself, so the panel does not repeat them.
-  const panelGroups = groups
-    .map((group) => ({
-      ...group,
-      entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
-    }))
-    .filter((group) => group.entries.length > 0);
+  const panelOnly = (list: NavGroup[]) =>
+    list
+      .map((group) => ({
+        ...group,
+        entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
+      }))
+      .filter((group) => group.entries.length > 0);
+  const panelGroups = panelOnly(groups);
+  // Every site's own links, so the panel can show them all open (the current site's come from the same lookup).
+  const siteGroups = Object.fromEntries(
+    destinations.map(({ site: { id } }) => [id, id === site ? panelGroups : panelOnly(siteNav(session, path, id).groups)]),
+  ) as Partial<Record<SiteId, NavGroup[]>>;
   const panelCurrent = panelGroups.some((group) =>
     group.entries.some((entry) => entry.href === current),
   )
@@ -1000,6 +1117,7 @@ export function AppChrome({
       "dean",
       "guidance",
       "osas",
+      "president",
     ].includes(role),
   )
     ? "compact"
@@ -1039,6 +1157,8 @@ export function AppChrome({
 
   // The drawer is a mobile-only surface; any route change closes it.
   useEffect(() => setMenuOpen(false), [path]);
+  // Same for the Assistant drawer, so "Open the assistant page" does not leave the sheet over the page.
+  useEffect(() => setAssistantOpen(false), [path]);
 
   // Ctrl+K (Cmd+K on a Mac) opens the quick jump from anywhere in the portal.
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -1110,8 +1230,9 @@ export function AppChrome({
         <SitePanel
           destinations={destinations}
           current={site}
-          groups={panelGroups}
+          siteGroups={siteGroups}
           currentHref={panelCurrent}
+          onAssistant={openAssistant}
         />
         <div className="shell-main">
           <Topbar
@@ -1130,16 +1251,57 @@ export function AppChrome({
           </main>
         </div>
       </div>
-      <Drawer title="Menu" side="start" isOpen={menuOpen} onOpenChange={setMenuOpen}>
+      <TabBar destinations={destinations} current={site} onMore={() => setMenuOpen(true)} />
+      <Drawer
+        title={
+          <>
+            <span aria-hidden>
+              <ShellBrand />
+            </span>
+            <span className="ds-visually-hidden">Menu</span>
+          </>
+        }
+        side="start"
+        className="shell-nav-drawer"
+        isOpen={menuOpen}
+        onOpenChange={setMenuOpen}
+      >
         <DrawerNav
+          session={session}
           destinations={destinations}
           current={site}
-          groups={groups}
-          currentHref={current}
+          siteGroups={siteGroups}
+          currentHref={panelCurrent}
           accountLinks={accountLinks}
           onNavigate={() => setMenuOpen(false)}
           onSignOut={() => void onSignOut()}
+          footer={
+            <AssistantCard
+              onPress={() => {
+                setMenuOpen(false);
+                openAssistant();
+              }}
+            />
+          }
         />
+      </Drawer>
+      <Onboarding session={session} destinations={destinations} />
+      <Drawer
+        title={
+          <>
+            <span>Assistant</span>
+            {/* The full page sits in the header, so the chat runs to the drawer's bottom edge. */}
+            <Link href="/assistant" variant="standalone" icon="arrow-up-right" className="shell-assist-drawer__page">
+              Open full page
+            </Link>
+          </>
+        }
+        side="end"
+        className="shell-assist-drawer"
+        isOpen={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      >
+        <AssistantPanel suggestions={assistantSuggestions(path)} />
       </Drawer>
     </div>
   );

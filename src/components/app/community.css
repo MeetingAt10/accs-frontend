@@ -10,18 +10,6 @@
   white-space: nowrap;
 }
 
-.fx-page .fx-av {
-  width: 36px;
-  height: 36px;
-  font-size: 0.8125rem;
-}
-
-.fx-page .fx-av--sm {
-  width: 22px;
-  height: 22px;
-  font-size: 0.625rem;
-}
-
 .fx-count {
   display: inline-grid;
   place-items: center;
@@ -54,15 +42,16 @@
   color: var(--site-accent-ink);
 }
 
-/* ---------- Feed layout ---------- */
+/* ---------- Feed layout (Figma "05 Forums feed") ----------
+   Posts are white cards on the page; the rail beside them is 340px on wide screens and drops below on narrow ones. */
 
 .fx-page .accs-split.fx-split {
-  gap: 28px;
+  gap: 24px;
 }
 
 @media (min-width: 1100px) {
   .fx-page .accs-split.fx-split {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 
   .fx-rail {
@@ -82,65 +71,142 @@
 }
 
 .fx-rail {
-  gap: 16px;
+  gap: 24px;
 }
 
-/* ---------- Compose bar ---------- */
-
-.fx-page a.fx-compose,
-.fx-compose--button {
+/* Page head: search and Start a discussion beside the title; they wrap under it on a phone. */
+.fx-head-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  min-height: 56px;
-  padding: 10px 12px;
+  min-width: 0;
+}
+
+.fx-head-search {
+  flex: 1 1 240px;
+  width: min(100%, 280px);
+  min-width: 0;
+}
+
+/* Avatars: navy initials on a light indigo, or a quiet grey "A" for an anonymous author. */
+.fx-page .fx-av {
+  width: 40px;
+  height: 40px;
+  background: color-mix(in srgb, var(--site-accent) 12%, var(--accs-surface));
+  color: var(--site-accent-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.fx-page .fx-av[data-anonymous] {
+  background: var(--accs-paper);
+  color: var(--accs-muted);
+  box-shadow: inset 0 0 0 1px var(--accs-line);
+}
+
+.fx-page .fx-av--sm {
+  width: 22px;
+  height: 22px;
+  font-size: 0.625rem;
+}
+
+/* ---------- Composer card ---------- */
+
+.fx-composer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
   border: 1px solid var(--accs-line);
   border-radius: var(--accs-radius-card);
   background: var(--accs-surface);
+  box-shadow: var(--accs-shadow-card);
+}
+
+/* The person writing: the solid brand navy, as in the top bar. */
+.fx-page .fx-composer .fx-av {
+  width: 36px;
+  height: 36px;
+  background: var(--accs-brand-800);
+  color: var(--accs-on-brand);
+  font-size: 0.8125rem;
+}
+
+.fx-page a.fx-composer__field {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: var(--accs-radius-control);
+  background: var(--accs-paper);
   color: var(--accs-muted);
-  font: inherit;
-  text-align: start;
+  font-size: 0.875rem;
   text-decoration: none;
   cursor: text;
-  transition:
-    border-color 160ms var(--accs-ease-out, ease-out),
-    box-shadow 280ms var(--accs-ease-out, ease-out),
-    transform 280ms var(--accs-ease-out, ease-out);
+  transition: box-shadow 160ms var(--accs-ease-out, ease-out);
 }
 
-.fx-page a.fx-compose:hover,
-.fx-compose--button:hover {
-  border-color: var(--site-accent);
-  box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--site-accent) 38%, transparent);
-  transform: translateY(-1px);
+.fx-page a.fx-composer__field:hover {
+  box-shadow: inset 0 0 0 1px var(--accs-line-strong);
 }
 
-.fx-compose__hint {
-  flex: 1;
-  font-size: 0.9375rem;
+.fx-composer__audience {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.fx-compose__cta {
-  display: inline-flex;
+/* "Audience" sits beside its picker, like a compact button, instead of above it. */
+.fx-page .fx-composer__audience .ds-field {
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: var(--accs-radius-control);
-  background: var(--site-accent);
-  color: var(--accs-on-accent);
-  font-size: 0.8125rem;
-  font-weight: 650;
+  gap: 8px;
 }
 
-@media (max-width: 480px) {
-  .fx-compose__cta {
-    display: none;
+.fx-page .fx-composer__audience .ds-field__label {
+  margin: 0;
+  color: var(--accs-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fx-page .fx-composer__audience .ds-select-trigger {
+  min-width: 7.5rem;
+  min-height: 38px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+/* Without the compose field the audience picker is the card's only control. */
+.fx-composer:not([data-post]) .fx-composer__audience {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 560px) {
+  .fx-composer {
+    padding: 14px 16px;
+  }
+
+  .fx-composer__audience {
+    flex: 1 1 100%;
+  }
+
+  .fx-page .fx-composer__audience .ds-select-trigger {
+    flex: 1 1 auto;
   }
 }
 
-/* ---------- Toolbar ---------- */
+/* ---------- Filters: label pills on the left, sort on the right ---------- */
+
+.fx-page .fx-toolbar.fx-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 0;
+}
 
 .fx-toolbar {
   display: grid;
@@ -166,39 +232,60 @@
   min-width: 0;
 }
 
-.fx-toolbar__row--pills {
-  align-items: center;
-  gap: 8px 16px;
-}
-
 .fx-toolbar__search {
   flex: 1 1 14rem;
   min-width: 0;
 }
 
+.fx-cats {
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fx-page .accs-pill.fx-cat {
+  gap: 0;
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accs-ink);
+}
+
+/* All, when chosen, is the solid brand colour. The label pills keep their own colours from the theme. */
+.fx-page .accs-pill.fx-cat:not([data-label])[aria-pressed='true'] {
+  border-color: var(--site-accent);
+  background: var(--site-accent);
+  color: var(--accs-on-accent);
+}
+
 /* Sort: a segmented control whose thumb slides between options. */
 .fx-seg {
   display: inline-flex;
+  gap: 2px;
+  margin-inline-start: auto;
   padding: 3px;
-  border-radius: var(--accs-radius-control);
-  background: var(--accs-paper);
+  border: 1px solid var(--accs-line);
+  border-radius: 9px;
+  background: var(--accs-surface);
 }
 
 .fx-seg__item {
   position: relative;
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 26px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: var(--accs-muted);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: color 160ms var(--accs-ease-out, ease-out);
 }
 
+.fx-seg__item:hover,
 .fx-seg__item[aria-pressed='true'] {
   color: var(--accs-ink);
 }
@@ -206,37 +293,30 @@
 .fx-seg__thumb {
   position: absolute;
   inset: 0;
-  border-radius: 8px;
-  background: var(--accs-surface);
-  box-shadow: 0 1px 2px rgb(11 18 32 / 10%), 0 2px 8px -2px rgb(11 18 32 / 12%);
+  border-radius: 7px;
+  background: var(--accs-paper);
 }
 
 .fx-seg__label {
   position: relative;
 }
 
-.fx-cats {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.fx-page .fx-cat[aria-pressed='true'] {
-  border-color: var(--site-accent);
-  background: var(--site-accent-wash);
-  color: var(--site-accent-ink);
-}
-
 @media (max-width: 640px) {
-  .fx-cat,
+  .fx-page .accs-pill.fx-cat,
   .fx-seg__item {
     min-height: 40px;
   }
+
+  .fx-seg {
+    margin-inline-start: 0;
+  }
 }
 
-/* ---------- Thread rows ---------- */
+/* ---------- Post cards ---------- */
 
 .fx-threads {
   display: grid;
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -245,63 +325,97 @@
 .fx-thread {
   position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 14px;
-  padding: 18px 20px 18px 16px;
-  border-bottom: 1px solid var(--accs-line);
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--accs-line);
+  border-radius: var(--accs-radius-card);
   background: var(--accs-surface);
-  transition: background-color 160ms var(--accs-ease-out, ease-out);
-}
-
-.fx-thread:last-child {
-  border-bottom: 0;
+  box-shadow: var(--accs-shadow-card);
+  transition:
+    border-color 160ms var(--accs-ease-out, ease-out),
+    box-shadow 160ms var(--accs-ease-out, ease-out);
 }
 
 .fx-thread:hover {
-  background: var(--accs-sunken);
+  border-color: var(--accs-line-strong);
+  box-shadow: var(--accs-shadow-hover);
 }
 
-.fx-vote {
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 2px;
-  padding: 6px 0;
-  border-radius: 10px;
-  background: var(--accs-paper);
-  color: var(--accs-muted);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  transition:
-    background-color 160ms var(--accs-ease-out, ease-out),
-    color 160ms var(--accs-ease-out, ease-out);
-}
-
-.fx-thread:hover .fx-vote {
-  background: var(--site-accent-wash);
-  color: var(--site-accent-ink);
-}
-
-.fx-thread__body {
-  display: grid;
-  gap: 8px;
+/* Author, when and where, then the label. Shared by feed cards and the post page. */
+.fx-thread__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
   min-width: 0;
+}
+
+.fx-thread__who {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.fx-thread__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+}
+
+.fx-thread__author {
+  color: var(--accs-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.fx-role {
+  padding: 3px 10px;
+  border-radius: var(--accs-radius-pill);
+  background: var(--accs-tint);
+  color: var(--site-accent-ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.fx-thread__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  margin: 0;
+  color: var(--accs-muted);
+  font-size: 0.75rem;
 }
 
 .fx-thread__tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  margin-inline-start: auto;
+}
+
+/* Label chips as pills, in the theme's label colours. */
+.fx-page .accs-tag.fx-tag--label,
+.fx-thread__tags .accs-tag {
+  padding: 3px 10px;
+  border-radius: var(--accs-radius-pill);
+  font-size: 0.6875rem;
+  line-height: 1.3;
 }
 
 .fx-thread__title {
   margin: 0;
-  font-family: var(--accs-font-display);
-  font-size: 1rem;
-  font-weight: 650;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
+  font-family: var(--accs-font-title);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.42;
+  letter-spacing: -0.005em;
   text-wrap: balance;
 }
 
@@ -310,10 +424,21 @@
   text-decoration: none;
 }
 
+/* The title's link covers the card, so the whole card opens the post. */
 .fx-page a.fx-title-link::after {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+}
+
+.fx-page a.fx-title-link:focus-visible {
+  outline: none;
+}
+
+.fx-page a.fx-title-link:focus-visible::after {
+  outline: 2px solid var(--site-accent);
+  outline-offset: 2px;
 }
 
 .fx-thread:hover a.fx-title-link {
@@ -326,65 +451,71 @@
   overflow: hidden;
   color: var(--accs-muted);
   font-size: 0.875rem;
-  line-height: 1.55;
+  line-height: 1.57;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.fx-thread__meta {
+/* Reactions, replies and files under a line; Comment sits at the end. */
+.fx-thread__foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  margin: 0;
+  gap: 8px 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--accs-line);
   color: var(--accs-muted);
   font-size: 0.8125rem;
+  font-weight: 500;
 }
 
-.fx-thread__author {
-  color: var(--accs-ink-2);
-  font-weight: 600;
-}
-
-.fx-thread__replies {
+.fx-stat {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-inline-start: auto;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-@media (max-width: 480px) {
+.fx-stat__emoji {
+  font-size: 0.9375rem;
+  letter-spacing: -2px;
+}
+
+@media (max-width: 560px) {
   .fx-thread {
-    grid-template-columns: minmax(0, 1fr);
     padding: 16px;
   }
 
-  .fx-vote {
-    display: none;
+  .fx-thread__tags {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-inline-start: 0;
+  }
+
+  .fx-thread__foot {
+    gap: 8px 16px;
   }
 }
 
 /* ---------- Rail ---------- */
 
 .fx-mini {
+  display: grid;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.fx-mini > li {
-  border-bottom: 1px solid var(--accs-line);
-}
-
-.fx-mini > li:last-child {
-  border-bottom: 0;
-}
-
 .fx-page a.fx-mini__row {
   display: grid;
-  gap: 2px;
-  padding: 12px 20px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-inline: -8px;
+  padding: 6px 8px;
+  border-radius: var(--accs-radius-control);
   color: inherit;
   text-decoration: none;
   transition: background-color 160ms var(--accs-ease-out, ease-out);
@@ -394,13 +525,19 @@
   background: var(--accs-sunken);
 }
 
+.fx-mini__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .fx-mini__title {
   display: -webkit-box;
   overflow: hidden;
   color: var(--accs-ink);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -415,8 +552,51 @@
   font-size: 0.75rem;
 }
 
+/* A rail row's mark: initials in a tinted square (one office colour per space, in turn), or a navy circle. */
+.fx-mini__mark {
+  --mark: var(--site-accent-ink);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--accs-radius-control);
+  background: color-mix(in srgb, var(--mark) 12%, transparent);
+  color: var(--mark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.fx-mini__mark[data-tone='adviser'] { --mark: var(--accs-stage-adviser); }
+.fx-mini__mark[data-tone='chair'] { --mark: var(--accs-stage-chair); }
+.fx-mini__mark[data-tone='dean'] { --mark: var(--accs-stage-dean); }
+.fx-mini__mark[data-tone='guidance'] { --mark: var(--accs-stage-guidance); }
+.fx-mini__mark[data-tone='osas'] { --mark: var(--accs-stage-osas); }
+.fx-mini__mark[data-tone='announcement'] { --mark: var(--lbl-announcement); }
+
+.fx-mini__mark[data-round] {
+  border-radius: 50%;
+  background: var(--accs-brand-800);
+  color: var(--accs-on-brand);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.fx-mini__badge {
+  margin-inline-start: 6px;
+  padding: 0 6px;
+  border-radius: var(--accs-radius-pill);
+  background: var(--accs-ok-bg);
+  color: var(--accs-ok);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
 .fx-page a.fx-rail-link {
-  color: var(--site-accent-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accs-link);
   font-size: 0.8125rem;
   font-weight: 600;
   text-decoration: none;
@@ -465,9 +645,9 @@
 
 .fx-group__title {
   margin: 0;
-  font-family: var(--accs-font-display);
-  font-size: 0.9375rem;
-  font-weight: 700;
+  font-family: var(--accs-font-title);
+  font-size: 1rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--accs-ink);
 }
@@ -575,8 +755,8 @@
 .fx-post__body {
   max-width: 70ch;
   color: var(--accs-ink-2);
-  font-size: 1.0625rem;
-  line-height: 1.7;
+  font-size: 0.9375rem;
+  line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -639,8 +819,47 @@
   gap: 12px;
 }
 
-.fx-compose--button {
+/* "Add a comment…" on the post page: the writer's initials and a quiet field, like the feed's composer card. */
+:root .fx-page button.fx-compose.fx-compose--button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accs-muted);
+  font: inherit;
+  text-align: start;
   cursor: text;
+}
+
+.fx-compose__hint {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: var(--accs-radius-control);
+  background: var(--accs-paper);
+  font-size: 0.875rem;
+  transition: box-shadow 160ms var(--accs-ease-out, ease-out);
+}
+
+.fx-compose--button:hover .fx-compose__hint {
+  box-shadow: inset 0 0 0 1px var(--accs-line-strong);
+}
+
+.fx-compose--button:focus-visible {
+  outline: 2px solid var(--site-accent);
+  outline-offset: 4px;
+  border-radius: var(--accs-radius-control);
+}
+
+.fx-page .fx-compose--button .fx-av {
+  width: 36px;
+  height: 36px;
+  background: var(--accs-brand-800);
+  color: var(--accs-on-brand);
+  font-size: 0.8125rem;
 }
 
 .fx-about {
@@ -699,62 +918,36 @@
 .fx-review { display: block; margin-top: 6px; color: var(--accs-warn-ink, var(--accs-muted)); font-size: 0.8125rem; }
 .fx-muted { color: var(--accs-muted); }
 
-/* ---------- Rail sections: each has its own colour and icon, so Announcements, spaces and organizations read apart. */
-.fx-rail-sec[data-tone='warn'] { --rail-ink: var(--accs-warn); --rail-wash: var(--accs-warn-bg); }
-.fx-rail-sec[data-tone='info'] { --rail-ink: var(--accs-info); --rail-wash: var(--accs-info-bg); }
-.fx-rail-sec[data-tone='ok'] { --rail-ink: var(--accs-ok); --rail-wash: var(--accs-ok-bg); }
-.fx-rail-title { display: inline-flex; align-items: center; gap: 8px; }
-.fx-rail-mark {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--rail-ink, var(--accs-ink));
-  color: var(--accs-surface);
-}
-.fx-rail-count {
-  padding: 0 7px;
-  border-radius: var(--accs-radius-pill);
-  background: var(--rail-wash, var(--accs-sunken));
-  color: var(--rail-ink, var(--accs-muted));
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.6;
-  font-variant-numeric: tabular-nums;
-}
-.fx-page a.fx-mini__row { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
-.fx-mini__mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--rail-wash, var(--accs-sunken));
-  color: var(--rail-ink, var(--accs-muted));
-}
-.fx-mini__text { display: grid; gap: 2px; min-width: 0; }
-.fx-mini__badge {
-  margin-inline-start: 6px;
-  padding: 0 6px;
-  border-radius: var(--accs-radius-pill);
-  background: var(--rail-wash, var(--accs-sunken));
-  color: var(--rail-ink, var(--accs-ink));
-  font-size: 0.6875rem;
-  font-weight: 600;
-}
-.fx-rail { gap: 28px; }
 
 /* Comment from a feed row. It sits above the row's stretched title link so it can be clicked. */
-.fx-row-comment { position: relative; z-index: 1; margin-top: 6px; }
-.fx-row-comment__toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; margin-left: -8px; border: 0; border-radius: 8px; background: none; color: var(--accs-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.fx-row-comment { position: relative; z-index: 1; margin-inline-start: auto; }
+/* An open comment form takes the card's full width, under the counts. */
+.fx-row-comment:has(form) { flex-basis: 100%; margin-inline-start: 0; }
+.fx-row-comment__toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; margin-inline: -8px; border: 0; border-radius: 8px; background: none; color: var(--accs-muted); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
 .fx-row-comment__toggle:hover { background: var(--accs-sunken); color: var(--site-accent-ink); }
 .fx-row-comment__toggle:focus-visible { outline: 2px solid var(--site-accent); outline-offset: 2px; }
 .fx-row-comment__form { display: grid; gap: 8px; max-width: 40rem; }
 .fx-row-comment__actions { display: flex; gap: 8px; }
 /* With All, each label is shown as included, in a lighter tint than a picked one. */
-.fx-page .fx-cat[data-included] { border-color: color-mix(in srgb, var(--accs-navy) 30%, var(--accs-line)); background: color-mix(in srgb, var(--accs-navy) 6%, transparent); }
+.fx-page .fx-cat[data-included] { border-color: color-mix(in srgb, var(--site-accent) 16%, var(--accs-line)); background: color-mix(in srgb, var(--site-accent) 4%, var(--accs-surface)); }
 
 /* The organization account's edit button beside a member's position (19 November 2026). */
 .org-member-end { display: inline-flex; align-items: center; gap: 4px; justify-self: end; }
 .org-member-controls { display: inline-flex; }
+
+/* ---------- Redesign: New post, post page and list rows ---------- */
+/* New post sits in one white card, like every other form on the canvas. */
+:root .fx-page .fx-form-panel.fx-form-panel { padding: 16px 24px 20px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); background: var(--accs-surface); box-shadow: var(--accs-shadow-card); }
+:root .fx-page .fx-form-panel .fx-group:last-of-type { border-bottom: 0; }
+@media (max-width: 560px) { :root .fx-page .fx-form-panel.fx-form-panel { padding-inline: 16px; } }
+/* The post page's author line matches a feed card's. */
+.fx-post__head .fx-thread__tags { align-self: flex-start; }
+/* An organization row: its initials, then its name and description, then its members. */
+.fx-row.fx-row--mark { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+/* On a phone the post's actions wrap as one flowing row; the spacer would push the menu onto a line of its own. */
+@media (max-width: 560px) { .fx-actions__spacer { display: none; } }
+/* On a phone an organization's member count moves under its name, so the name and description keep the width. */
+@media (max-width: 560px) {
+  .fx-row.fx-row--mark { grid-template-columns: auto minmax(0, 1fr); }
+  .fx-row.fx-row--mark > .fx-count-label { grid-column: 2; white-space: normal; }
+}

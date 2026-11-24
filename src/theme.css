@@ -1,254 +1,270 @@
 /* ==========================================================================
-   ACCS neutral theme (2026-11-12).
-   A shadcn-style look: neutral (zinc) surfaces, near-black primary in light mode and near-white in dark mode, thin
-   borders, small radii, no drop shadows, and fewer boxes. Loaded after styles.css, it overrides the app tokens
-   (--accs-*, --site-*) and the design-system tokens (--ds-*) so every module and component follows it.
+   ACCS navy theme (2026-11-23), from the Figma redesign ("02 Home", "Components").
+   Navy sidebar, white top bar, a cool grey canvas with white cards, indigo links and one stage color per office.
+   Loaded after styles.css, it overrides the app tokens (--accs-*, --site-*) and the design-system tokens (--ds-*) so
+   every module and component follows it. Dark mode keeps the same structure on deep navy surfaces.
 
-   Fonts: Geist for all interface text, Geist Mono for IDs, codes and numbers, and Poppins for page titles
-   only. Geist carries everything; Geist Mono and Poppins are used sparingly so the type stays uniform.
+   Fonts: Inter for interface text, Poppins for page and card titles, Geist Mono for IDs, codes and numbers.
    ========================================================================== */
 
 :root {
-  --accs-font-body: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
-  --accs-font-display: 'Geist Variable', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --accs-font-body: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --accs-font-display: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --accs-font-title: 'Poppins', var(--accs-font-body);
   --accs-font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --ds-font-family-body: var(--accs-font-body);
   --ds-font-family-display: var(--accs-font-display);
   --ds-font-family-mono: var(--accs-font-mono);
 
-  --accs-radius-card: 10px;
-  --accs-radius-control: 8px;
-  --accs-shadow-hover: none;
-  --accs-shadow-pop: 0 1px 2px rgb(0 0 0 / 6%), 0 12px 32px -12px rgb(0 0 0 / 20%);
-  /* Text on the accent color: light on the near-black accent, dark on the near-white one in dark mode. */
-  --accs-on-accent: var(--accs-paper);
-  --ds-radius-block: 10px;
-  --ds-radius-control: 8px;
-  --ds-radius-sheet: 12px;
-  --ds-radius-overlay: 12px;
-  --ds-shadow-lift: none;
+  --accs-radius-card: 16px;
+  --accs-radius-tile: 14px;
+  --accs-radius-control: 10px;
+  --accs-shadow-card: 0 2px 10px rgb(18 23 51 / 5%);
+  --accs-shadow-tile: 0 2px 4px rgb(18 23 51 / 6%);
+  --accs-shadow-hover: 0 6px 18px -6px rgb(18 23 51 / 14%);
+  --accs-shadow-pop: 0 1px 2px rgb(18 23 51 / 6%), 0 12px 32px -12px rgb(18 23 51 / 24%);
+  /* Text on the accent color is white in both themes. */
+  --accs-on-accent: #ffffff;
+  --ds-radius-block: 14px;
+  --ds-radius-control: 10px;
+  --ds-radius-sheet: 16px;
+  --ds-radius-overlay: 16px;
+  --ds-shadow-lift: var(--accs-shadow-card);
   --ds-shadow-lift-dark: none;
+
+  /* Brand navy, always dark: the sidebar, the hero band and the logo mark use these in both themes. */
+  --accs-brand-950: #0a0f2e;
+  --accs-brand-900: #141b5c;
+  --accs-brand-800: #232e87;
+  --accs-brand-600: #2f3bd6;
+  --accs-brand-500: #3a47e0;
+  --accs-sidebar: var(--accs-brand-900);
+  --accs-hero: linear-gradient(170deg, #2f3bd6 0%, #141b5c 71%);
+  --accs-on-brand: #ffffff;
 }
 
-/* The design system's gray scale is a cool slate; these zinc grays keep chips, badges and dividers neutral in both themes. */
+/* Cool grays tinted toward the navy, so chips, badges and dividers sit with the brand. */
 :root {
-  --ds-neutral-0: #ffffff; --ds-neutral-50: #fafafa; --ds-neutral-100: #f4f4f5; --ds-neutral-200: #e4e4e7;
-  --ds-neutral-500: #71717a; --ds-neutral-700: #3f3f46; --ds-neutral-900: #18181b; --ds-neutral-950: #09090b;
-  --ds-neutral-dark-raised: #18181b; --ds-neutral-dark-border: #27272a; --ds-neutral-dark-secondary: #a1a1aa;
+  --ds-neutral-0: #ffffff; --ds-neutral-50: #f5f6fa; --ds-neutral-100: #eef0f7; --ds-neutral-200: #e3e5ee;
+  --ds-neutral-500: #5e6482; --ds-neutral-700: #2a3052; --ds-neutral-900: #111632; --ds-neutral-950: #0a0f2e;
+  --ds-neutral-dark-raised: #161c3d; --ds-neutral-dark-border: #262d52; --ds-neutral-dark-secondary: #9aa0c3;
 }
 
 /* ---------- Light (default) ---------- */
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
-  --accs-ink: #09090b;
-  --accs-ink-2: #27272a;
-  --accs-muted: #71717a;
-  --accs-faint: #a1a1aa;
-  --accs-paper: #ffffff;
+  --accs-ink: #111632;
+  --accs-ink-2: #2a3052;
+  --accs-muted: #5e6482;
+  --accs-faint: #9196b0;
+  --accs-paper: #f5f6fa;
   --accs-surface: #ffffff;
-  --accs-sunken: #f4f4f5;
-  --accs-line: #e4e4e7;
-  --accs-line-strong: #d4d4d8;
-  /* The old navy becomes the primary: near-black, used for primary buttons and focus. */
-  --accs-navy: #18181b;
-  --accs-navy-deep: #09090b;
-  --accs-navy-rail: #fafafa;
-  --accs-gold: #a16207;
+  --accs-sunken: #eef0f7;
+  --accs-tint: #f3f4fd;
+  --accs-line: #e3e5ee;
+  --accs-line-strong: #cfd3e2;
+  /* Primary buttons and focus use the brand navy; links use the brighter indigo. */
+  --accs-navy: #232e87;
+  --accs-navy-deep: #141b5c;
+  --accs-navy-rail: #0a0f2e;
+  --accs-link: #2f3bd6;
+  --accs-gold: #c77a0a;
 
-  --accs-ok: #15803d;
-  --accs-ok-bg: #dcfce7;
-  --accs-warn: #92400e;
-  --accs-warn-bg: #fef3c7;
-  --accs-danger: #b91c1c;
-  --accs-danger-bg: #fee2e2;
-  --accs-info: #1d4ed8;
-  --accs-info-bg: #dbeafe;
+  --accs-ok: #1e9e5a;
+  --accs-ok-bg: #e3f5ea;
+  --accs-warn: #a86607;
+  --accs-warn-bg: #fbf0dd;
+  --accs-danger: #d6334b;
+  --accs-danger-bg: #fbe5e8;
+  --accs-info: #2f6feb;
+  --accs-info-bg: #e5eefd;
 
-  --ds-canvas: #ffffff;
+  /* One color per office a case can sit with. */
+  --accs-stage-adviser: #2f6feb;
+  --accs-stage-chair: #5b3fd6;
+  --accs-stage-dean: #9a2fc4;
+  --accs-stage-guidance: #0f9a8a;
+  --accs-stage-osas: #c77a0a;
+  --accs-stage-done: #1e9e5a;
+
+  --ds-canvas: #f5f6fa;
   --ds-surface: #ffffff;
   --ds-raised: #ffffff;
-  --ds-text-primary: #09090b;
-  --ds-text-secondary: #71717a;
-  --ds-border-subtle: #e4e4e7;
-  --ds-border-default: #e4e4e7;
-  --ds-border-strong: #d4d4d8;
-  --ds-action-default: #18181b;
-  --ds-action-hover: #27272a;
-  --ds-action-pressed: #09090b;
-  --ds-on-action: #fafafa;
-  --ds-accent-default: #18181b;
-  --ds-accent-hover: #27272a;
-  --ds-accent-pressed: #09090b;
-  --ds-accent-on-solid: #fafafa;
-  --ds-accent-bg: #f4f4f5;
-  --ds-accent-fg: #18181b;
-  --ds-accent-border: #d4d4d8;
-  --ds-secondary-default: #f4f4f5;
-  --ds-secondary-hover: #e4e4e7;
-  --ds-secondary-pressed: #d4d4d8;
-  --ds-secondary-on-solid: #18181b;
-  --ds-secondary-bg: #f4f4f5;
-  --ds-secondary-fg: #18181b;
-  --ds-secondary-border: #e4e4e7;
-  --ds-info-bg: #dbeafe;
-  --ds-info-fg: #1d4ed8;
-  --ds-success-bg: #dcfce7;
-  --ds-success-fg: #15803d;
-  --ds-warning-bg: #fef3c7;
-  --ds-warning-fg: #92400e;
-  --ds-danger-bg: #fee2e2;
-  --ds-danger-fg: #b91c1c;
-  --ds-focus: #a1a1aa;
-  --ds-disabled-bg: #f4f4f5;
-  --ds-disabled-fg: #a1a1aa;
-  --ds-inverse-bg: #18181b;
-  --ds-inverse-fg: #fafafa;
+  --ds-text-primary: #111632;
+  --ds-text-secondary: #5e6482;
+  --ds-border-subtle: #e3e5ee;
+  --ds-border-default: #e3e5ee;
+  --ds-border-strong: #cfd3e2;
+  --ds-action-default: #232e87;
+  --ds-action-hover: #2f3bd6;
+  --ds-action-pressed: #141b5c;
+  --ds-on-action: #ffffff;
+  --ds-accent-default: #232e87;
+  --ds-accent-hover: #2f3bd6;
+  --ds-accent-pressed: #141b5c;
+  --ds-accent-on-solid: #ffffff;
+  --ds-accent-bg: #f3f4fd;
+  --ds-accent-fg: #232e87;
+  --ds-accent-border: #c9cdf5;
+  --ds-secondary-default: #ffffff;
+  --ds-secondary-hover: #f3f4fd;
+  --ds-secondary-pressed: #e3e5ee;
+  --ds-secondary-on-solid: #111632;
+  --ds-secondary-bg: #f3f4fd;
+  --ds-secondary-fg: #232e87;
+  --ds-secondary-border: #e3e5ee;
+  --ds-info-bg: #e5eefd;
+  --ds-info-fg: #2f6feb;
+  --ds-success-bg: #e3f5ea;
+  --ds-success-fg: #1e9e5a;
+  --ds-warning-bg: #fbf0dd;
+  --ds-warning-fg: #a86607;
+  --ds-danger-bg: #fbe5e8;
+  --ds-danger-fg: #d6334b;
+  --ds-focus: #2f3bd6;
+  --ds-disabled-bg: #eef0f7;
+  --ds-disabled-fg: #9196b0;
+  --ds-inverse-bg: #111632;
+  --ds-inverse-fg: #ffffff;
 }
 
-/* Every site uses the same neutral accent, so buttons and active marks are black (white in dark mode). Status colors stay. */
-:root { --site-accent: #18181b; --site-accent-ink: #18181b; --site-accent-wash: #f4f4f5; }
-[data-site='portal'] { --site-accent: #18181b; --site-accent-ink: #18181b; --site-accent-wash: #f4f4f5; }
-[data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-[data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-[data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-[data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-[data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-[data-site='admin'] { --site-accent: #3f3f46; --site-accent-ink: #27272a; --site-accent-wash: #f4f4f5; }
+/* Every site uses the brand indigo for buttons and active marks. Status and stage colors stay their own. */
+:root, [data-site] { --site-accent: #232e87; --site-accent-ink: #2f3bd6; --site-accent-wash: #f3f4fd; }
 
 /* ---------- Dark ---------- */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --accs-ink: #fafafa;
-  --accs-ink-2: #e4e4e7;
-  --accs-muted: #a1a1aa;
-  --accs-faint: #71717a;
-  --accs-paper: #09090b;
-  --accs-surface: #09090b;
-  --accs-sunken: #18181b;
-  --accs-line: #27272a;
-  --accs-line-strong: #3f3f46;
-  --accs-navy: #fafafa;
-  --accs-navy-deep: #e4e4e7;
-  --accs-navy-rail: #0c0c0e;
-  --accs-gold: #eab308;
-  --accs-ok: #86efac;
-  --accs-ok-bg: #14532d;
-  --accs-warn: #fde047;
-  --accs-warn-bg: #422006;
-  --accs-danger: #fca5a5;
-  --accs-danger-bg: #450a0a;
-  --accs-info: #93c5fd;
-  --accs-info-bg: #172554;
+  --accs-ink: #eef0fa;
+  --accs-ink-2: #d4d8ee;
+  --accs-muted: #9aa0c3;
+  --accs-faint: #6b7299;
+  --accs-paper: #0b0f24;
+  --accs-surface: #121733;
+  --accs-sunken: #1a2045;
+  --accs-tint: #1a2150;
+  --accs-line: #262d52;
+  --accs-line-strong: #343c66;
+  --accs-navy: #4b57e8;
+  --accs-navy-deep: #3a47e0;
+  --accs-navy-rail: #070a1c;
+  --accs-link: #9aa4ff;
+  --accs-gold: #f0a93a;
+  --accs-ok: #5fd394;
+  --accs-ok-bg: #12301f;
+  --accs-warn: #f0b45a;
+  --accs-warn-bg: #33240a;
+  --accs-danger: #ff8597;
+  --accs-danger-bg: #3a1218;
+  --accs-info: #8db4ff;
+  --accs-info-bg: #142449;
+  --accs-stage-adviser: #8db4ff;
+  --accs-stage-chair: #a996ff;
+  --accs-stage-dean: #d98af5;
+  --accs-stage-guidance: #4fd6c4;
+  --accs-stage-osas: #f0b45a;
+  --accs-stage-done: #5fd394;
+  --accs-shadow-card: none;
+  --accs-shadow-tile: none;
 
-  --ds-canvas: #09090b;
-  --ds-surface: #09090b;
-  --ds-raised: #18181b;
-  --ds-text-primary: #fafafa;
-  --ds-text-secondary: #a1a1aa;
-  --ds-border-subtle: #27272a;
-  --ds-border-default: #27272a;
-  --ds-border-strong: #3f3f46;
-  --ds-action-default: #fafafa;
-  --ds-action-hover: #e4e4e7;
-  --ds-action-pressed: #d4d4d8;
-  --ds-on-action: #18181b;
-  --ds-accent-default: #fafafa;
-  --ds-accent-hover: #e4e4e7;
-  --ds-accent-pressed: #d4d4d8;
-  --ds-accent-on-solid: #18181b;
-  --ds-accent-bg: #18181b;
-  --ds-accent-fg: #fafafa;
-  --ds-accent-border: #3f3f46;
-  --ds-secondary-default: #27272a;
-  --ds-secondary-hover: #3f3f46;
-  --ds-secondary-pressed: #52525b;
-  --ds-secondary-on-solid: #fafafa;
-  --ds-secondary-bg: #18181b;
-  --ds-secondary-fg: #fafafa;
-  --ds-secondary-border: #27272a;
-  --ds-info-bg: #172554;
-  --ds-info-fg: #93c5fd;
-  --ds-success-bg: #14532d;
-  --ds-success-fg: #86efac;
-  --ds-warning-bg: #422006;
-  --ds-warning-fg: #fde047;
-  --ds-danger-bg: #450a0a;
-  --ds-danger-fg: #fca5a5;
-  --ds-focus: #71717a;
-  --ds-disabled-bg: #18181b;
-  --ds-disabled-fg: #52525b;
-  --ds-inverse-bg: #fafafa;
-  --ds-inverse-fg: #18181b;
+  --ds-canvas: #0b0f24;
+  --ds-surface: #121733;
+  --ds-raised: #161c3d;
+  --ds-text-primary: #eef0fa;
+  --ds-text-secondary: #9aa0c3;
+  --ds-border-subtle: #262d52;
+  --ds-border-default: #262d52;
+  --ds-border-strong: #343c66;
+  --ds-action-default: #4b57e8;
+  --ds-action-hover: #5d68f0;
+  --ds-action-pressed: #3a47e0;
+  --ds-on-action: #ffffff;
+  --ds-accent-default: #4b57e8;
+  --ds-accent-hover: #5d68f0;
+  --ds-accent-pressed: #3a47e0;
+  --ds-accent-on-solid: #ffffff;
+  --ds-accent-bg: #1a2150;
+  --ds-accent-fg: #c3c9ff;
+  --ds-accent-border: #343c66;
+  --ds-secondary-default: #161c3d;
+  --ds-secondary-hover: #1a2150;
+  --ds-secondary-pressed: #262d52;
+  --ds-secondary-on-solid: #eef0fa;
+  --ds-secondary-bg: #1a2150;
+  --ds-secondary-fg: #c3c9ff;
+  --ds-secondary-border: #262d52;
+  --ds-info-bg: #142449;
+  --ds-info-fg: #8db4ff;
+  --ds-success-bg: #12301f;
+  --ds-success-fg: #5fd394;
+  --ds-warning-bg: #33240a;
+  --ds-warning-fg: #f0b45a;
+  --ds-danger-bg: #3a1218;
+  --ds-danger-fg: #ff8597;
+  --ds-focus: #9aa4ff;
+  --ds-disabled-bg: #1a2045;
+  --ds-disabled-fg: #6b7299;
+  --ds-inverse-bg: #eef0fa;
+  --ds-inverse-fg: #111632;
 }
-:root[data-theme='dark'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
-:root[data-theme='dark'] [data-site='portal'], :root[data-theme='dark'] [data-site='admin'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
-:root[data-theme='dark'] [data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-:root[data-theme='dark'] [data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-:root[data-theme='dark'] [data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-:root[data-theme='dark'] [data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-:root[data-theme='dark'] [data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+:root[data-theme='dark'], :root[data-theme='dark'] [data-site] { --site-accent: #4b57e8; --site-accent-ink: #9aa4ff; --site-accent-wash: #1a2150; }
 
 /* The system preference applies until the user picks a theme (data-theme set). Same values as above. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --accs-ink: #fafafa; --accs-ink-2: #e4e4e7; --accs-muted: #a1a1aa; --accs-faint: #71717a;
-    --accs-paper: #09090b; --accs-surface: #09090b; --accs-sunken: #18181b; --accs-line: #27272a; --accs-line-strong: #3f3f46;
-    --accs-navy: #fafafa; --accs-navy-deep: #e4e4e7; --accs-navy-rail: #0c0c0e; --accs-gold: #eab308;
-    --accs-ok: #86efac; --accs-ok-bg: #14532d; --accs-warn: #fde047; --accs-warn-bg: #422006; --accs-danger: #fca5a5; --accs-danger-bg: #450a0a; --accs-info: #93c5fd; --accs-info-bg: #172554;
-    --ds-canvas: #09090b; --ds-surface: #09090b; --ds-raised: #18181b; --ds-text-primary: #fafafa; --ds-text-secondary: #a1a1aa;
-    --ds-border-subtle: #27272a; --ds-border-default: #27272a; --ds-border-strong: #3f3f46;
-    --ds-action-default: #fafafa; --ds-action-hover: #e4e4e7; --ds-action-pressed: #d4d4d8; --ds-on-action: #18181b;
-    --ds-accent-default: #fafafa; --ds-accent-hover: #e4e4e7; --ds-accent-pressed: #d4d4d8; --ds-accent-on-solid: #18181b; --ds-accent-bg: #18181b; --ds-accent-fg: #fafafa; --ds-accent-border: #3f3f46;
-    --ds-secondary-default: #27272a; --ds-secondary-hover: #3f3f46; --ds-secondary-pressed: #52525b; --ds-secondary-on-solid: #fafafa; --ds-secondary-bg: #18181b; --ds-secondary-fg: #fafafa; --ds-secondary-border: #27272a;
-    --ds-info-bg: #172554; --ds-info-fg: #93c5fd; --ds-success-bg: #14532d; --ds-success-fg: #86efac; --ds-warning-bg: #422006; --ds-warning-fg: #fde047; --ds-danger-bg: #450a0a; --ds-danger-fg: #fca5a5;
-    --ds-focus: #71717a; --ds-disabled-bg: #18181b; --ds-disabled-fg: #52525b; --ds-inverse-bg: #fafafa; --ds-inverse-fg: #18181b;
-    --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b;
+    --accs-ink: #eef0fa; --accs-ink-2: #d4d8ee; --accs-muted: #9aa0c3; --accs-faint: #6b7299;
+    --accs-paper: #0b0f24; --accs-surface: #121733; --accs-sunken: #1a2045; --accs-tint: #1a2150; --accs-line: #262d52; --accs-line-strong: #343c66;
+    --accs-navy: #4b57e8; --accs-navy-deep: #3a47e0; --accs-navy-rail: #070a1c; --accs-link: #9aa4ff; --accs-gold: #f0a93a;
+    --accs-ok: #5fd394; --accs-ok-bg: #12301f; --accs-warn: #f0b45a; --accs-warn-bg: #33240a; --accs-danger: #ff8597; --accs-danger-bg: #3a1218; --accs-info: #8db4ff; --accs-info-bg: #142449;
+    --accs-stage-adviser: #8db4ff; --accs-stage-chair: #a996ff; --accs-stage-dean: #d98af5; --accs-stage-guidance: #4fd6c4; --accs-stage-osas: #f0b45a; --accs-stage-done: #5fd394;
+    --accs-shadow-card: none; --accs-shadow-tile: none;
+    --ds-canvas: #0b0f24; --ds-surface: #121733; --ds-raised: #161c3d; --ds-text-primary: #eef0fa; --ds-text-secondary: #9aa0c3;
+    --ds-border-subtle: #262d52; --ds-border-default: #262d52; --ds-border-strong: #343c66;
+    --ds-action-default: #4b57e8; --ds-action-hover: #5d68f0; --ds-action-pressed: #3a47e0; --ds-on-action: #ffffff;
+    --ds-accent-default: #4b57e8; --ds-accent-hover: #5d68f0; --ds-accent-pressed: #3a47e0; --ds-accent-on-solid: #ffffff; --ds-accent-bg: #1a2150; --ds-accent-fg: #c3c9ff; --ds-accent-border: #343c66;
+    --ds-secondary-default: #161c3d; --ds-secondary-hover: #1a2150; --ds-secondary-pressed: #262d52; --ds-secondary-on-solid: #eef0fa; --ds-secondary-bg: #1a2150; --ds-secondary-fg: #c3c9ff; --ds-secondary-border: #262d52;
+    --ds-info-bg: #142449; --ds-info-fg: #8db4ff; --ds-success-bg: #12301f; --ds-success-fg: #5fd394; --ds-warning-bg: #33240a; --ds-warning-fg: #f0b45a; --ds-danger-bg: #3a1218; --ds-danger-fg: #ff8597;
+    --ds-focus: #9aa4ff; --ds-disabled-bg: #1a2045; --ds-disabled-fg: #6b7299; --ds-inverse-bg: #eef0fa; --ds-inverse-fg: #111632;
   }
-  :root:not([data-theme]) [data-site='portal'], :root:not([data-theme]) [data-site='admin'] { --site-accent: #fafafa; --site-accent-ink: #fafafa; --site-accent-wash: #18181b; }
-  :root:not([data-theme]) [data-site='forums'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-  :root:not([data-theme]) [data-site='schedule'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-  :root:not([data-theme]) [data-site='cases'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-  :root:not([data-theme]) [data-site='evaluations'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
-  :root:not([data-theme]) [data-site='records'] { --site-accent: var(--accs-ink); --site-accent-ink: var(--accs-ink); --site-accent-wash: var(--accs-sunken); }
+  :root:not([data-theme]), :root:not([data-theme]) [data-site] { --site-accent: #4b57e8; --site-accent-ink: #9aa4ff; --site-accent-wash: #1a2150; }
 }
 
 /* ---------- Type ---------- */
 html, body { font-family: var(--accs-font-body); font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; }
 body { background: var(--accs-paper); color: var(--accs-ink); }
 code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feature-settings: normal; }
-/* Page titles use Poppins; everything else stays in Geist. */
+/* Page titles use Poppins; everything else is Inter. */
 :root .accs-page-title { font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
 .accs-page-title, .accs-page-header h1, :root .ch-head__title { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
 :focus-visible { outline: 2px solid var(--accs-faint); outline-offset: 2px; }
 
-/* ---------- Fewer boxes ----------
+/* ---------- Cards ----------
    Overrides are scoped under :root so they beat module stylesheets, which load later with each page. */
-/* A panel is a section, not a card: no border or fill, a heading and a thin divider below it. */
-:root .accs-panel { padding: 0; border: 0; border-radius: 0; background: transparent; gap: 12px; }
-:root .accs-panel > .accs-panel__head { padding: 0 0 10px; border-bottom: 1px solid var(--accs-line); }
-:root .accs-panel__title { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.005em; }
-/* Lists in flush panels are rows split by thin lines, with no outer box. Only a table keeps one light outline. */
-:root .accs-panel--flush { border: 0; border-radius: 0; background: transparent; overflow: visible; }
-:root .accs-panel--flush > .accs-panel__head { padding: 0 0 10px; }
-:root .accs-panel--flush:has(table) { border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); overflow: hidden; }
-:root .accs-panel--flush:has(table) > .accs-panel__head { padding: 12px 16px; }
-/* Clickable panels change background on hover instead of lifting. */
-:root .accs-panel--interactive { border-radius: var(--accs-radius-card); padding: 12px; margin: -12px; transition: background-color 150ms var(--accs-ease); }
-:root .accs-panel--interactive:hover { background: var(--accs-sunken); box-shadow: none; transform: none; }
+/* A panel is a white card on the grey canvas: thin border, 16px corners, a soft shadow, a Poppins heading. */
+:root .accs-panel { padding: 20px 24px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); background: var(--accs-surface); box-shadow: var(--accs-shadow-card); gap: 12px; }
+:root .accs-panel > .accs-panel__head { padding: 0; border-bottom: 0; }
+:root .accs-panel__title { font-family: var(--accs-font-title); font-size: 1rem; font-weight: 600; letter-spacing: -0.005em; color: var(--accs-ink); }
+:root .accs-panel__link { color: var(--accs-link); font-weight: 600; }
+/* Lists in flush panels run edge to edge inside the card; rows are split by thin lines. */
+:root .accs-panel--flush { padding: 20px 24px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-card); background: var(--accs-surface); overflow: hidden; }
+:root .accs-panel--flush > .accs-panel__head { padding: 0 0 4px; }
+:root .accs-panel--flush:has(table) { padding: 0; }
+:root .accs-panel--flush:has(table) > .accs-panel__head { padding: 16px 20px; }
+/* Clickable panels lift a little on hover. */
+:root .accs-panel--interactive { transition: box-shadow 150ms var(--accs-ease), border-color 150ms var(--accs-ease); }
+:root .accs-panel--interactive:hover { border-color: var(--accs-line-strong); box-shadow: var(--accs-shadow-hover); transform: none; }
 
 /* ---------- Module tiles and design-system cards ---------- */
 :root .ds-card { --ds-sheet-rule: var(--accs-line); box-shadow: none; }
 :root .ds-card__title { font-family: var(--accs-font-body); font-weight: 600; letter-spacing: -0.01em; }
 /* Icon squares are all the same quiet neutral; no solid black or colored blocks. */
 :root :is(.ds-tile, .ds-tile--neutral, .ds-tile--community, .ds-tile--consult, .ds-tile--restricted, .ds-tile--success, .ds-tile--warning, .ds-tile--danger) {
-  width: 36px; height: 36px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-control); background: var(--accs-surface); color: var(--accs-ink);
+  width: 36px; height: 36px; border: 0; border-radius: var(--accs-radius-control); background: var(--accs-tint); color: var(--accs-link);
 }
 
 /* ---------- Logo mark ---------- */
-:root .shell-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--accs-navy); box-shadow: none; color: var(--accs-paper); font-family: var(--accs-font-body); font-size: 0.95rem; font-weight: 700; }
+:root .shell-mark { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(127deg, var(--accs-brand-500) 0%, var(--accs-brand-900) 71%); box-shadow: none; color: #fff; font-family: var(--accs-font-title); font-size: 0.95rem; font-weight: 700; }
 
 /* ---------- Filter bars, composers and page heads ---------- */
 /* Search and filters sit on the page, not in a box. Sticky bars keep the page color so rows scroll under them cleanly. */
@@ -270,21 +286,15 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 :root .sc-bar { padding: 4px 0; border: 0; border-radius: 0; background: var(--accs-paper); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
 
 /* ---------- Sign-in brand panel ---------- */
-/* Always a dark zinc panel with white text, whatever the theme: the old navy tokens now follow the theme. */
-:root { --ds-plate-bg: var(--accs-ink); --ds-plate-fg: var(--accs-paper); }
-:root .au-brand { color: #fafafa; background: radial-gradient(110% 80% at 0% 0%, rgb(255 255 255 / 7%), transparent 65%), #09090b; --ds-plate-bg: #fafafa; --ds-plate-fg: #09090b; }
+/* Always the brand navy with white text, whatever the theme (used by /first-login). */
+:root { --ds-plate-bg: var(--accs-ink); --ds-plate-fg: var(--accs-surface); }
+:root .au-brand { color: #fff; background: linear-gradient(180deg, #032e87 0%, #010b21 100%); --ds-plate-bg: #fff; --ds-plate-fg: #032e87; }
 :root .au-brand::before { background: radial-gradient(40% 40% at 25% 30%, rgb(255 255 255 / 5%), transparent 70%), radial-gradient(35% 35% at 75% 75%, rgb(161 161 170 / 8%), transparent 70%); }
 :root .au-brand__line { color: rgb(250 250 250 / 65%); }
 :root .au-brand__headline { font-family: var(--accs-font-title); font-weight: 600; letter-spacing: -0.02em; }
 :root .au-brand__facts li { border-inline-start-color: rgb(250 250 250 / 30%); }
 
 /* ---------- Home: short and scannable ---------- */
-/* Getting started is one line that opens. */
-:root .getting-started-box { border-top: 1px solid var(--accs-line); padding-top: 16px; }
-:root .getting-started-box > summary { cursor: pointer; color: var(--accs-muted); font-size: 0.875rem; font-weight: 500; list-style-position: inside; }
-:root .getting-started-box > summary:hover { color: var(--accs-ink); }
-:root .getting-started-box__count { margin-inline-start: 6px; color: var(--accs-faint); font-weight: 400; }
-:root .getting-started-box[open] > .getting-started { margin-top: 10px; }
 /* Student and faculty home head: greeting as the title, the date under it, actions beside it on wide screens. */
 :root .ch-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
 :root .ch-head__title { margin: 0; font-size: clamp(1.4rem, 1.15rem + 0.6vw, 1.75rem); line-height: 1.2; }
@@ -335,9 +345,9 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
 
 /* ---------- Charts ---------- */
 /* Line charts keep a readable size on wide pages instead of growing with the page; series get distinct colors. */
-:root { --accs-chart-1: #18181b; --accs-chart-2: #0d9488; --accs-chart-3: #d97706; --accs-chart-4: #a1a1aa; }
-:root[data-theme='dark'] { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --accs-chart-1: #fafafa; --accs-chart-2: #2dd4bf; --accs-chart-3: #fbbf24; --accs-chart-4: #71717a; } }
+:root { --accs-chart-1: #2f3bd6; --accs-chart-2: #0f9a8a; --accs-chart-3: #c77a0a; --accs-chart-4: #9196b0; }
+:root[data-theme='dark'] { --accs-chart-1: #9aa4ff; --accs-chart-2: #4fd6c4; --accs-chart-3: #f0b45a; --accs-chart-4: #6b7299; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --accs-chart-1: #9aa4ff; --accs-chart-2: #4fd6c4; --accs-chart-3: #f0b45a; --accs-chart-4: #6b7299; } }
 :root .ch-plot { height: 240px; }
 
 /* ---------- Messages and settings use the space ---------- */
@@ -351,13 +361,14 @@ code, kbd, samp, pre, .accs-mono { font-family: var(--accs-font-mono); font-feat
   :root .communications-messages__thread > :last-child:not(.ds-empty) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
   :root .communications-messages__thread > :last-child:not(.ds-empty) > :last-child { margin-top: auto; }
   :root .communications-messages__thread:has(> .ds-empty) { justify-content: center; }
-  :root .cm-chat-panel { height: calc(100dvh - 12rem); max-height: none; }
+  /* Room for the page heading above, so the card and its note end inside the window. */
+  :root .cm-chat-panel { height: calc(100dvh - 18rem); min-height: 28rem; max-height: none; }
 }
 /* Settings: the password fields fill their column. */
 :root .pa-pw { max-width: none; }
 
-/* Avatars: one quiet neutral, not the design system's blue and purple fills. */
-:root :is(.ds-avatar, .ds-avatar--community, .ds-avatar--consult, .ds-avatar--neutral) { background: var(--accs-sunken); color: var(--accs-ink); }
+/* Avatars: the brand navy with white initials, as in the top bar. */
+:root :is(.ds-avatar, .ds-avatar--community, .ds-avatar--consult, .ds-avatar--neutral) { background: var(--accs-brand-800); color: #fff; }
 
 /* ---------- Module tiles ---------- */
 /* The design-system cards, three to a row on wide screens so a role's six tasks sit in two even rows. */

@@ -183,6 +183,7 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
     font-weight: 600;
   }
   .accs-table.adm-stack .adm-trunc, .accs-table.adm-stack .adm-trunc--wide { display: inline-block; max-width: calc(100% - 7rem); vertical-align: bottom; }
+  .accs-table.adm-stack tr.adm-row { grid-template-columns: minmax(0, 1fr); }
   .adm-meter { grid-template-columns: minmax(4.5rem, 7rem) minmax(0, 1fr) 3.5rem; }
 }
 
@@ -307,6 +308,10 @@ a.adm-link:focus-visible { outline-offset: -2px; border-radius: 8px; }
 .adm-proposed__chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 3px 12px; border: 1px solid var(--accs-line); border-radius: var(--accs-radius-pill); background: var(--accs-sunken); color: var(--accs-ink); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
 .adm-proposed__chip:hover { border-color: var(--accs-navy); }
 .adm-proposed__chip:focus-visible { outline: 2px solid var(--accs-navy); outline-offset: 2px; }
+.adm-proposed__chip:active { background: var(--accs-line); }
+.adm-flash { animation: adm-flash 1.8s var(--accs-ease-out); }
+@keyframes adm-flash { 0%, 60% { box-shadow: 0 0 0 3px var(--accs-warn); background: var(--accs-warn-bg); } 100% { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .adm-flash { animation-duration: 0.01ms; } }
 .adm-proposed__note { flex-basis: 100%; margin: 0; color: var(--accs-muted); font-size: 0.75rem; }
 
 @media (max-width: 640px) {

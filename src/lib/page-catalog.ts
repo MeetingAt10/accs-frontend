@@ -184,3 +184,9 @@ export function titleForPath(path: string) {
   const pageId = pageIdForPath(path)
   return pageId ? pageTitles[pageId] : 'ACCS'
 }
+
+/** Pages that show one record, so their layout comes from the record. */
+export const recordPages = ['P06', 'P08', 'P10', 'P12', 'P16', 'P20', 'P22', 'P24', 'P27', 'P29', 'P31', 'P32', 'P34', 'P38', 'P47', 'P50']
+
+/** Pages that are a form; while loading they show disabled fields. */
+export const formPages = ['P05', 'P19']

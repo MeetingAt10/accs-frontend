@@ -4,13 +4,14 @@ import { sessionQuery } from '@/lib/queries'
 import { roleLine } from '@/lib/role-scope'
 import type { ReactNode } from 'react'
 
-import { siteById, siteForPath } from '@/lib/sites'
+import { allowsPath, siteById, siteForPath, siteLanding, type SiteId } from '@/lib/sites'
 import { dateParts } from '@/lib/format'
+import { bar, SkeletonRows, useLoadingLayout } from '@/components/app/skeleton-rows'
 
 // Shared page vocabulary for every ACCS screen. Styles live in src/styles.css (foundation section).
 // Spec: docs/deltas/2026-11-01-real-auth-and-visual-refactor.md
 
-type Crumb = { label: string; href?: string }
+type Crumb = { label: string; href?: string; site?: SiteId }
 
 /** Page header used at the top of every page. No eyebrow labels above the title. */
 export function PageHeader({
@@ -25,7 +26,8 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   // Every page says which role it is shown for (testing sheet: only Home did).
-  const user = useQuery(sessionQuery()).data?.user
+  const session = useQuery(sessionQuery()).data
+  const user = session?.user
   return (
     <header className="accs-page-head">
       <div className="accs-page-head__main">
@@ -33,9 +35,11 @@ export function PageHeader({
           {crumbs && crumbs.length > 0 && (
             <nav aria-label="Breadcrumb">
               <ol className="accs-crumbs">
-                {crumbs.map((crumb) => (
-                  <li key={crumb.label}>{crumb.href ? <a href={crumb.href}>{crumb.label}</a> : crumb.label}</li>
-                ))}
+                {crumbs.map((crumb) => {
+                  // A site crumb opens the first landing this session may open (the first one can be closed to its role).
+                  const href = crumb.site && session ? siteLanding(crumb.site, (h) => allowsPath(session, h)) ?? crumb.href : crumb.href
+                  return <li key={crumb.label}>{href ? <a href={href}>{crumb.label}</a> : crumb.label}</li>
+                })}
               </ol>
             </nav>
           )}
@@ -52,7 +56,7 @@ export function PageHeader({
 /** Breadcrumb root for the site that owns a path. */
 export function siteCrumb(path: string): Crumb {
   const site = siteById[siteForPath(path)]
-  return { label: site.label, href: site.landings[0] }
+  return { label: site.label, href: site.landings[0], site: site.id }
 }
 
 /** The one container. Pass `flush` for lists and tables that run edge to edge. */
@@ -140,7 +144,13 @@ export function Kpis({ children, label }: { children: ReactNode; label?: string 
 }
 
 export function Kpi({ label, value, note, href }: { label: string; value: ReactNode; note?: ReactNode; href?: string }) {
-  const body = (
+  const loading = useLoadingLayout()
+  const body = loading ? (
+    <>
+      <p className="accs-kpi__label">{label}</p>
+      <p className="accs-kpi__value">{bar('3rem', 28)}</p>
+    </>
+  ) : (
     <>
       <p className="accs-kpi__label">{label}</p>
       <p className="accs-kpi__value">{value}</p>
@@ -170,6 +180,8 @@ export function DateTile({ value }: { value: unknown }) {
 }
 
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+  // While the page's data loads, an empty list is a loading list, not "nothing here".
+  if (useLoadingLayout()) return <SkeletonRows count={3} />
   return (
     <div className="accs-empty">
       <strong>{title}</strong>

@@ -54,6 +54,11 @@ describe('notificationsFromQuery', () => {
     })
   })
 
+  it('lists a high priority item first even when it is older than five others', () => {
+    const items = [...Array.from({ length: 6 }, (_, index) => ({ id: String(index), priority: 'normal' })), { id: 'R', priority: 'high' }]
+    expect(notificationsFromQuery({ isSuccess: true, data: notificationsPage(items) }).recent[0]).toEqual(items[6])
+  })
+
   it('is empty when a successful response has no notifications list', () => {
     expect(notificationsFromQuery({ isSuccess: true, data: notificationsPage(undefined) })).toEqual({
       recent: [],

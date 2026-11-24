@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Checkbox,
+  CheckboxGroup,
   DatePicker,
   Disclosure,
   Icon,
@@ -68,7 +69,10 @@ import {
   type PageEnvelope,
 } from "@/lib/api";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
+import { useLocalDraft } from "@/lib/local-draft";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { pageTitles } from "@/lib/page-catalog";
 import { replaceFilters } from "@/lib/url-filters";
 
 import "./evaluations.css";
@@ -591,7 +595,7 @@ function EvaluationHome({ page }: { page: PageEnvelope }) {
             )}
             {page.data.canViewResults === true && (
               <Button href="/evaluations/results" variant="secondary">
-                {professor ? "My results" : "Results"}
+                {professor && !session.data?.user.roles.some((role) => ["chair", "dean"].includes(role)) ? "My results" : "Results"}
               </Button>
             )}
           </>
@@ -904,10 +908,16 @@ function FacultyResults({
   const faculty = object(result.faculty);
   const [note, setNote] = useState("");
   const action = useEvaluationAction("P29");
-  const canFollowUp =
+  // Paper Fig 3.14: the full result and follow-up notes show only once 100% of the program has rated; until then the
+  // faculty average only. A result from an older API without `released` shows in full.
+  const released = result.released !== false;
+  const oversight =
     session.data?.user.roles.some((role) =>
       ["chair", "dean"].includes(role),
     ) === true;
+  const canFollowUp =
+    oversight && (result.canFollowUp === undefined || result.canFollowUp === true);
+  const followUps = items(result.followUps);
   const programAverage = object(page.data.programAverage);
   const programCriteria = items(programAverage.criteria);
   const criteria: BarDatum[] = items(result.criteria).map((criterion) => {
@@ -962,6 +972,17 @@ function FacultyResults({
               note="Of the forms you can see"
             />
           </Kpis>
+          {!released ? (
+            <Panel>
+              <p className="ev-note">
+                Faculty average only. The full result opens when 100% of{" "}
+                {words(faculty.program, "the program")} has rated (
+                {number(programAverage.submitted)} of{" "}
+                {number(programAverage.assigned)} evaluations in).
+              </p>
+            </Panel>
+          ) : (
+          <>
           <Panel title="By criterion">
             <CriteriaBars
               data={criteria}
@@ -997,6 +1018,8 @@ function FacultyResults({
               <Empty title="No themes yet" />
             )}
           </Panel>
+          </>
+          )}
         </>
       ) : (
         <Panel>
@@ -1010,6 +1033,21 @@ function FacultyResults({
       {/* TBD(D-08): release thresholds and feedback retention need QCU approval. */}
       {canFollowUp && (
         <Panel title="Follow-up">
+          {followUps.length > 0 && (
+            <ul className="accs-rows">
+              {followUps.map((entry, index) => (
+                <li key={words(entry.id, String(index))}>
+                  <div className="ev-theme">
+                    <strong>
+                      {words(object(entry.author).name, "Follow-up")}
+                      <span className="ev-muted">{formatDateTime(words(entry.at))}</span>
+                    </strong>
+                    <p>{words(entry.note)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="ev-followup">
             <TextArea
               label="Follow-up note"
@@ -1065,7 +1103,8 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
   );
   const criteria: BarDatum[] = ["Clarity", "Support", "Fairness"].map(
     (label) => {
-      const values = results.flatMap((result) =>
+      // Only faculty with responses: a faculty member nobody evaluated would count as 0 and drag the average down.
+      const values = results.filter((result) => number(result.responses) > 0).flatMap((result) =>
         items(result.criteria)
           .filter((criterion) => criterion.label === label)
           .map((criterion) => number(criterion.value)),
@@ -1104,12 +1143,7 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             label="Completion rate"
             value={
               <AnimatedNumber
-                value={Math.round(
-                  results.reduce(
-                    (total, result) => total + number(result.completion),
-                    0,
-                  ) / Math.max(1, results.length),
-                )}
+                value={completionRate(results)}
                 suffix="%"
               />
             }
@@ -1131,10 +1165,10 @@ function ResultsOverview({ page }: { page: PageEnvelope }) {
             value={
               <AnimatedNumber
                 value={
-                  results.reduce(
-                    (total, result) => total + number(result.average),
-                    0,
-                  ) / Math.max(1, results.length)
+                  results
+                    .filter((result) => number(result.responses) > 0)
+                    .reduce((total, result) => total + number(result.average), 0) /
+                  Math.max(1, results.filter((result) => number(result.responses) > 0).length)
                 }
                 decimals={2}
               />
@@ -1648,11 +1682,11 @@ export function QuestionEditor({
 
 /* ---------- P31 Cycle detail ---------- */
 
-function CompletionTable({ title, rows }: { title: string; rows: Item[] }) {
+function CompletionTable({ title, rows, noun = "people" }: { title: string; rows: Item[]; noun?: string }) {
   return (
     <Panel flush title={title}>
       {rows.length ? (
-        <PagedList items={rows} noun="students">
+        <PagedList items={rows} noun={noun}>
           {(rows) => (
           <div className="accs-table-wrap" style={{ border: 0, borderRadius: 0 }}>
             <table className="accs-table" aria-label={title}>
@@ -1707,6 +1741,11 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const [instructions, setInstructions] = useState(words(record.instructions));
   const [opens, setOpens] = useState(words(record.opens));
   const [closes, setCloses] = useState(words(record.closes));
+  // 360-degree evaluation (paper, Chapter 1 Scope item 5): the student form is always on; the Dean may add the peer and
+  // upward forms.
+  const [forms, setForms] = useState(() => [
+    ...new Set(["student", ...strings(record.forms)]),
+  ]);
   const [formQuestions, setFormQuestions] = useState(
     questions(record.questions),
   );
@@ -1721,7 +1760,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     ...(!title.trim() ? ["Name"] : []),
     ...(!instructions.trim() ? ["Instructions"] : []),
     ...(!opens || !closes || closes < opens
-      ? ["Open and close dates (close on or after open)"]
+      ? ["Close date must be on or after the open date."]
       : []),
     ...(!formQuestions.length ||
     formQuestions.some(
@@ -1733,6 +1772,10 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
   const completion = items(page.data.completion);
   const facultyCompletion = items(page.data.facultyCompletion);
   const facultyReviews = items(page.data.facultyReviews);
+  const reviewsOpen = facultyReviews.filter((review) => review.status !== "Reviewed").length;
+  const reviewBlock = reviewsOpen
+    ? `${reviewsOpen} faculty review${reviewsOpen === 1 ? " is" : "s are"} pending or ask for changes. Publish once all are reviewed.`
+    : "";
   const visible = (rows: Item[]) =>
     rows.filter(
       (entry) =>
@@ -1746,8 +1789,7 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
     instructions,
     opens,
     closes,
-    // Cycles use the student evaluation form only (MeetingAt10/accs-backend#47).
-    forms: ["student"],
+    forms,
     questions: formQuestions,
   };
 
@@ -1859,10 +1901,20 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             isDisabled={!editable}
           />
         </div>
-        <p className="ev-note">
-          Form: <strong>{formLabels.student}</strong>. Students evaluate the
-          faculty who teach their sections; it is the only form a cycle uses.
-        </p>
+        <CheckboxGroup
+          label="Forms"
+          description="Students always evaluate the faculty who teach their sections. Add the peer and upward forms for a 360-degree evaluation."
+          value={forms}
+          onChange={(next) => setForms([...new Set(["student", ...next])])}
+          isDisabled={!editable}
+          isRequired
+        >
+          {Object.entries(formLabels).map(([key, label]) => (
+            <Checkbox value={key} key={key} isDisabled={key === "student"}>
+              {label}
+            </Checkbox>
+          ))}
+        </CheckboxGroup>
       </Panel>
       <Panel title="Participation">
         {/* TBD(D-01): participation rules have no approved value and cannot be changed. */}
@@ -1987,8 +2039,8 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
           ))}
         </Select>
       </div>
-      <CompletionTable title="By section" rows={visible(completion)} />
-      <CompletionTable title="By faculty" rows={visible(facultyCompletion)} />
+      <CompletionTable title="By section" rows={visible(completion)} noun="sections" />
+      <CompletionTable title="By faculty" rows={visible(facultyCompletion)} noun="faculty" />
     </div>
   );
 
@@ -2009,12 +2061,15 @@ function CycleEditorPage({ page }: { page: PageEnvelope }) {
             </StatusChip>
             {record.status === "Draft" && sendForReview}
             {record.status === "In review" && (
-              <Button
-                isDisabled={incomplete.length > 0}
-                onPress={() => setConfirmStatus("Published")}
-              >
-                Publish
-              </Button>
+              <>
+                {reviewBlock && <span className="ev-muted">{reviewBlock}</span>}
+                <Button
+                  isDisabled={incomplete.length > 0 || reviewsOpen > 0}
+                  onPress={() => setConfirmStatus("Published")}
+                >
+                  Publish
+                </Button>
+              </>
             )}
             {record.status === "Published" && (
               <Button
@@ -2134,7 +2189,10 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
   const formQuestions = questions(record.questions);
   const savedReview = items(record.reviews)[0];
   const [decisions, setDecisions] = useState<Record<string, string>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const me = useQuery(sessionQuery()).data?.user.id ?? "signed-in";
+  const [saved, setSaved, clearSaved] = useLocalDraft<{ comments: Record<string, string> }>(`accs-question-review-draft-${me}-${words(record.id)}`, { comments: {} });
+  const comments = saved.comments;
+  const setComments = (update: (current: Record<string, string>) => Record<string, string>) => setSaved((current) => ({ comments: update(current.comments) }));
   const [sent, setSent] = useState(false);
   const action = useEvaluationAction("P32");
   const readOnly = sent || page.data.canReview !== true;
@@ -2172,6 +2230,7 @@ function QuestionReviewPage({ page }: { page: PageEnvelope }) {
         },
       });
       setSent(true);
+      clearSaved();
     } catch {
       // Comments remain available after an error.
     }
@@ -2312,25 +2371,6 @@ export function EvaluationPages({ page }: { page: PageEnvelope }) {
   }
 }
 
-function LoadingSkeleton() {
-  return (
-    <div
-      className="accs-stack"
-      role="status"
-      aria-label="Loading evaluations"
-      aria-busy="true"
-    >
-      <div className="accs-skeleton" style={{ height: 36, width: "38%" }} />
-      <div className="accs-skeleton" style={{ height: 88 }} />
-      <div className="accs-grid ev-grid">
-        {[0, 1, 2].map((key) => (
-          <div className="accs-skeleton" style={{ height: 210 }} key={key} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function EvaluationScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>;
   const recordId = Object.values(params).at(-1);
@@ -2347,7 +2387,7 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <LoadingSkeleton />
+          <PageLoading pageId={pageId} title={pageTitles[pageId] || "Evaluations"} />
         ) : page.isError ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (
@@ -2363,4 +2403,11 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
       </div>
     </RequirePermission>
   );
+}
+
+/** Submitted evaluations out of those assigned, across the listed faculty. Faculty with nothing assigned in a published cycle don't count. */
+function completionRate(results: Item[]) {
+  const assigned = results.reduce((total, result) => total + number(result.assigned), 0)
+  const submitted = results.reduce((total, result) => total + number(result.responses), 0)
+  return assigned ? Math.round((submitted / assigned) * 100) : 0
 }

@@ -10,6 +10,7 @@ import { pageQuery } from '@/lib/queries'
 import { replaceFilters } from '@/lib/url-filters'
 import { Empty, PageHeader, Panel, StatusChip } from '@/components/app/page-shell'
 import { PagedList } from '@/components/app/paging'
+import { PageLoading } from '@/components/app/skeleton-page'
 import './faculty-load.css'
 
 // Faculty load (P54, MeetingAt10/accs-backend#39): the CCS Secretary uploads each term's class schedule as a CSV file, and
@@ -167,6 +168,9 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
   const withClasses = faculty.filter((person) => items(person.classes).length)
   const conflicts = faculty.reduce((total, person) => total + items(person.conflicts).length, 0)
   const showTerm = (value: string) => replaceFilters(router, location.pathname, new URLSearchParams(value ? { period: value } : {}))
+  // The chosen term shows at once; the page on screen is still the previous term's while the new one loads.
+  const period = new URLSearchParams(location.searchStr).get('period') ?? ''
+  const chosen = terms.some((entry) => text(entry.term) === period) ? period : text(term.term)
   return (
     <div className="accs-stack">
       <PageHeader
@@ -176,7 +180,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
       <UploadLoad onSaved={showTerm} />
       {terms.length > 1 && (
         <div className="fl-term">
-          <Select label="Term" selectedKey={text(term.term) || null} onSelectionChange={(key) => showTerm(String(key ?? ''))}>
+          <Select label="Term" selectedKey={chosen || null} onSelectionChange={(key) => showTerm(String(key ?? ''))}>
             {terms.map((entry) => <SelectOption id={text(entry.term)} key={text(entry.term)}>{text(entry.term)}</SelectOption>)}
           </Select>
         </div>
@@ -231,7 +235,7 @@ function FacultyLoadScreen({ page }: { page: PageEnvelope }) {
 export function FacultyLoadPage() {
   const filters = useRouterState({ select: (state) => state.location.searchStr.replace(/^\?/, '') })
   const page = useQuery({ ...pageQuery('P54', undefined, filters), placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, 'P54') ? previous : undefined })
-  if (page.isPending) return <ViewState kind="loading" title="Loading faculty load" />
+  if (page.isPending) return <PageLoading title="Faculty load" />
   if (page.isError) return <ViewState kind="error" title="Faculty load didn't load" description={page.error.message} actions={<Button variant="secondary" onPress={() => void page.refetch()}>Try again</Button>} />
   return <FacultyLoadScreen page={page.data} />
 }

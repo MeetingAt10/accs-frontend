@@ -1,0 +1,482 @@
+/* App shell, navy redesign (Figma "02 Home" sidebar and top bar, "08 Mobile Home", "09 Mobile drawer").
+   Overrides the base shell in sites.css and theme.css. Every rule starts with ":root .shell" (or ":root" plus the drawer's
+   own class, since the drawers render outside .shell) so it wins whatever order the stylesheets load in.
+   The panel and the phone menu are brand navy in both themes; the top bar and tab bar follow the theme tokens. */
+
+/* ---------- Brand block (panel, phone top bar, phone menu) ---------- */
+:root .shell-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--accs-on-brand); }
+:root .shell-brand[data-tone='page'] { color: var(--accs-ink); }
+/* The key is a mask filled with the text colour (see ShellBrand). */
+:root .shell-brand__key { display: block; flex: none; width: 46px; height: 29px; background: currentColor; mask: no-repeat center / contain; -webkit-mask: no-repeat center / contain; }
+:root .shell-brand__text { display: grid; min-width: 0; white-space: nowrap; }
+:root .shell-brand__name { font-family: var(--accs-font-title); font-size: 18px; font-weight: 700; line-height: 21.6px; }
+:root .shell-brand__sub { font-size: 10px; font-weight: 500; line-height: 1.2; opacity: 0.6; }
+:root .shell-brand[data-tone='page'] .shell-brand__sub { color: var(--accs-muted); opacity: 1; }
+:root .shell-brand[data-size='sm'] .shell-brand__key { width: 35px; height: 22px; }
+:root .shell-brand[data-size='sm'] .shell-brand__name { font-size: 14px; line-height: 16.8px; }
+
+/* ---------- Navigation items on navy (panel and phone menu) ---------- */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group { display: grid; gap: 4px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item {
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: rgb(255 255 255 / 72%);
+  font-size: 14px;
+  font-weight: 500;
+}
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item svg { opacity: 0.97; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item:hover { background: rgb(255 255 255 / 6%); color: var(--accs-on-brand); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -2px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item[aria-current='page'] { background: transparent; color: var(--accs-on-brand); font-weight: 600; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item[data-section]:not([aria-current='page']) { color: var(--accs-on-brand); font-weight: 600; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-nav-item__pill { border-radius: 10px; background: rgb(255 255 255 / 12%); }
+/* The current site's own links, nested under it with a thin rule. */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub { gap: 12px; margin: 2px 0 8px 21px; padding-inline-start: 10px; border-inline-start: 1px solid rgb(255 255 255 / 14%); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-group { gap: 2px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item { min-height: 36px; gap: 10px; padding: 0 10px; font-size: 13px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item svg { width: 18px; height: 18px; }
+/* The caret at the end of a site row folds that site's links. */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group { position: relative; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-fold) > .shell-nav-item { padding-inline-end: 44px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgb(255 255 255 / 55%);
+  cursor: pointer;
+  transition: color 160ms var(--accs-ease), background-color 160ms var(--accs-ease);
+}
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold:hover { background: rgb(255 255 255 / 8%); color: var(--accs-on-brand); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -2px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold svg { transition: transform 160ms var(--accs-ease); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-fold[aria-expanded='false'] svg { transform: rotate(-90deg); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group__label {
+  margin: 0 0 2px;
+  padding: 0 10px;
+  color: var(--accs-on-brand);
+  opacity: 0.45;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- Assistant card ---------- */
+:root .shell-assist {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 8%);
+  color: var(--accs-on-brand);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 160ms var(--accs-ease), border-color 160ms var(--accs-ease);
+}
+:root .shell-assist:hover { border-color: rgb(255 255 255 / 24%); background: rgb(255 255 255 / 12%); }
+:root .shell-assist:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 2px; }
+:root .shell-assist__mascot { border-radius: 12px; background-color: rgb(255 255 255 / 10%); }
+:root .shell-assist__body { display: grid; gap: 2px; min-width: 0; }
+:root .shell-assist__title { font-size: 13px; font-weight: 600; line-height: 18px; }
+:root .shell-assist__text { font-size: 11.5px; line-height: 16px; opacity: 0.65; }
+:root .shell-assist__ask {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px 0 12px;
+  border-radius: 9px;
+  background: var(--accs-on-brand);
+  color: var(--accs-brand-900);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+:root .shell-assist__ask svg { transition: transform 160ms var(--accs-ease); }
+:root .shell-assist:hover .shell-assist__ask svg { transform: translateX(2px); }
+
+/* ---------- Sidebar (1024px and up) ---------- */
+:root .shell .shell-side {
+  flex-direction: column;
+  gap: 4px;
+  padding: 24px 16px 20px;
+  border-right: 0;
+  background: var(--accs-sidebar);
+  color: var(--accs-on-brand);
+}
+:root .shell .shell-side__head { padding: 0 0 24px; }
+:root .shell .shell-side__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 0;
+  margin: 0 -4px;
+  padding-inline: 4px;
+  overflow-y: auto;
+  scrollbar-color: rgb(255 255 255 / 20%) transparent;
+}
+:root .shell .shell-side__label {
+  margin: 0;
+  color: var(--accs-on-brand);
+  opacity: 0.45;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.88px;
+  text-transform: uppercase;
+}
+:root .shell .shell-side__foot { margin-top: auto; padding-top: 16px; }
+
+/* ---------- Top bar ---------- */
+:root .shell { --shell-top-h: 56px; }
+:root .shell .shell-top {
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--accs-line);
+  background: var(--accs-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root .shell .shell-top__menu { margin-inline-start: -8px; color: var(--accs-ink); }
+:root .shell .shell-top__brand { display: none; min-width: 0; }
+:root .shell .shell-top__crumb { gap: 6px; font-size: 13px; font-weight: 600; color: var(--accs-muted); }
+:root .shell .shell-top__crumb strong { color: var(--accs-ink); font-weight: 600; }
+:root .shell .shell-top__tools { gap: 4px; }
+:root .shell .shell-top__tools .ds-icon-btn { width: 38px; height: 38px; border-radius: 10px; color: var(--accs-ink-2, var(--accs-ink)); }
+:root .shell .shell-top__tools .ds-icon-btn:hover { background: var(--accs-sunken); color: var(--accs-ink); }
+:root .shell .shell-top__tools .ds-icon-btn:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 1px; }
+:root .shell .shell-top__tools .ds-icon-btn .ds-icon { width: 18px; height: 18px; }
+:root .shell .shell-top__wide { display: contents; }
+:root .shell .shell-top__search-link { display: none; }
+:root .shell .shell-top__icon { text-decoration: none; }
+
+/* Search: 340 x 38, canvas fill, 10px corners, with the Ctrl+K / Cmd+K hint at the end. */
+:root .shell .shell-top__search { position: relative; width: 340px; margin: 0; }
+:root .shell .shell-top__search .ds-input {
+  min-height: 38px;
+  height: 38px;
+  padding-inline: 40px 56px;
+  border: 1px solid var(--accs-line);
+  border-radius: 10px;
+  background: var(--accs-paper);
+  color: var(--accs-ink);
+  font-size: 13px;
+}
+:root .shell .shell-top__search .ds-input::placeholder { color: var(--accs-muted); }
+:root .shell .shell-top__search .ds-input:focus { border-color: var(--accs-link); outline: 2px solid color-mix(in srgb, var(--accs-link) 30%, transparent); outline-offset: 0; }
+:root .shell .shell-top__search .ds-input-group__icon { inset-inline-start: 14px; width: 16px; height: 16px; color: var(--accs-muted); }
+:root .shell .shell-top__search .ds-input-group__action { inset-inline-end: 4px; top: 4px; width: 30px; height: 30px; }
+:root .shell .shell-top__kbd {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 10px;
+  translate: 0 -50%;
+  padding: 3px 10px;
+  border: 1px solid var(--accs-line);
+  border-radius: 999px;
+  background: var(--accs-surface);
+  color: var(--accs-muted);
+  font: 600 11px / 1.2 var(--accs-font-body);
+  pointer-events: none;
+}
+
+/* Account block: navy initials circle, then name and role over each other, then a caret. */
+:root .shell .shell-account__button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 4px 2px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accs-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 160ms var(--accs-ease);
+}
+:root .shell .shell-account__button:hover,
+:root .shell .shell-account__button[aria-expanded='true'] { background: var(--accs-sunken); }
+:root .shell .shell-account__button:focus-visible { outline: 2px solid var(--accs-link); outline-offset: 1px; }
+:root .shell .shell-avatar {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  border: 0;
+  background: var(--accs-brand-800);
+  color: var(--accs-on-brand);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: inherit;
+}
+:root .shell .shell-account__button:hover .shell-avatar { background: var(--accs-brand-800); }
+:root .shell .shell-account__who { display: none; min-width: 0; max-width: 180px; line-height: normal; }
+:root .shell .shell-account__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--accs-ink); }
+:root .shell .shell-account__line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--accs-muted); }
+:root .shell .shell-account__caret { display: none; flex: none; color: var(--accs-muted); }
+:root .shell .shell-account[data-paused]::after { inset-inline-start: 32px; inset-inline-end: auto; }
+
+@media (min-width: 1024px) {
+  :root .shell { --shell-top-h: 64px; }
+  :root .shell .shell-top { gap: 16px; padding: 0 32px; }
+  :root .shell .shell-top__tools { gap: 8px; }
+  :root .shell .shell-account__who { display: grid; }
+  :root .shell .shell-account__caret { display: block; }
+  :root .shell .shell-account { margin-inline-start: 8px; }
+}
+@media (min-width: 768px) and (max-width: 1279px) {
+  :root .shell .shell-top__search { width: min(340px, 30vw); }
+}
+
+/* ---------- Phones (below 768px): brand in the top bar, search as a button, tab bar at the bottom ---------- */
+@media (max-width: 767px) {
+  :root .shell .shell-top { gap: 8px; }
+  :root .shell .shell-top__brand { display: block; flex: 1; }
+  :root .shell .shell-top__crumb { display: none; }
+  :root .shell .shell-top__wide { display: none; }
+  :root .shell .shell-top__search-link { display: inline-grid; }
+  :root .shell .shell-top__tools .ds-icon-btn { width: 36px; height: 36px; }
+  :root .shell .shell-top__tools .ds-icon-btn .ds-icon { width: 20px; height: 20px; }
+  :root .shell .shell-avatar { width: 30px; height: 30px; font-size: 11px; }
+  :root .shell .shell-account__button { padding: 3px; border-radius: 999px; }
+  :root .shell .shell-main { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- Tab bar ---------- */
+:root .shell .shell-tabs { display: none; }
+@media (max-width: 767px) {
+  :root .shell .shell-tabs {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    display: flex;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--accs-line);
+    background: var(--accs-surface);
+  }
+}
+:root .shell .shell-tab {
+  flex: 1 1 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accs-muted);
+  font: 500 11px / 1.2 var(--accs-font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+:root .shell .shell-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .shell .shell-tab svg { width: 22px; height: 22px; }
+:root .shell .shell-tab[aria-current='page'] { color: var(--accs-link); font-weight: 600; }
+:root .shell .shell-tab:focus-visible { outline: 2px solid var(--accs-link); outline-offset: -2px; }
+
+/* ---------- Phone menu drawer (frame 09) ---------- */
+:root .ds-drawer.shell-nav-drawer {
+  width: min(300px, calc(100vw - 48px));
+  padding: 20px 16px 24px;
+  border-radius: 0 20px 20px 0;
+  background: var(--accs-sidebar);
+  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 50%);
+  color: var(--accs-on-brand);
+}
+:root .shell-nav-drawer .ds-drawer__head { min-height: 0; padding: 0; border: 0; }
+:root .shell-nav-drawer .ds-drawer__title { font: inherit; letter-spacing: normal; }
+:root .shell-nav-drawer .shell-brand__name { font-size: 17px; line-height: 20.4px; }
+:root .shell-nav-drawer .ds-drawer__head .ds-icon-btn { color: var(--accs-on-brand); }
+:root .shell-nav-drawer .ds-drawer__head .ds-icon-btn:hover { background: rgb(255 255 255 / 10%); color: var(--accs-on-brand); }
+:root .shell-nav-drawer .ds-drawer__head .ds-icon-btn:focus-visible { outline: 2px solid var(--accs-on-brand); }
+:root .shell-nav-drawer .ds-drawer__body { display: flex; flex-direction: column; padding: 16px 0 0; overflow-y: auto; }
+:root .shell-nav-drawer .shell-drawer { display: flex; flex: 1; flex-direction: column; gap: 4px; margin: 0; }
+:root .shell-nav-drawer .shell-drawer > * { animation: none; }
+:root .shell-nav-drawer .shell-drawer__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 8%);
+}
+:root .shell-nav-drawer .shell-drawer__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--accs-brand-600);
+  color: var(--accs-on-brand);
+  font-size: 13px;
+  font-weight: 600;
+}
+:root .shell-nav-drawer .shell-drawer__id { display: grid; gap: 1px; min-width: 0; }
+:root .shell-nav-drawer .shell-drawer__id strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+:root .shell-nav-drawer .shell-drawer__id span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.6; }
+:root .shell-nav-drawer .shell-drawer__nav { display: grid; gap: 4px; }
+:root .shell-nav-drawer .shell-drawer .shell-assist { margin-top: auto; }
+:root .shell-nav-drawer .shell-drawer__nav { margin-bottom: 16px; }
+:root .shell-nav-drawer .shell-drawer__account { display: grid; margin-top: 12px; }
+:root .shell-nav-drawer .shell-drawer__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accs-on-brand);
+  font: 500 14px / 1.2 var(--accs-font-body);
+  text-align: start;
+  text-decoration: none;
+  opacity: 0.75;
+  cursor: pointer;
+}
+:root .shell-nav-drawer .shell-drawer__link svg { width: 18px; height: 18px; }
+:root .shell-nav-drawer .shell-drawer__link:hover { background: rgb(255 255 255 / 6%); opacity: 1; }
+:root .shell-nav-drawer .shell-drawer__link:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -2px; opacity: 1; }
+
+/* The design-system drawer's dialog is display: contents, which cannot take focus, so opening a drawer left focus on the
+   page and Escape did nothing. A flex column keeps the same head/body/foot layout and lets the dialog take focus. */
+:root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+:root :is(.shell-nav-drawer, .shell-assist-drawer) .ds-drawer__dialog:focus-visible { outline: none; }
+/* The drawer body is auto-height, so the chat grew with its messages and .cm-chat__scroll (overscroll-behavior: contain) never overflowed, and the wheel went nowhere. A fixed height makes the message list the scroller. */
+/* The assistant drawer is solid like the chat it holds: the glass let the page show through above an opaque composer.
+   The body has no padding and the chat fills it, so the composer sits on the drawer's bottom edge. */
+:root .ds-drawer.shell-assist-drawer { background: var(--accs-surface); backdrop-filter: none; }
+:root .shell-assist-drawer .ds-drawer__title { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+:root .shell-assist-drawer .shell-assist-drawer__page { font-family: var(--accs-font-body, inherit); font-size: 0.8125rem; font-weight: 600; letter-spacing: normal; }
+:root .shell-assist-drawer .ds-drawer__body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+:root .shell-assist-drawer .cm-chat { flex: 1; height: auto; min-height: 0; }
+:root .shell-assist-drawer .cm-chat__scroll { padding: 20px; }
+:root .shell-assist-drawer .cm-chat__foot { padding: 12px 20px 16px; }
+
+/* Skip link: brand navy with white text in both themes (the ink fill turned light in dark mode, under white text). */
+:root .shell .shell-skip { background: var(--accs-brand-800); color: var(--accs-on-brand); box-shadow: var(--accs-shadow-pop); }
+:root .shell .shell-skip:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: -4px; }
+
+/* Route changes animate only the page content. The sidebar, top bar and phone tab bar get their own view-transition
+   names, so they stay put instead of fading and sliding up with the page on every navigation and redirect. */
+.shell-side { view-transition-name: accs-shell-side; }
+.shell-top { view-transition-name: accs-shell-top; }
+.shell-tabs { view-transition-name: accs-shell-tabs; }
+::view-transition-group(accs-shell-side), ::view-transition-group(accs-shell-top), ::view-transition-group(accs-shell-tabs),
+::view-transition-old(accs-shell-side), ::view-transition-old(accs-shell-top), ::view-transition-old(accs-shell-tabs),
+::view-transition-new(accs-shell-side), ::view-transition-new(accs-shell-top), ::view-transition-new(accs-shell-tabs) { animation: none; }
+
+/* ---------- Collapsed sidebar ----------
+   Clicking the logo folds the panel to a 72px icon rail; clicking it again opens it. Labels hide, icons stay, and each
+   link keeps its title as a tooltip. The choice is saved in localStorage (accs.sidebar). Resting the mouse on the folded
+   rail opens it (data-peek) until the pointer leaves; the page moves over with it, as when clicking. */
+@media (min-width: 1024px) {
+  .shell-frame { transition: grid-template-columns 220ms var(--accs-ease-out, ease); }
+  .shell-frame:has(> .shell-side[data-collapsed]) { --shell-side-w: 72px; }
+}
+@media (prefers-reduced-motion: reduce) { .shell-frame { transition: none; } }
+:root .shell-side__toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+:root .shell-side__toggle:focus-visible { outline: 2px solid var(--accs-on-brand); outline-offset: 4px; }
+:root .shell-side__toggle { position: relative; }
+/* On hover or focus the key crossfades into a sidebar glyph in the same spot, open or folded. */
+:root .shell-side__hint {
+  position: absolute;
+  top: 50%;
+  left: 23px;
+  display: grid;
+  color: var(--accs-on-brand);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease);
+  pointer-events: none;
+}
+:root .shell-side__toggle .shell-brand__key { transition: opacity 200ms var(--accs-ease), transform 200ms var(--accs-ease); }
+:root .shell-side__toggle:is(:hover, :focus-visible) .shell-brand__key { opacity: 0; transform: scale(0.6); }
+:root .shell-side__toggle:is(:hover, :focus-visible) .shell-side__hint { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  :root .shell-side__toggle :is(.shell-brand__key, .shell-side__hint) { transition: none; }
+}
+:root .shell .shell-side { overflow: hidden; }
+/* Folding animates instead of snapping: the rail narrows while labels and text fade out, and every icon keeps its place.
+   The folded rail shows every link the open panel shows, icons only; the small site headings fold away. */
+@media (min-width: 1024px) {
+  .shell-frame > .shell-side { box-sizing: border-box; width: var(--shell-side-w); transition: width 220ms var(--accs-ease-out, ease), padding 220ms var(--accs-ease-out, ease); }
+}
+:root .shell .shell-side .shell-nav-item { overflow: hidden; }
+:root .shell .shell-side .shell-nav-item__label { min-width: 0; white-space: nowrap; transition: opacity 160ms var(--accs-ease); }
+:root .shell .shell-side :is(.shell-brand__text, .shell-assist__body) { transition: opacity 160ms var(--accs-ease); }
+:root .shell .shell-side[data-collapsed] .shell-assist__body { overflow: hidden; white-space: nowrap; }
+:root .shell .shell-side .shell-assist { overflow: hidden; transition: padding 220ms var(--accs-ease), gap 220ms var(--accs-ease), background-color 160ms var(--accs-ease), border-color 160ms var(--accs-ease); }
+:root .shell .shell-side .shell-assist__mascot { transition: width 220ms var(--accs-ease), height 220ms var(--accs-ease); }
+:root .shell .shell-side .shell-assist__ask { overflow: hidden; max-height: 34px; white-space: nowrap; transition: max-height 220ms var(--accs-ease), min-height 220ms var(--accs-ease), opacity 160ms var(--accs-ease); }
+:root .shell .shell-side[data-collapsed] { padding-inline: 16px; }
+:root .shell .shell-side[data-collapsed] :is(.shell-side__label, .shell-fold) { display: none; }
+:root .shell .shell-side[data-collapsed] :is(.shell-nav-item__label, .shell-brand__text, .shell-assist__body) { opacity: 0; }
+/* Same side padding and icon inset as the open panel, so icons stay put when it opens or folds: 16 + 12 + 20 + 8 + 16 = 72. */
+:root .shell .shell-side[data-collapsed] .shell-group > .shell-nav-item.shell-nav-item,
+:root .shell .shell-side[data-collapsed] .shell-sub .shell-nav-item { padding-inline: 12px 8px; }
+:root .shell .shell-side[data-collapsed] .shell-assist { gap: 0; padding: 3px; }
+:root .shell .shell-side[data-collapsed] .shell-assist__mascot { width: 36px !important; height: 35px !important; }
+:root .shell .shell-side[data-collapsed] .shell-assist__ask { min-height: 0; max-height: 0; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .shell-frame > .shell-side,
+  :root .shell .shell-side :is(.shell-nav-item, .shell-nav-item__label, .shell-brand__text, .shell-brand__key, .shell-assist, .shell-assist__body, .shell-assist__mascot, .shell-assist__ask) { transition: none; }
+}
+
+/* Go to (Ctrl+K): sit near the top so the results list has room to open downward under the input. */
+.ds-modal-overlay:has(> .quick-jump) { place-items: start center; padding-top: 12dvh; }
+@media (max-width: 599.98px) {
+  .ds-modal-overlay:has(> .quick-jump) { place-items: start stretch; padding-top: 0; }
+  .quick-jump { border-radius: 0 0 var(--ds-radius-overlay) var(--ds-radius-overlay); }
+}
+
+/* No trees: a site's links sit at the site's own level, and a hairline separates each site that has links. */
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub { margin: 0; padding: 0; border: 0; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item { min-height: 40px; gap: 12px; padding: 0 12px; font-size: 14px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-sub .shell-nav-item svg { width: 20px; height: 20px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) { padding-block: 6px; border-block: 1px solid rgb(255 255 255 / 10%); }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) + .shell-group:has(> .shell-sub) { border-top: 0; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { color: rgb(255 255 255 / 50%); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; min-height: 28px; }
+:root :is(.shell .shell-side, .shell-nav-drawer) .shell-group:has(> .shell-sub) > .shell-nav-item:first-child svg { display: none; }
+/* The folded rail keeps every link as an icon. The text-only site heading above them only fades and keeps its height,
+   so the icons sit at the same height open or folded (folding it to nothing moved every icon when the rail opened on hover). */
+:root .shell .shell-side .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { max-height: 28px; transition: opacity 160ms var(--accs-ease), visibility 160ms; }
+:root .shell .shell-side[data-collapsed] .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  :root .shell .shell-side .shell-group:has(> .shell-sub) > .shell-nav-item:first-child { transition: none; }
+}
+:root .shell .shell-side__label { display: none; }

@@ -1,4 +1,5 @@
-import { campusToday } from '@/lib/campus-date'
+import { typedDateImpossible } from '@/lib/typed-date'
+import { campusToday, isPastLocal } from '@/lib/campus-date'
 import { parseDate as parseCalendarDate } from '@internationalized/date'
 import {
   Alert,
@@ -46,8 +47,11 @@ import {
   toneFor,
   DateTile,
 } from '@/components/app/page-shell'
+import { PageLoading } from '@/components/app/skeleton-page'
+import { pageTitles } from '@/lib/page-catalog'
 import {
   EventCalendar,
+  ToneDate,
   formatClock,
   type CalendarEvent,
 } from '@/components/ds-next/EventCalendar'
@@ -65,6 +69,7 @@ import {
   initials,
   relativeTime,
 } from '@/lib/format'
+import { useLocalDraft } from '@/lib/local-draft'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import { replaceFilters } from '@/lib/url-filters'
 import './schedule.css'
@@ -368,8 +373,10 @@ function CalendarPage({
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedEntry])
   const [todoOpen, setTodoOpen] = useState(false)
+  const [pickDate, setPickDate] = useState<string>()
   const [todoTitle, setTodoTitle] = useState('')
   const [todoDate, setTodoDate] = useState('')
+  const [todoDateBad, setTodoDateBad] = useState(false)
   const [todoError, setTodoError] = useState('')
   const selectedDate = isoDate(parseDate(params.get('date') ?? today()))
   const view = ['month', 'week', 'list'].includes(params.get('view') ?? '')
@@ -528,6 +535,10 @@ function CalendarPage({
 
   async function saveTodo(event: FormEvent) {
     event.preventDefault()
+    if (todoDateBad) {
+      setTodoError("That date doesn't exist.")
+      return
+    }
     if (!todoTitle.trim() || !todoDate) {
       setTodoError('Enter a title and due date.')
       return
@@ -539,7 +550,7 @@ function CalendarPage({
       })
       setTodoOpen(false)
       setTodoTitle('')
-      setTodoDate('')
+      setTodoDate(''); setTodoDateBad(false)
       setTodoError('')
     } catch {
       // Keep the entered to-do for another attempt.
@@ -644,18 +655,29 @@ function CalendarPage({
     )
   }
 
-  const layerPills = (
-    <div className="sc-layers" role="group" aria-label="Calendar layers">
+  // Narrow screens get pills above the grid; the rail lists the same layers as check rows.
+  const layerButtons = (variant: 'pills' | 'checks') => (
+    <div
+      className={variant === 'pills' ? 'sc-layers' : 'sc-checks'}
+      role="group"
+      aria-label="Calendar layers"
+    >
       {layers.map((layer) => (
         <button
           type="button"
           key={layer.id}
-          className="sc-layer"
+          className={variant === 'pills' ? 'sc-layer' : 'sc-check'}
           data-etone={layerTone[layer.id]}
           aria-pressed={selectedLayers.includes(layer.id)}
           onClick={() => toggleLayer(layer.id)}
         >
-          <i aria-hidden />
+          {variant === 'pills' ? (
+            <i aria-hidden />
+          ) : (
+            <span className="sc-check__box" aria-hidden>
+              <Icon name="check" size={16} />
+            </span>
+          )}
           {layer.label}
         </button>
       ))}
@@ -666,9 +688,14 @@ function CalendarPage({
     <>
       <PageHeader
         title="Calendar"
-        description="All times are campus time."
+        description="All times are campus time (PHT)."
         actions={
           <>
+            {professor && (
+              <Button variant="secondary" icon="clock" href="/consultations/availability">
+                Manage availability
+              </Button>
+            )}
             {/* Events are announcements with a date: this opens one with the chosen day filled in (a past day becomes today). */}
             {session.permissions.includes('announcement.publish') && (
               <Button
@@ -684,60 +711,71 @@ function CalendarPage({
                 Add to-do
               </Button>
             )}
-            {professor && (
-              <Button variant="secondary" href="/consultations/availability">
-                Manage availability
-              </Button>
-            )}
           </>
         }
       />
       <div className="accs-stack accs-stagger">
-        <div className="sc-bar">
-          <div className="sc-bar__nav">
-            <IconButton
-              icon="caret-left"
-              label="Previous"
-              onPress={() => shift(-1)}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => update({ date: today() })}
-            >
-              Today
-            </Button>
-            <IconButton
-              icon="caret-right"
-              label="Next"
-              onPress={() => shift(1)}
-            />
-            <h2 className="sc-bar__label" aria-live="polite">
-              {periodLabel}
-            </h2>
-          </div>
-          <Segmented
-            id="calendar-view"
-            label="Calendar view"
-            value={view}
-            onChange={(id) => update({ view: id })}
-            items={[
-              { id: 'month', label: 'Month' },
-              { id: 'week', label: 'Week' },
-              { id: 'list', label: 'List' },
-            ]}
-          />
-          <div className="sc-bar__layers">{layerPills}</div>
-        </div>
         <div className="accs-split">
           <div className="accs-stack">
-            <Panel flush aria-label="Calendar">
+            <Panel className="sc-cal" aria-label="Calendar">
+              <div className="sc-bar">
+                <div className="sc-bar__nav">
+                  <button
+                    type="button"
+                    className="sc-navbtn"
+                    aria-label="Previous"
+                    onClick={() => shift(-1)}
+                  >
+                    <Icon name="caret-left" size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="sc-navbtn"
+                    aria-label="Next"
+                    onClick={() => shift(1)}
+                  >
+                    <Icon name="caret-right" size={16} />
+                  </button>
+                  <h2 className="sc-bar__label" aria-live="polite">
+                    {periodLabel}
+                  </h2>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => update({ date: today() })}
+                  >
+                    Today
+                  </Button>
+                </div>
+                <Segmented
+                  id="calendar-view"
+                  label="Calendar view"
+                  value={view}
+                  onChange={(id) => update({ view: id })}
+                  items={[
+                    { id: 'month', label: 'Month' },
+                    { id: 'week', label: 'Week' },
+                    { id: 'list', label: 'List' },
+                  ]}
+                />
+                <div className="sc-bar__layers">{layerButtons('pills')}</div>
+                {small && (
+                  <input
+                    type="date"
+                    className="sc-datejump"
+                    aria-label="Go to date"
+                    value={selectedDate}
+                    onChange={(event) => event.target.value && update({ date: event.target.value })}
+                  />
+                )}
+              </div>
               {/* On a phone, Month is a list grouped by day (testing sheet, P13: the grid was too cramped). */}
               <EventCalendar
                 date={selectedDate}
                 view={small && view === 'month' ? 'list' : view}
                 events={entries}
                 onDateChange={(date) => update({ date })}
+                onDateClick={(day) => (canTodo || session.permissions.includes('announcement.publish')) && setPickDate(day)}
                 onEventPress={(event) =>
                   setSelectedEntry(
                     entries.find((entry) => entry.id === event.id),
@@ -749,7 +787,7 @@ function CalendarPage({
             {(canTodo || session.permissions.includes('announcement.publish')) && selectedDate >= today() && (
               <div className="sc-dayadd">
                 <span>{formatDate(selectedDate)}</span>
-                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoOpen(true) }}>Add to-do</Button>}
+                {canTodo && <Button size="sm" variant="secondary" icon="plus" onPress={() => { setTodoDate(selectedDate); setTodoDateBad(false); setTodoOpen(true) }}>Add to-do</Button>}
                 {session.permissions.includes('announcement.publish') && (
                   <Button size="sm" variant="tertiary" icon="calendar" href={`/feed/new?type=announcement&date=${encodeURIComponent(selectedDate)}`}>Add event</Button>
                 )}
@@ -772,32 +810,45 @@ function CalendarPage({
                 </button>
               }
             >
-              {layerPills}
+              {layerButtons('checks')}
             </Panel>
-            <Panel flush title="Upcoming">
+            <Panel
+              title="Coming up"
+              className="sc-coming"
+              action={
+                // Every upcoming event in the calendar's own list view.
+                view !== 'list' && upcoming.length > 0 ? (
+                  <button
+                    type="button"
+                    className="accs-panel__link sc-linkbtn sc-seeall"
+                    onClick={() => update({ view: 'list' })}
+                  >
+                    See all
+                    <Icon name="caret-right" size={16} />
+                  </button>
+                ) : undefined
+              }
+            >
               {upcoming.length ? (
                 <PagedList items={upcoming} noun="events">
                   {(upcoming) => (
-                  <ul className="accs-rows">
+                  <ul className="sc-uplist">
                     {upcoming.map((entry) => (
                       <li key={entry.id}>
                         <button
                           type="button"
-                          className="accs-row accs-row--link sc-up"
+                          className="sc-up"
                           onClick={() => setSelectedEntry(entry)}
                         >
-                          <DateTile value={entry.date} />
-                          <span>
-                            <span className="accs-row__title">{entry.title}</span>
-                            <span className="accs-row__sub">
-                              {entry.allDay ? 'All day' : entry.time}
+                          <ToneDate value={entry.date} tone={entry.tone} />
+                          <span className="sc-up__text">
+                            <span className="sc-up__title">{entry.title}</span>
+                            <span className="sc-up__sub">
+                              {[entry.allDay ? 'All day' : entry.time, entry.place ?? entry.type]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           </span>
-                          <i
-                            className="ec-dot"
-                            data-etone={entry.tone}
-                            aria-hidden
-                          />
                         </button>
                       </li>
                     ))}
@@ -886,6 +937,16 @@ function CalendarPage({
       >
         {selectedEntry && entryDetails(selectedEntry)}
       </Drawer>
+      <Modal title={pickDate ? `Add on ${formatDate(pickDate)}` : 'Add'} isOpen={Boolean(pickDate)} onOpenChange={(open) => !open && setPickDate(undefined)}>
+        <ModalBody>
+          <div className="app-page">
+            {canTodo && <Button icon="plus" onPress={() => { setTodoDate(pickDate ?? ''); setTodoDateBad(false); setPickDate(undefined); setTodoOpen(true) }}>Add to-do</Button>}
+            {session.permissions.includes('announcement.publish') && pickDate && (
+              <Button icon="calendar" variant="secondary" href={`/feed/new?type=announcement&date=${encodeURIComponent(pickDate)}`}>Add event</Button>
+            )}
+          </div>
+        </ModalBody>
+      </Modal>
       <Modal title="Add to-do" isOpen={todoOpen} onOpenChange={setTodoOpen}>
         <form onSubmit={saveTodo}>
           <ModalBody>
@@ -902,7 +963,11 @@ function CalendarPage({
                 isRequired
                 minValue={campusToday()}
                 defaultValue={todoDate ? parseCalendarDate(todoDate) : undefined}
-                onChange={(value) => setTodoDate(value?.toString() ?? '')}
+                onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setTodoDateBad(bad) }}
+                onChange={(value) => {
+                  setTodoDate(value?.toString() ?? '')
+                  if (document.activeElement?.closest('.ds-date-picker__popover')) setTodoDateBad(false)
+                }}
               />
               <PrivacyNotice title="Personal to-do">
                 Only you can see your to-dos.
@@ -1228,9 +1293,12 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const [step, setStep] = useState({ n: 2, dir: 1 })
   const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
-  const [category, setCategory] = useState('')
-  const [subcategory, setSubcategory] = useState('')
-  const [details, setDetails] = useState('')
+  const me = useQuery(sessionQuery()).data?.user.id ?? 'signed-in'
+  const [purpose, setPurpose, clearPurpose] = useLocalDraft(`accs-appointment-draft-${me}-${faculty?.id ?? ''}`, { category: '', subcategory: '', details: '' })
+  const { category, subcategory, details } = purpose
+  const setCategory = (value: string) => setPurpose((current) => ({ ...current, category: value }))
+  const setSubcategory = (value: string) => setPurpose((current) => ({ ...current, subcategory: value }))
+  const setDetails = (value: string) => setPurpose((current) => ({ ...current, details: value }))
   const [purposeError, setPurposeError] = useState('')
   const options = readCategoryOptions(page.data.appointmentCategories)
   const option = options.find((entry) => entry.label === category)
@@ -1300,6 +1368,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
         },
       })
       const request = record<Consultation>(result.record)
+      clearPurpose()
       if (request)
         router.history.push(
           `/consultations/requests/${encodeURIComponent(request.id)}`,
@@ -1946,6 +2015,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const [state, setState] = useState<'open' | 'unavailable'>('open')
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const [repeat, setRepeat] = useState<'once' | 'weekly'>('once')
+  const [weeks, setWeeks] = useState('4')
+  const [notice, setNotice] = useState('')
+  const [dateBad, setDateBad] = useState(false)
   // A time being marked not available from the list waits here for its reason.
   const [reasonFor, setReasonFor] = useState<Slot>()
   const [quickReason, setQuickReason] = useState('')
@@ -1990,6 +2063,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 
   async function saveTimes(event: FormEvent) {
     event.preventDefault()
+    if (dateBad) {
+      setFieldError("That date doesn't exist.")
+      return
+    }
     if (!date || end <= start) {
       setFieldError('Choose a date and an end time after the start time.')
       return
@@ -2006,12 +2083,31 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       return
     }
     try {
-      await action.mutateAsync({
-        action: 'saveAvailability',
-        payload: { date, start, end, state, ...(state === 'unavailable' ? { reason: reason.trim() } : {}) },
-      })
+      const extra = state === 'unavailable' ? { reason: reason.trim() } : {}
+      await action.mutateAsync({ action: 'saveAvailability', payload: { date, start, end, state, ...extra } })
+      // Weekly: one saveAvailability per later week; past times and overlaps are skipped.
+      let made = 1
+      let skipped = 0
+      for (let i = 1; repeat === 'weekly' && i < Number(weeks); i++) {
+        const d = addDays(date, 7 * i)
+        if (isPastLocal(`${d}T${start}`) || slots.some((slot) => slot.date === d && slot.start < end && slot.end > start)) {
+          skipped++
+          continue
+        }
+        try {
+          await action.mutateAsync({ action: 'saveAvailability', payload: { date: d, start, end, state, ...extra } })
+          made++
+        } catch {
+          skipped++
+        }
+      }
+      if (repeat === 'weekly') {
+        action.reset()
+        setNotice(`Added ${made} weekly time${made === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} (past or overlapping)` : ''}.`)
+      } else setNotice('')
+      setRepeat('once')
       setAddOpen(false)
-      setDate('')
+      setDate(''); setDateBad(false)
       setReason('')
       setFieldError('')
     } catch {
@@ -2113,41 +2209,47 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
           This week: {count('open')} open, {count('requested', 'booked')}{' '}
           requested or booked, {count('unavailable')} unavailable.
         </p>
-        <div className="sc-bar">
-          <div className="sc-bar__nav">
-            <IconButton
-              icon="caret-left"
-              label="Previous week"
-              onPress={() => setWeek(addDays(week, -7))}
+        <Panel className="sc-cal" aria-label="Availability">
+          <div className="sc-bar">
+            <div className="sc-bar__nav">
+              <button
+                type="button"
+                className="sc-navbtn"
+                aria-label="Previous week"
+                onClick={() => setWeek(addDays(week, -7))}
+              >
+                <Icon name="caret-left" size={16} />
+              </button>
+              <button
+                type="button"
+                className="sc-navbtn"
+                aria-label="Next week"
+                onClick={() => setWeek(addDays(week, 7))}
+              >
+                <Icon name="caret-right" size={16} />
+              </button>
+              <h2 className="sc-bar__label" aria-live="polite">
+                {weekLabel(week)}
+              </h2>
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => setWeek(weekStart(today()))}
+              >
+                This week
+              </Button>
+            </div>
+            <Segmented
+              id="availability-view"
+              label="Availability view"
+              value={view}
+              onChange={setView}
+              items={[
+                { id: 'week', label: 'Week' },
+                { id: 'list', label: 'List' },
+              ]}
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => setWeek(weekStart(today()))}
-            >
-              This week
-            </Button>
-            <IconButton
-              icon="caret-right"
-              label="Next week"
-              onPress={() => setWeek(addDays(week, 7))}
-            />
-            <h2 className="sc-bar__label" aria-live="polite">
-              {weekLabel(week)}
-            </h2>
           </div>
-          <Segmented
-            id="availability-view"
-            label="Availability view"
-            value={view}
-            onChange={setView}
-            items={[
-              { id: 'week', label: 'Week' },
-              { id: 'list', label: 'List' },
-            ]}
-          />
-        </div>
-        <Panel flush aria-label="Availability">
           {view === 'week' ? (
             <>
               <EventCalendar
@@ -2246,9 +2348,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
           )}
         </Panel>
         <ActionError error={action.error} />
-        {/* TBD(D-04): external calendar sync, recurrence and booking-change policy are not approved. */}
+        {notice && <Alert tone="neutral" title={notice} />}
+        {/* TBD(D-04): external calendar sync and booking-change policy are not approved. */}
         <p className="accs-meta">
-          Changes apply in ACCS only. Calendar sync and recurring times are not available yet.
+          Changes apply in ACCS only. Calendar sync is not available yet.
         </p>
       </div>
       <Modal title="Add times" isOpen={addOpen} onOpenChange={setAddOpen}>
@@ -2259,7 +2362,11 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
                 label="Date"
                 isRequired
                 minValue={campusToday()}
-                onChange={(value) => setDate(value?.toString() ?? '')}
+                onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setDateBad(bad) }}
+                onChange={(value) => {
+                  setDate(value?.toString() ?? '')
+                  if (document.activeElement?.closest('.ds-date-picker__popover')) setDateBad(false)
+                }}
               />
               <div className="sc-timepair">
                 <Select
@@ -2306,14 +2413,20 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               )}
               <RadioGroup
                 label="Repeat"
-                value="once"
-                description="Recurring times are not available yet."
+                value={repeat}
+                onChange={(value) => setRepeat(value as 'once' | 'weekly')}
+                description="Weekly adds this same time on the same weekday each week. Past and overlapping times are skipped."
               >
                 <Radio value="once">Once</Radio>
-                <Radio value="weekly" isDisabled>
-                  Weekly until the end of term
-                </Radio>
+                <Radio value="weekly">Weekly</Radio>
               </RadioGroup>
+              {repeat === 'weekly' && (
+                <Select label="For how many weeks" selectedKey={weeks} onSelectionChange={(key) => setWeeks(String(key))}>
+                  {Array.from({ length: 15 }, (_, i) => String(i + 2)).map((n) => (
+                    <SelectOption key={n} id={n}>{n} weeks</SelectOption>
+                  ))}
+                </Select>
+              )}
               <Alert tone="neutral" title="Students see changes immediately">
                 To change a requested or booked time, cancel the consultation first.
               </Alert>
@@ -2415,7 +2528,7 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
 export function SchedulePage({ page }: { page: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   if (!session.data)
-    return <ViewState kind="loading" title="Loading" />
+    return <PageLoading pageId={page.pageId} title={pageTitles[page.pageId] || 'page'} />
   if (page.pageId === 'P13')
     return <CalendarPage page={page} session={session.data} />
   if (page.pageId === 'P14')
