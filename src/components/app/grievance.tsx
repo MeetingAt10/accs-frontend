@@ -1244,6 +1244,8 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / 8))
   const shown = filtered.slice((Math.min(currentPage, pageCount) - 1) * 8, Math.min(currentPage, pageCount) * 8)
   const reset = (change: () => void) => { change(); setCurrentPage(1) }
+  const hasFilters = Boolean(query || level || category || subcategory || status || stage || received !== 'term')
+  const clearFilters = () => reset(() => { setQuery(''); setLevel(''); setCategory(''); setSubcategory(''); setStatus(''); setStage(''); setReceived('term') })
   const title = role === 'chair' ? 'Program reports · ' + (session.data?.user.program ?? '') : role === 'dean' ? 'Escalated reports' : role === 'guidance' ? 'Case Files' : role === 'osas' ? 'OSAS cases' : role === 'president' ? 'Executive cases' : 'Assigned reports'
   const intro = role === 'chair' ? 'Every concern in your program, who holds it, and how long it has waited.' : 'The reports routed to you, where each one is, and how long it has waited.'
   const toggleSort = (column: string) => setSort((current) => ({ column, direction: current.column === column && current.direction === 'ascending' ? 'descending' : 'ascending' }))
@@ -1282,6 +1284,7 @@ function CaseQueue({ page }: { page: PageEnvelope }) {
             <FilterSelect label="Status" value={status} onChange={(value) => reset(() => setStatus(value))} options={[['', 'All'], ...[...new Set(records.map((report) => words(report.status)))].filter(Boolean).map((value): [string, string] => [value, value])]} />
             <FilterSelect label="Stage" value={stage} onChange={(value) => reset(() => setStage(value))} options={[['', 'All'], ...stages.map(([key, name]): [string, string] => [key, name + ' (' + inQueue.filter((report) => stageOf(report) === key).length + ')'])]} />
             <FilterSelect label="Received" value={received} onChange={(value) => reset(() => setReceived(value))} options={[['term', 'Any time'], ['7', 'Last 7 days'], ['30', 'Last 30 days']]} />
+            {hasFilters && <Button size="sm" variant="tertiary" onPress={clearFilters}>Clear filters</Button>}
             <div className="gv-qbar__sort">
               <FilterSelect label="Sorted by" value={String(sort.column)} onChange={(value) => setSort((current) => ({ ...current, column: value }))} options={sortOptions} />
               <button type="button" className="gv-filter gv-filter--dir" onClick={() => setSort((current) => ({ ...current, direction: current.direction === 'ascending' ? 'descending' : 'ascending' }))}
