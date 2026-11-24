@@ -71,6 +71,8 @@ import {
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { useLocalDraft } from "@/lib/local-draft";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { pageTitles } from "@/lib/page-catalog";
 import { replaceFilters } from "@/lib/url-filters";
 
 import "./evaluations.css";
@@ -2369,25 +2371,6 @@ export function EvaluationPages({ page }: { page: PageEnvelope }) {
   }
 }
 
-function LoadingSkeleton() {
-  return (
-    <div
-      className="accs-stack"
-      role="status"
-      aria-label="Loading evaluations"
-      aria-busy="true"
-    >
-      <div className="accs-skeleton" style={{ height: 36, width: "38%" }} />
-      <div className="accs-skeleton" style={{ height: 88 }} />
-      <div className="accs-grid ev-grid">
-        {[0, 1, 2].map((key) => (
-          <div className="accs-skeleton" style={{ height: 210 }} key={key} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function EvaluationScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>;
   const recordId = Object.values(params).at(-1);
@@ -2404,7 +2387,7 @@ export function EvaluationScreen({ pageId }: { pageId: string }) {
     <RequirePermission pageId={pageId}>
       <div className="app-page">
         {page.isPending ? (
-          <LoadingSkeleton />
+          <PageLoading title={pageTitles[pageId] || "Evaluations"} />
         ) : page.isError ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (

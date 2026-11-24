@@ -66,6 +66,8 @@ import {
   relativeTime,
 } from "@/lib/format";
 import { pageQuery, sessionQuery } from "@/lib/queries";
+import { PageLoading } from "@/components/app/skeleton-page";
+import { pageTitles } from "@/lib/page-catalog";
 
 import "./admin.css";
 
@@ -2203,17 +2205,7 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     (["P49", "P50"].includes(pageId) && ["moderation.referral", "moderation.osas"].some(has)) ||
     (["P46", "P47", "P48"].includes(pageId) && has("role.manage"));
   if (session.isPending || page.isPending)
-    return (
-      <div
-        className="adm-skeleton"
-        role="status"
-        aria-label="Loading administration"
-      >
-        <div className="accs-skeleton" />
-        <div className="accs-skeleton" />
-        <div className="accs-skeleton" />
-      </div>
-    );
+    return <PageLoading title={pageTitles[pageId] || "Administration"} />;
   if (!roleAllowed)
     return (
       <ViewState

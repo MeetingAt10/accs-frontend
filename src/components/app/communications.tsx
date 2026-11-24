@@ -31,7 +31,6 @@ import {
   Tabs,
   TextArea,
   TextField,
-  ViewState,
   toast,
 } from "@meetingat10/design-system/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -54,7 +53,7 @@ import {
   type PageAction,
   type PageEnvelope,
 } from "@/lib/api";
-import { pageQuery, sessionQuery } from "@/lib/queries";
+import { keepFilteredPage, pageQuery, sessionQuery } from "@/lib/queries";
 import { messageFileLink, messageFilePath } from "@/lib/api";
 import { replaceFilters } from "@/lib/url-filters";
 import {
@@ -67,6 +66,8 @@ import {
 } from "@/components/ds-next";
 import { NotificationGroup } from "@/components/ds-next/notifications";
 import { Empty, PageHeader, Panel } from "@/components/app/page-shell";
+import { pageTitles } from "@/lib/page-catalog";
+import { PageLoading } from "@/components/app/skeleton-page";
 import { SlidePills, ease } from "@/components/app/portal-motion";
 import "./communications.css";
 
@@ -1022,6 +1023,10 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
   const paged = usePaged(filtered, 10, filter);
   const visible = paged.shown;
   const rows: ReactNode[] = [];
+  // Day headings only help when the page holds both days; a lone "Earlier" band labels nothing.
+  const mixedDays =
+    visible.some((notice) => dayOf(notice.at) === today) &&
+    visible.some((notice) => dayOf(notice.at) !== today);
   visible.forEach((notice, index) => {
     const group = dayOf(notice.at) === today ? "Today" : "Earlier";
     const previous =
@@ -1030,7 +1035,7 @@ function NotificationsPage({ page }: { page: PageEnvelope }) {
           ? "Today"
           : "Earlier"
         : undefined;
-    if (group !== previous)
+    if (mixedDays && group !== previous)
       rows.push(<NotificationGroup key={"group-" + group} label={group} />);
     rows.push(
       <NotificationItem
@@ -1460,6 +1465,7 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
   const page = useQuery({
     ...pageQuery(pageId, recordId, filters),
     enabled: session.data?.allowedPages.includes(pageId) === true,
+    placeholderData: (previous, previousQuery) => keepFilteredPage(previousQuery?.queryKey, pageId, recordId) ? previous : undefined,
   });
   // A failed background refetch (after a mute toggle) keeps the page and its open panel instead of swapping to the error (QA v5, D13).
   return (
@@ -1484,14 +1490,7 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
               </Panel>
             </div>
           ) : (
-            <ViewState
-              kind="loading"
-              title={
-                pageId === "P11" || pageId === "P12"
-                  ? "Loading conversations"
-                  : "Loading page"
-              }
-            />
+            <PageLoading title={pageTitles[pageId] || "page"} />
           )
         ) : page.isError && !page.data ? (
           page.error instanceof ApiError &&

@@ -1,7 +1,8 @@
 import { Icon, type IconName } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 import { ApiError, type PageEnvelope } from '@/lib/api'
 import { categoryText } from '@/lib/concern-categories'
@@ -12,14 +13,14 @@ import { keepFilteredPage, pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
 import { dashboardStats } from '@/components/app/community-home'
-import { GettingStarted } from '@/components/app/getting-started'
 import { QuickAccess } from '@/components/app/module-picker'
 import { CommunityPage } from '@/components/app/community'
 import { SchedulePage } from '@/components/app/schedule'
 import { DateTile, Empty, Kpi, Kpis, PageHeader, Panel, StatusChip, toneFor } from '@/components/app/page-shell'
 import { Counter, SlidePills, SwapView } from '@/components/app/portal-motion'
 import { NavLink as Go } from '@/components/app/site-chrome'
-import { PageSkeleton } from '@/components/app/skeleton-page'
+import { PageLoading, SkeletonKpis, SkeletonRows } from '@/components/app/skeleton-page'
+import { LoadingLayout } from '@/components/app/skeleton-rows'
 import { StageChip, StageProgress } from '@/components/app/stage-chip'
 import { roleLabelOf } from '@/lib/role-labels'
 
@@ -168,8 +169,6 @@ function CaseRow({ item, route, mine, status }: { item: Item; route: string; min
       <span className="hm-case__main">
         <span className="hm-case__title">{categoryText(item)}</span>
         <span className="hm-case__meta">
-          <span>{text(item.caseFileId, id || '—')}</span>
-          {text(item.severity) && <span aria-hidden>·</span>}
           <Priority value={item.severity} />
           {mine && <span className="pt-sr"> · waiting on you</span>}
         </span>
@@ -193,11 +192,20 @@ function CaseRow({ item, route, mine, status }: { item: Item; route: string; min
   )
 }
 
+/** The summary cards each role's Home carries, by label, so the tiles keep their names while the counts load. */
+function loadingStats(role: string) {
+  const labels = role === 'student' ? ['My reports', 'Appointments', 'Evaluations due']
+    : role === 'professor' ? ['Assigned reports', 'Appointments', 'Evaluations due']
+    : ownStage[role] || role === 'secretary' ? ['Case queue', 'Appointments']
+    : ['Reports', 'Appointments']
+  return labels.map((label) => statLabels[label] ?? label)
+}
+
 /** The Home summary-card labels, worded for what each count is. */
 const statLabels: Record<string, string> = { Appointments: 'Open appointments' }
 
 /** Both Home columns: the main one (cases, events, posts) and the 380px side one (announcements, quick access, the rest). */
-function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick?: ReactNode }) {
+function DashboardPanel({ data, role, quick, loading }: { data: Item; role: string; quick?: ReactNode; loading?: boolean }) {
   const allow = useAllow()
   const session = useQuery(sessionQuery())
   const me = session.data?.user.id
@@ -211,9 +219,17 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
   const reports = top(asItems(data.reports))
   const cases = top(asItems(data.cases))
   const sections: Item[] = []
-  const consultations = session.data && canOpenPath(session.data, '/consultations') ? top(asItems(data.consultations)) : []
+  // Only appointments still ahead; finished, cancelled and declined ones live on the Appointments page.
+  const consultations = session.data && canOpenPath(session.data, '/consultations')
+    ? top(asItems(data.consultations).filter((item) => !/(cancel|declin|reject|complet|done|no.?show|missed|expired)/i.test(text(item.status))))
+    : []
   const assignments = session.data && canOpenPath(session.data, '/evaluations') ? asItems(data.assignments) : []
   const today = manilaToday()
+  // Evaluations still to answer, the soonest due first (no due date last); submitted ones only count in the progress.
+  const dueOf = (item: Item) => dayKey(item.due ?? item.dueDate)
+  const pendingEvaluations = assignments
+    .filter((item) => !/submitted/i.test(text(item.status)))
+    .sort((a, b) => (dueOf(a) || '9999').localeCompare(dueOf(b) || '9999'))
   const events = asItems(data.events)
     .filter((event) => dayKey(event.date) >= today)
     .sort((a, b) => dayKey(a.date).localeCompare(dayKey(b.date)) || text(a.start).localeCompare(text(b.start)))
@@ -222,7 +238,23 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
   const caseTitle = role === 'professor' ? 'Assigned reports' : 'Case queue'
   const empty =
     reports.length + cases.length + sections.length + consultations.length + announcements.length + posts.length +
-      events.length + assignments.length === 0
+      events.length + pendingEvaluations.length === 0
+
+  if (loading) {
+    return (
+      <div className="hm-body" aria-busy="true">
+        <SkeletonKpis labels={loadingStats(role)} />
+        <div className="hm-cols">
+          <div className="hm-col"><Panel flush className="hm-queue" title={role === 'student' ? 'My reports' : caseTitle}><SkeletonRows /></Panel></div>
+          <aside className="hm-col hm-side">
+            <Panel flush title="Coming up"><SkeletonRows count={3} /></Panel>
+            <Panel flush title="Announcements"><SkeletonRows count={3} /></Panel>
+            {quick}
+          </aside>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="hm-body">
@@ -251,14 +283,32 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
               <Empty title="Nothing here yet">Reports, events, and announcements for your role show up here once they exist.</Empty>
             </Panel>
           )}
-          {cases.length > 0 && (
-            <Panel flush className="hm-queue" title={caseTitle} action={<PanelLink href="/cases">Open queue</PanelLink>}>
-              <p className="hm-queue__lede">Where each concern in your queue stands right now.</p>
-              <ul className="hm-cases" role="list">
-                {cases.map((item, index) => (
-                  <CaseRow key={text(item.id, 'case-' + index)} item={item} route="/cases/" mine={Boolean(ownStage[role]) && text(item.stage) === ownStage[role] && !/^(resolved|closed)$/i.test(text(item.status))} />
-                ))}
-              </ul>
+          <div className="hm-pair">
+          {pendingEvaluations.length > 0 && (
+            <Panel flush title="Evaluations due" action={<PanelLink href="/evaluations">Open evaluations</PanelLink>}>
+              <div className="pt-progress">
+                <p><strong>{submitted} of {assignments.length} submitted</strong><span className="accs-num">{Math.round((submitted / assignments.length) * 100)}%</span></p>
+                <div className="accs-progress" role="progressbar" aria-label="Evaluations submitted" aria-valuemin={0} aria-valuemax={assignments.length} aria-valuenow={submitted}>
+                  <span style={{ width: (submitted / assignments.length) * 100 + '%' }} />
+                </div>
+              </div>
+              <Rows>
+                {pendingEvaluations.slice(0, 4).map((item, index) => {
+                  const due = item.due ?? item.dueDate
+                  const overdue = Boolean(dueOf(item)) && dueOf(item) < today
+                  return (
+                    <Entry key={text(item.id, 'assignment-' + index)} href="/evaluations">
+                      <p className="pt-row__title">{text(item.cycleTitle, text(item.title, 'Evaluation'))}</p>
+                      <Sub>
+                        {nameOf(item.faculty) && <span>{nameOf(item.faculty)}</span>}
+                        {dueOf(item) && (overdue
+                          ? <StatusChip tone="danger">Overdue since {formatDate(due)}</StatusChip>
+                          : <span>Due {formatDate(due)}</span>)}
+                      </Sub>
+                    </Entry>
+                  )
+                })}
+              </Rows>
             </Panel>
           )}
           {reports.length > 0 && (
@@ -270,6 +320,35 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
               </ul>
             </Panel>
           )}
+          </div>
+          {cases.length > 0 && (
+            <Panel flush className="hm-queue" title={caseTitle} action={<PanelLink href="/cases">Open queue</PanelLink>}>
+              <p className="hm-queue__lede">Where each concern in your queue stands right now.</p>
+              <ul className="hm-cases" role="list">
+                {cases.map((item, index) => (
+                  <CaseRow key={text(item.id, 'case-' + index)} item={item} route="/cases/" mine={Boolean(ownStage[role]) && text(item.stage) === ownStage[role] && !/^(resolved|closed)$/i.test(text(item.status))} />
+                ))}
+              </ul>
+            </Panel>
+          )}
+          {sections.length > 0 && (
+            <Panel flush title="Your sections" action={<PanelLink href="/spaces">View sections</PanelLink>}>
+              <Rows>
+                {sections.map((item, index) => (
+                  <Entry
+                    key={text(item.id, 'section-' + index)}
+                    lead={<span className="accs-avatar" aria-hidden><Icon name="chalkboard" size={16} /></span>}
+                    href={'/spaces/' + encodeURIComponent(text(item.id))}
+                  >
+                    <p className="pt-row__title">{text(item.title, text(item.name, 'Class section'))}</p>
+                    <Sub>{[text(item.subject, text(item.detail)), text(item.program)].filter(Boolean).join(' · ')}</Sub>
+                  </Entry>
+                ))}
+              </Rows>
+            </Panel>
+          )}
+        </div>
+        <aside className="hm-col hm-side accs-stagger">
           {events.length > 0 && (
             <Panel
               flush
@@ -291,6 +370,58 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
                   )
                 })}
               </Rows>
+            </Panel>
+          )}
+          {consultations.length > 0 && (
+            <Panel flush title="Appointments" action={<PanelLink href="/consultations">View all</PanelLink>}>
+              <Rows>
+                {consultations.map((item, index) => {
+                  const student = asItem(item.student)
+                  const other = student && text(student.id) === me ? asItem(item.faculty) : student ?? asItem(item.faculty)
+                  const slot = asItem(item.slot)
+                  const status = text(item.status, 'Requested')
+                  return (
+                    <Entry key={text(item.id, 'appointment-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
+                      <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Appointment'))}</p>
+                      <Sub>
+                        <StatusChip tone={toneFor(status)}>{status}</StatusChip>
+                        {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
+                      </Sub>
+                    </Entry>
+                  )
+                })}
+              </Rows>
+            </Panel>
+          )}
+          {announcements.length > 0 && (
+            <Panel title="Announcements" className="hm-news" action={<PanelLink href="/feed">View feed</PanelLink>}>
+              <ul className="hm-news__list" role="list">
+                {announcements.map((item, index) => {
+                  // Urgent and Important show their own colored tag (QA 19 November).
+                  const priority = text(item.priority)
+                  const href = text(item.id) ? '/feed/' + encodeURIComponent(text(item.id)) : '/feed'
+                  const author = nameOf(item.author, text(item.source))
+                  const when = item.at ?? item.date
+                  const body = (
+                    <>
+                      <span className="hm-news__icon" aria-hidden><Icon name="megaphone" size={16} /></span>
+                      <span className="hm-news__body">
+                        <span className="hm-news__title">{text(item.title, 'Announcement')}</span>
+                        <span className="hm-news__meta">
+                          {(priority === 'urgent' || priority === 'high') && <StatusChip tone="danger">Urgent</StatusChip>}
+                          {priority === 'important' && <StatusChip tone="warn">Important</StatusChip>}
+                          <span>{[author, shortDay(when)].filter(Boolean).join(' · ')}</span>
+                        </span>
+                      </span>
+                    </>
+                  )
+                  return (
+                    <li key={text(item.id, 'announcement-' + index)}>
+                      {allow(href) ? <Go className="hm-news__row" href={href}>{body}</Go> : <div className="hm-news__row">{body}</div>}
+                    </li>
+                  )
+                })}
+              </ul>
             </Panel>
           )}
           {posts.length > 0 && (
@@ -326,102 +457,7 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
               </Rows>
             </Panel>
           )}
-          {sections.length > 0 && (
-            <Panel flush title="Your sections" action={<PanelLink href="/spaces">View sections</PanelLink>}>
-              <Rows>
-                {sections.map((item, index) => (
-                  <Entry
-                    key={text(item.id, 'section-' + index)}
-                    lead={<span className="accs-avatar" aria-hidden><Icon name="chalkboard" size={16} /></span>}
-                    href={'/spaces/' + encodeURIComponent(text(item.id))}
-                  >
-                    <p className="pt-row__title">{text(item.title, text(item.name, 'Class section'))}</p>
-                    <Sub>{[text(item.subject, text(item.detail)), text(item.program)].filter(Boolean).join(' · ')}</Sub>
-                  </Entry>
-                ))}
-              </Rows>
-            </Panel>
-          )}
-        </div>
-        <aside className="hm-col hm-side accs-stagger">
-          {announcements.length > 0 && (
-            <Panel title="Announcements" className="hm-news" action={<PanelLink href="/feed">View feed</PanelLink>}>
-              <ul className="hm-news__list" role="list">
-                {announcements.map((item, index) => {
-                  // Urgent and Important show their own colored tag (QA 19 November).
-                  const priority = text(item.priority)
-                  const href = text(item.id) ? '/feed/' + encodeURIComponent(text(item.id)) : '/feed'
-                  const author = nameOf(item.author, text(item.source))
-                  const when = item.at ?? item.date
-                  const body = (
-                    <>
-                      <span className="hm-news__icon" aria-hidden><Icon name="megaphone" size={16} /></span>
-                      <span className="hm-news__body">
-                        <span className="hm-news__title">{text(item.title, 'Announcement')}</span>
-                        <span className="hm-news__meta">
-                          {(priority === 'urgent' || priority === 'high') && <StatusChip tone="danger">Urgent</StatusChip>}
-                          {priority === 'important' && <StatusChip tone="warn">Important</StatusChip>}
-                          <span>{[author, shortDay(when)].filter(Boolean).join(' · ')}</span>
-                        </span>
-                      </span>
-                    </>
-                  )
-                  return (
-                    <li key={text(item.id, 'announcement-' + index)}>
-                      {allow(href) ? <Go className="hm-news__row" href={href}>{body}</Go> : <div className="hm-news__row">{body}</div>}
-                    </li>
-                  )
-                })}
-              </ul>
-            </Panel>
-          )}
           {quick}
-          {consultations.length > 0 && (
-            <Panel flush title="Appointments" action={<PanelLink href="/consultations">View all</PanelLink>}>
-              <Rows>
-                {consultations.map((item, index) => {
-                  const student = asItem(item.student)
-                  const other = student && text(student.id) === me ? asItem(item.faculty) : student ?? asItem(item.faculty)
-                  const slot = asItem(item.slot)
-                  const status = text(item.status, 'Requested')
-                  return (
-                    <Entry key={text(item.id, 'appointment-' + index)} href={'/consultations/requests/' + encodeURIComponent(text(item.id))}>
-                      <p className="pt-row__title">{text(item.title) || (other?.name ? 'With ' + text(other.name) : text(item.purpose, 'Appointment'))}</p>
-                      <Sub>
-                        <StatusChip tone={toneFor(status)}>{status}</StatusChip>
-                        {slot && <span>{[formatDate(slot.date), clock(slot.start)].filter(Boolean).join(', ')}</span>}
-                      </Sub>
-                    </Entry>
-                  )
-                })}
-              </Rows>
-            </Panel>
-          )}
-          {assignments.length > 0 && (
-            <Panel flush title="Evaluations due" action={<PanelLink href="/evaluations">Open evaluations</PanelLink>}>
-              <div className="pt-progress">
-                <p><strong>{submitted} of {assignments.length} submitted</strong><span className="accs-num">{Math.round((submitted / assignments.length) * 100)}%</span></p>
-                <div className="accs-progress" role="progressbar" aria-label="Evaluations submitted" aria-valuemin={0} aria-valuemax={assignments.length} aria-valuenow={submitted}>
-                  <span style={{ width: (submitted / assignments.length) * 100 + '%' }} />
-                </div>
-              </div>
-              <Rows>
-                {assignments.map((item, index) => {
-                  const status = text(item.status, 'Not started')
-                  return (
-                    <Entry key={text(item.id, 'assignment-' + index)} href="/evaluations">
-                      <p className="pt-row__title">{text(item.cycleTitle, text(item.title, 'Evaluation'))}</p>
-                      <Sub>
-                        <StatusChip tone={toneFor(status)}>{status}</StatusChip>
-                        {nameOf(item.faculty) && <span>{nameOf(item.faculty)}</span>}
-                        {text(item.due, text(item.dueDate)) && <span>Due {formatDate(item.due ?? item.dueDate)}</span>}
-                      </Sub>
-                    </Entry>
-                  )
-                })}
-              </Rows>
-            </Panel>
-          )}
         </aside>
       </div>
     </div>
@@ -488,16 +524,30 @@ function HomeHero({ pill, title, date, summary, actions }: { pill: string; title
   )
 }
 
-function HomeDashboard({ page }: { page: PageEnvelope }) {
+/** The top bar's page slot (#shell-top-slot) at 768px and wider, else null. */
+function useTopSlot() {
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)')
+    const pick = () => setSlot(media.matches ? document.getElementById('shell-top-slot') : null)
+    pick()
+    media.addEventListener('change', pick)
+    return () => media.removeEventListener('change', pick)
+  }, [])
+  return slot
+}
+
+/** Without `page` the data is still loading: the hero and panel titles show, the data-bound parts are placeholders. */
+function HomeDashboard({ page }: { page?: PageEnvelope }) {
   const session = useQuery(sessionQuery())
   const allow = useAllow()
-  const variants = asItems(page.data.roleSections)
+  const variants = asItems(page?.data.roleSections)
   const roles = session.data?.user.roles ?? []
   const panels = variants.filter((variant) => roles.some((role) => role === variant.role))
   const tabbed = roles.length > 1 && panels.length > 1
   const [selected, setSelected] = useState('')
   const active = panels.find((panel) => text(panel.role) === selected) ?? panels[0]
-  const panel = (tabbed ? active : panels[0]) ?? (page.data as Item)
+  const panel = (tabbed ? active : panels[0]) ?? ((page?.data ?? {}) as Item)
   const role = tabbed ? text(panel.role) : (roles[0] ?? 'student')
 
   const actions = shortcuts
@@ -506,8 +556,23 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
   const name = firstName(session.data?.user.name ?? '')
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })
   const user = session.data?.user
-  const pill = [user?.program ?? (role === 'dean' ? 'CCS' : ''), roleLabelOf(role)].filter(Boolean).join(' · ')
+  // With role views, the view's scope ("BSIT · Section A") joins the tag instead of a separate line under the hero.
+  const scope = tabbed ? text(panel.description) : ''
+  const roleName = roleLabelOf(role)
+  const pill = scope
+    ? (scope.includes(roleName) ? scope : `${scope} · ${roleName}`)
+    : [user?.program ?? (role === 'dean' ? 'CCS' : ''), roleName].filter(Boolean).join(' · ')
   const quick = session.data ? <QuickAccess session={session.data} /> : undefined
+  // The role views sit in the top bar from tablet width up; phones keep them on the page, where the bar has no room.
+  const topSlot = useTopSlot()
+  const views = (
+    <SlidePills
+      label="Dashboard role views"
+      value={text(panel.role)}
+      onChange={setSelected}
+      options={panels.map((entry) => ({ id: text(entry.role), label: 'As ' + text(entry.label, text(entry.title, text(entry.role))) }))}
+    />
+  )
 
   return (
     <div className="hm">
@@ -515,28 +580,17 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
         pill={pill}
         title={name ? `${greeting()}, ${name}` : greeting()}
         date={date}
-        summary={summaryLine(openableStats(dashboardStats(asItems(panel.stats), role), session.data))}
+        summary={!page ? 'Loading your updates…' : summaryLine(openableStats(dashboardStats(asItems(panel.stats), role), session.data))}
         actions={actions}
       />
-      {tabbed && (
-        <div className="hm-views">
-          <SlidePills
-            label="Dashboard role views"
-            value={text(panel.role)}
-            onChange={setSelected}
-            options={panels.map((entry) => ({ id: text(entry.role), label: 'As ' + text(entry.label, text(entry.title, text(entry.role))) }))}
-          />
-          {text(panel.description) && <p className="pt-scope">{text(panel.description)}</p>}
-        </div>
-      )}
+      {tabbed && (topSlot ? createPortal(views, topSlot) : <div className="hm-views">{views}</div>)}
       {tabbed ? (
         <SwapView id={role}>
-          <DashboardPanel data={panel} role={role} quick={quick} />
+          <DashboardPanel data={panel} role={role} quick={quick} loading={!page} />
         </SwapView>
       ) : (
-        <DashboardPanel data={panel} role={role} quick={quick} />
+        <DashboardPanel data={panel} role={role} quick={quick} loading={!page} />
       )}
-      {session.data && <GettingStarted session={session.data} />}
     </div>
   )
 }
@@ -576,6 +630,19 @@ function BasicPage({ page }: { page: PageEnvelope }) {
   )
 }
 
+// List pages whose layout does not depend on the record: they draw themselves on empty data while the real data loads.
+const communityLists = ['P04', 'P07', 'P09']
+const scheduleLists = ['P13', 'P14', 'P15', 'P17']
+const grievanceLists = ['P18', 'P21']
+
+function LoadingPage({ pageId }: { pageId: string }) {
+  const page: PageEnvelope = { pageId, title: pageTitles[pageId] ?? '', scope: '', data: {} }
+  if (communityLists.includes(pageId)) return <LoadingLayout><CommunityPage page={page} /></LoadingLayout>
+  if (scheduleLists.includes(pageId)) return <LoadingLayout><SchedulePage page={page} /></LoadingLayout>
+  if (grievanceLists.includes(pageId)) return <LoadingLayout><GrievancePage page={page} /></LoadingLayout>
+  return <PageLoading title={pageTitles[pageId] || 'page'} kpis={3} />
+}
+
 export function PageScreen({ pageId }: { pageId: string }) {
   const params = useParams({ strict: false }) as Record<string, string>
   const recordId = Object.values(params).at(-1)
@@ -593,7 +660,7 @@ export function PageScreen({ pageId }: { pageId: string }) {
       {/* Appointment request takes the portal blue instead of the Schedule teal (QA v5 E8). */}
       <div className="app-page" data-site={pageId === 'P16' ? 'portal' : undefined}>
         {page.isPending ? (
-          <PageSkeleton pageId={pageId} />
+          pageId === 'P03' ? <HomeDashboard /> : <LoadingPage pageId={pageId} />
         ) : page.isError ? (
           page.error instanceof ApiError && [403, 404].includes(page.error.status) ? (
             <RestrictedView record />

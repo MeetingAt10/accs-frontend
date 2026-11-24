@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 
 import { allowsPath, siteById, siteForPath, siteLanding, type SiteId } from '@/lib/sites'
 import { dateParts } from '@/lib/format'
+import { bar, SkeletonRows, useLoadingLayout } from '@/components/app/skeleton-rows'
 
 // Shared page vocabulary for every ACCS screen. Styles live in src/styles.css (foundation section).
 // Spec: docs/deltas/2026-11-01-real-auth-and-visual-refactor.md
@@ -143,7 +144,13 @@ export function Kpis({ children, label }: { children: ReactNode; label?: string 
 }
 
 export function Kpi({ label, value, note, href }: { label: string; value: ReactNode; note?: ReactNode; href?: string }) {
-  const body = (
+  const loading = useLoadingLayout()
+  const body = loading ? (
+    <>
+      <p className="accs-kpi__label">{label}</p>
+      <p className="accs-kpi__value">{bar('3rem', 28)}</p>
+    </>
+  ) : (
     <>
       <p className="accs-kpi__label">{label}</p>
       <p className="accs-kpi__value">{value}</p>
@@ -173,6 +180,8 @@ export function DateTile({ value }: { value: unknown }) {
 }
 
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+  // While the page's data loads, an empty list is a loading list, not "nothing here".
+  if (useLoadingLayout()) return <SkeletonRows count={3} />
   return (
     <div className="accs-empty">
       <strong>{title}</strong>

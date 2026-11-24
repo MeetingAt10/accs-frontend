@@ -26,6 +26,12 @@ const kindIcons: Record<string, IconName> = {
   moderation: "warning-circle",
 };
 
+/**
+ * Older notices carry a placeholder body ("Open this update to see the details.", "Open the feed to read it.") that
+ * says nothing the title and the click don't already say, so the list leaves it out.
+ */
+const placeholderBody = /^open (this update|the feed)\b/i;
+
 export function NotificationList({ children }: { children: ReactNode }) {
   return (
     <ul className="ds-next-notification-list" aria-label="Notifications">
@@ -65,6 +71,7 @@ export function NotificationItem({
   const unread = notification.read !== true;
   const kind = words(notification.kind, "update");
   const at = words(notification.at);
+  const body = words(notification.body);
   return (
     <motion.li
       layout={reduce ? false : "position"}
@@ -100,10 +107,8 @@ export function NotificationItem({
           )}
           {unread && <span className="ds-next-notification-item__sr">Unread</span>}
         </div>
-        {words(notification.body) && (
-          <p className="ds-next-notification-item__text">
-            {words(notification.body)}
-          </p>
+        {body && !placeholderBody.test(body) && (
+          <p className="ds-next-notification-item__text">{body}</p>
         )}
         <span className="ds-next-notification-item__meta">
           <span className="ds-next-notification-item__kind">{kind}</span>

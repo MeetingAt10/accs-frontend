@@ -31,14 +31,3 @@ a.quick-access__tile:hover { background: var(--accs-tint); color: var(--accs-lin
 a.quick-access__tile:hover > svg { color: var(--accs-link); }
 .quick-access__tile--soon { color: var(--accs-muted); opacity: 0.8; }
 
-/* Getting started: a numbered list in the order of the demo. Numbers come from the list, not the markup. */
-.getting-started {
-  display: grid;
-  gap: var(--ds-space-8);
-  margin: 0;
-  padding-inline-start: var(--ds-space-24);
-}
-.getting-started__step {
-  padding-inline-start: var(--ds-space-8);
-  color: var(--ds-text-secondary);
-}

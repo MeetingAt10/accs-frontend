@@ -71,6 +71,7 @@
 }
 .ds-next-notification-item__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--accs-muted); font-size: 0.75rem; }
 .ds-next-notification-item__kind { text-transform: capitalize; }
+.ds-next-notification-item__kind::after { content: "·"; margin-inline-start: 8px; }
 .ds-next-notification-item__read {
   min-height: 40px;
   padding: 0 12px;

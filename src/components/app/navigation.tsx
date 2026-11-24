@@ -661,9 +661,23 @@ function resolvedTheme(theme: string) {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+/** The new theme fades in over the old one (shell included) through a view transition; at once without one. */
+let themeSwaps = 0;
+function swapTheme(apply: () => void) {
+  const root = document.documentElement;
+  if (!document.startViewTransition || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return apply();
+  const swap = ++themeSwaps;
+  root.classList.add("accs-theme-swap");
+  document.startViewTransition(apply).finished.finally(() => {
+    // A newer press may have started its own fade; only the last one clears the class.
+    if (swap === themeSwaps) root.classList.remove("accs-theme-swap");
+  });
+}
+
 /**
  * Light / dark switch in the top bar. It applies at once and saves the choice with the same settings action as the
- * Settings page (Settings keeps "Match my device" for following the device again).
+ * Settings page (Settings keeps "Match my device" for following the device again). The switch stays live while a save
+ * runs: presses in quick succession only save the last choice, once the presses stop.
  */
 function ThemeToggle() {
   const queryClient = useQueryClient();
@@ -681,29 +695,58 @@ function ThemeToggle() {
     media.addEventListener("change", follow);
     return () => media.removeEventListener("change", follow);
   }, [saved]);
+  const latest = useRef<string>(undefined);
+  const timer = useRef<number>(undefined);
+  // Saves run one at a time, so the server cannot store them out of order; one a later press replaced is skipped.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const save = useMutation({
-    mutationFn: (theme: string) => performPageAction("P43", { action: "saveSettings", payload: { theme, density } }),
-    // A failed save puts the saved theme back and says so, instead of showing a choice that is gone on reload.
-    onError: (error) => {
-      const restored = resolvedTheme(saved);
-      if (saved === "system") document.documentElement.removeAttribute("data-theme");
-      else document.documentElement.setAttribute("data-theme", restored);
-      setCurrent(restored);
-      toast(apiErrorText(error));
+    mutationFn: (theme: string) => {
+      const run = queue.current
+        .catch(() => undefined)
+        .then(() => (theme === latest.current ? performPageAction("P43", { action: "saveSettings", payload: { theme, density } }) : undefined));
+      queue.current = run;
+      return run;
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["page", "P43"] }),
+    // A failed save reloads the stored settings (the shell applies the stored theme) and says so, instead of showing a
+    // choice that is gone on reload. A save that a later press has overtaken does neither.
+    onError: (error, theme) => {
+      if (theme !== latest.current) return;
+      toast(apiErrorText(error));
+      void queryClient.invalidateQueries({ queryKey: ["page", "P43"] });
+    },
+    onSettled: (_data, _error, theme) => {
+      if (theme === latest.current) void queryClient.invalidateQueries({ queryKey: ["page", "P43"] });
+    },
   });
+  const mutate = save.mutate;
+  // Leaving the page (signing out) still saves a choice that was waiting for the presses to stop.
+  useEffect(() => () => {
+    if (timer.current === undefined) return;
+    window.clearTimeout(timer.current);
+    if (latest.current) mutate(latest.current);
+  }, [mutate]);
   const next = current === "dark" ? "light" : "dark";
   return (
     <IconButton
       icon={current === "dark" ? "sun" : "moon"}
       label={next === "dark" ? "Switch to dark mode" : "Switch to light mode"}
       // Off until the saved settings are known, so saving the theme never replaces the saved density with a default.
-      isDisabled={!appearance.isSuccess || save.isPending}
+      isDisabled={!appearance.isSuccess}
       onPress={() => {
-        document.documentElement.setAttribute("data-theme", next);
+        swapTheme(() => document.documentElement.setAttribute("data-theme", next));
         setCurrent(next);
-        save.mutate(next);
+        latest.current = next;
+        // The settings cache takes the choice now, and a settings reply already on its way is dropped, so a reply that
+        // left the server before this press cannot switch the theme back.
+        void queryClient.cancelQueries({ queryKey: ["page", "P43"] });
+        queryClient.setQueryData(pageQuery("P43").queryKey, (old) =>
+          old && { ...old, data: { ...old.data, settings: { ...(old.data.settings as object), theme: next } } },
+        );
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => {
+          timer.current = undefined;
+          mutate(next);
+        }, 500);
       }}
     />
   );
@@ -824,6 +867,8 @@ function Topbar({
           )}
           <strong>{title}</strong>
         </nav>
+        {/* Pages put page-wide controls here through a portal (Home's role views). Empty elsewhere. */}
+        <div className="shell-top__slot" id="shell-top-slot" />
         <div className="shell-top__tools">
           <form
             className="shell-top__search"
@@ -1023,12 +1068,18 @@ export function AppChrome({
   // The top bar already has the bell, so its account menu leaves Notifications out. The drawer lists everything.
   const menuLinks = accountLinks.filter((link) => link.href !== "/notifications");
   // These live in the top bar (Assistant, Notifications, the account menu) or are Home itself, so the panel does not repeat them.
-  const panelGroups = groups
-    .map((group) => ({
-      ...group,
-      entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
-    }))
-    .filter((group) => group.entries.length > 0);
+  const panelOnly = (list: NavGroup[]) =>
+    list
+      .map((group) => ({
+        ...group,
+        entries: group.entries.filter((entry) => !utilityHrefs.includes(entry.href)),
+      }))
+      .filter((group) => group.entries.length > 0);
+  const panelGroups = panelOnly(groups);
+  // Every site's own links, so the panel can show them all open (the current site's come from the same lookup).
+  const siteGroups = Object.fromEntries(
+    destinations.map(({ site: { id } }) => [id, id === site ? panelGroups : panelOnly(siteNav(session, path, id).groups)]),
+  ) as Partial<Record<SiteId, NavGroup[]>>;
   const panelCurrent = panelGroups.some((group) =>
     group.entries.some((entry) => entry.href === current),
   )
@@ -1172,7 +1223,7 @@ export function AppChrome({
         <SitePanel
           destinations={destinations}
           current={site}
-          groups={panelGroups}
+          siteGroups={siteGroups}
           currentHref={panelCurrent}
           onAssistant={() => setAssistantOpen(true)}
         />
@@ -1212,7 +1263,7 @@ export function AppChrome({
           session={session}
           destinations={destinations}
           current={site}
-          groups={panelGroups}
+          siteGroups={siteGroups}
           currentHref={panelCurrent}
           accountLinks={accountLinks}
           onNavigate={() => setMenuOpen(false)}

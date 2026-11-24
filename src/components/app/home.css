@@ -186,3 +186,15 @@ a.hm-news__row:hover .hm-news__title { color: var(--accs-link); text-decoration:
 /* Before the session is known there is no shell yet, so the placeholders sit on the bare page. */
 .pg-skel-page { min-height: 100dvh; padding: 32px 16px; background: var(--accs-paper); }
 @media (min-width: 768px) { .pg-skel-page { padding: 32px 40px 48px; } }
+
+/* Evaluations due and My reports side by side on wide screens. */
+.hm-pair { display: grid; gap: 24px; align-items: stretch; min-width: 0; }
+.hm-pair > * { align-content: start; }
+.hm-pair:empty { display: none; }
+@media (min-width: 1280px) { .hm-pair:has(> :nth-child(2)) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Both columns end level: the main column stretches to the side column's height and the paired cards take the slack. */
+@media (min-width: 1280px) {
+  .hm-cols:has(> .hm-side:not(:empty)) { align-items: stretch; }
+  .hm-cols > .hm-col:first-child { display: flex; flex-direction: column; }
+  .hm-cols > .hm-col:first-child > .hm-pair { flex: 1 0 auto; }
+}
