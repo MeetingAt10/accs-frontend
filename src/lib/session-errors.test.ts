@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from './api'
-import { authRedirectFor, retryDelay, sessionEndedHref, shouldRetry } from './session-errors'
+import { authRedirectFor, isSessionExpired, retryDelay, sessionEndedHref, shouldRetry } from './session-errors'
 
 const apiError = (status: number, code?: string) => new ApiError('x', status, code ? { code } : undefined)
 
 describe('authRedirectFor', () => {
   it('sends an ended session to Sign in and temporary details to First login', () => {
     expect(authRedirectFor(apiError(401, 'UNAUTHENTICATED'))).toBe('sign-in')
+    expect(authRedirectFor(apiError(401, 'SESSION_EXPIRED'))).toBe('sign-in')
+    expect(isSessionExpired(apiError(401, 'SESSION_EXPIRED'))).toBe(true)
+    expect(isSessionExpired(apiError(401, 'UNAUTHENTICATED'))).toBe(false)
     expect(authRedirectFor(apiError(403, 'CREDENTIALS_CHANGE_REQUIRED'))).toBe('first-login')
   })
 
@@ -22,6 +25,8 @@ describe('authRedirectFor', () => {
 describe('sessionEndedHref', () => {
   it('comes back to the page the person was on', () => {
     expect(sessionEndedHref('/feed?q=lab')).toBe('/sign-in?ended=1&redirect=%2Ffeed%3Fq%3Dlab')
+    expect(sessionEndedHref('/feed?q=lab', false)).toBe('/sign-in?redirect=%2Ffeed%3Fq%3Dlab')
+    expect(sessionEndedHref('/', false)).toBe('/sign-in?redirect=%2F')
   })
 
   it('never redirects back to Sign in, First login, or another site', () => {

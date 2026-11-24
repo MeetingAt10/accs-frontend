@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 
 import { RouteError, RouteNotFound, RoutePending } from '@/components/app/route-fallbacks'
 import { initAnalytics, initObservability } from '@/lib/observability'
-import { authRedirectFor, sessionEndedHref, signedOutPaths } from '@/lib/session-errors'
+import { authRedirectFor, isSessionExpired, sessionEndedHref, signedOutPaths } from '@/lib/session-errors'
 
 import '@meetingat10/design-system/tokens.css'
 import '@meetingat10/design-system/components.css'
@@ -32,7 +32,7 @@ function onRequestError(error: unknown) {
   leaving = true
   if (where === 'sign-in') queryClient.removeQueries()
   else void queryClient.invalidateQueries({ queryKey: ['session'] })
-  void router.navigate({ href: where === 'sign-in' ? sessionEndedHref(here) : '/first-login?redirect=' + encodeURIComponent(here), replace: true }).finally(() => { leaving = false })
+  void router.navigate({ href: where === 'sign-in' ? sessionEndedHref(here, isSessionExpired(error)) : '/first-login?redirect=' + encodeURIComponent(here), replace: true }).finally(() => { leaving = false })
 }
 const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({ onError: onRequestError }),
