@@ -49,7 +49,7 @@ export function studentProblems(draft: StudentDraft): StudentProblems {
   else if (Number(studentId.slice(0, 2)) > new Date(Date.now() + 8 * 3_600_000).getUTCFullYear() % 100) problems.studentId = 'The first two digits are the enrollment year; they cannot be a later year.'
   if (!programs.includes(draft.program as Program)) problems.program = 'Choose BSIT, BSCS, or BSIS.'
   if (!/^[1-4]$/.test(draft.year.trim())) problems.year = 'Choose a year level from 1 to 4.'
-  if (!/^[A-Za-z]{1,3}$/.test(draft.section.trim())) problems.section = 'Use the section letter, like A.'
+  if (!/^[A-Za-z]$/.test(draft.section.trim())) problems.section = 'Use the section letter, like A.'
   return problems
 }
 

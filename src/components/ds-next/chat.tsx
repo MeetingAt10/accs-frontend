@@ -350,7 +350,7 @@ export function MessageComposer({
             !event.nativeEvent.isComposing
           ) {
             event.preventDefault();
-            if (canSend) onSend();
+            if (canSend || (filesBusy && !isPending)) onSend();
           }
         }}
       />

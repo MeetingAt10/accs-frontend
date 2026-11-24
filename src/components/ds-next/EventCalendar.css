@@ -141,6 +141,7 @@
 .ec-table td:last-child { border-right: 0; }
 .ec-table tbody tr:last-child td { border-bottom: 0; }
 .ec-table td:hover { background: color-mix(in srgb, var(--accs-tint) 60%, var(--accs-surface)); }
+@media (hover: hover) { .ec-table td[data-addable] { cursor: pointer; } }
 .ec-table td[data-outside] { background: var(--accs-paper); }
 .ec-table td[data-outside] .ec-chip { opacity: 0.7; }
 

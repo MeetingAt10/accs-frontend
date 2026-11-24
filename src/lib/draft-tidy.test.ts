@@ -41,6 +41,16 @@ describe('tidyDraft', () => {
     ])
   })
 
+  it('builds a structured draft from a short English report', () => {
+    const result = tidyDraft({ narrative: 'my groupmate took my laptop charger in the lab yesterday', location: 'IC lab' })
+    expect(result.text).toBe('What happened: My groupmate took my laptop charger in the lab yesterday.\nWhere: IC lab.')
+  })
+
+  it('builds a structured draft from a short Taglish report', () => {
+    const result = tidyDraft({ narrative: 'sinigawan ako ng prof namin sa harap ng klase\nnahiya ako', occurredOn: '2026-11-20', ongoing: false })
+    expect(result.text).toBe('What happened: Sinigawan ako ng prof namin sa harap ng klase. Nahiya ako.\nWhen: 20 November 2026.')
+  })
+
   it('gives no text for an empty draft', () => {
     expect(tidyDraft({ narrative: '   ' }).text).toBe('')
   })

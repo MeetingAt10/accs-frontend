@@ -1,5 +1,5 @@
 import { typedDateImpossible } from '@/lib/typed-date'
-import { campusToday } from '@/lib/campus-date'
+import { campusToday, isPastLocal } from '@/lib/campus-date'
 import { parseDate as parseCalendarDate } from '@internationalized/date'
 import {
   Alert,
@@ -67,6 +67,7 @@ import {
   initials,
   relativeTime,
 } from '@/lib/format'
+import { useLocalDraft } from '@/lib/local-draft'
 import { pageQuery, sessionQuery } from '@/lib/queries'
 import { replaceFilters } from '@/lib/url-filters'
 import './schedule.css'
@@ -370,6 +371,7 @@ function CalendarPage({
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedEntry])
   const [todoOpen, setTodoOpen] = useState(false)
+  const [pickDate, setPickDate] = useState<string>()
   const [todoTitle, setTodoTitle] = useState('')
   const [todoDate, setTodoDate] = useState('')
   const [todoDateBad, setTodoDateBad] = useState(false)
@@ -771,6 +773,7 @@ function CalendarPage({
                 view={small && view === 'month' ? 'list' : view}
                 events={entries}
                 onDateChange={(date) => update({ date })}
+                onDateClick={(day) => (canTodo || session.permissions.includes('announcement.publish')) && setPickDate(day)}
                 onEventPress={(event) =>
                   setSelectedEntry(
                     entries.find((entry) => entry.id === event.id),
@@ -932,6 +935,16 @@ function CalendarPage({
       >
         {selectedEntry && entryDetails(selectedEntry)}
       </Drawer>
+      <Modal title={pickDate ? `Add on ${formatDate(pickDate)}` : 'Add'} isOpen={Boolean(pickDate)} onOpenChange={(open) => !open && setPickDate(undefined)}>
+        <ModalBody>
+          <div className="app-page">
+            {canTodo && <Button icon="plus" onPress={() => { setTodoDate(pickDate ?? ''); setTodoDateBad(false); setPickDate(undefined); setTodoOpen(true) }}>Add to-do</Button>}
+            {session.permissions.includes('announcement.publish') && pickDate && (
+              <Button icon="calendar" variant="secondary" href={`/feed/new?type=announcement&date=${encodeURIComponent(pickDate)}`}>Add event</Button>
+            )}
+          </div>
+        </ModalBody>
+      </Modal>
       <Modal title="Add to-do" isOpen={todoOpen} onOpenChange={setTodoOpen}>
         <form onSubmit={saveTodo}>
           <ModalBody>
@@ -1278,9 +1291,12 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
   const [step, setStep] = useState({ n: 2, dir: 1 })
   const [week, setWeek] = useState(() => weekStart(firstOpen?.date ?? today()))
   const [selectedSlot, setSelectedSlot] = useState<string>()
-  const [category, setCategory] = useState('')
-  const [subcategory, setSubcategory] = useState('')
-  const [details, setDetails] = useState('')
+  const me = useQuery(sessionQuery()).data?.user.id ?? 'signed-in'
+  const [purpose, setPurpose, clearPurpose] = useLocalDraft(`accs-appointment-draft-${me}-${faculty?.id ?? ''}`, { category: '', subcategory: '', details: '' })
+  const { category, subcategory, details } = purpose
+  const setCategory = (value: string) => setPurpose((current) => ({ ...current, category: value }))
+  const setSubcategory = (value: string) => setPurpose((current) => ({ ...current, subcategory: value }))
+  const setDetails = (value: string) => setPurpose((current) => ({ ...current, details: value }))
   const [purposeError, setPurposeError] = useState('')
   const options = readCategoryOptions(page.data.appointmentCategories)
   const option = options.find((entry) => entry.label === category)
@@ -1350,6 +1366,7 @@ function FacultyTimesPage({ page }: { page: PageEnvelope }) {
         },
       })
       const request = record<Consultation>(result.record)
+      clearPurpose()
       if (request)
         router.history.push(
           `/consultations/requests/${encodeURIComponent(request.id)}`,
@@ -1996,6 +2013,9 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
   const [state, setState] = useState<'open' | 'unavailable'>('open')
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const [repeat, setRepeat] = useState<'once' | 'weekly'>('once')
+  const [weeks, setWeeks] = useState('4')
+  const [notice, setNotice] = useState('')
   const [dateBad, setDateBad] = useState(false)
   // A time being marked not available from the list waits here for its reason.
   const [reasonFor, setReasonFor] = useState<Slot>()
@@ -2061,10 +2081,29 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
       return
     }
     try {
-      await action.mutateAsync({
-        action: 'saveAvailability',
-        payload: { date, start, end, state, ...(state === 'unavailable' ? { reason: reason.trim() } : {}) },
-      })
+      const extra = state === 'unavailable' ? { reason: reason.trim() } : {}
+      await action.mutateAsync({ action: 'saveAvailability', payload: { date, start, end, state, ...extra } })
+      // Weekly: one saveAvailability per later week; past times and overlaps are skipped.
+      let made = 1
+      let skipped = 0
+      for (let i = 1; repeat === 'weekly' && i < Number(weeks); i++) {
+        const d = addDays(date, 7 * i)
+        if (isPastLocal(`${d}T${start}`) || slots.some((slot) => slot.date === d && slot.start < end && slot.end > start)) {
+          skipped++
+          continue
+        }
+        try {
+          await action.mutateAsync({ action: 'saveAvailability', payload: { date: d, start, end, state, ...extra } })
+          made++
+        } catch {
+          skipped++
+        }
+      }
+      if (repeat === 'weekly') {
+        action.reset()
+        setNotice(`Added ${made} weekly time${made === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} (past or overlapping)` : ''}.`)
+      } else setNotice('')
+      setRepeat('once')
       setAddOpen(false)
       setDate(''); setDateBad(false)
       setReason('')
@@ -2307,9 +2346,10 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
           )}
         </Panel>
         <ActionError error={action.error} />
-        {/* TBD(D-04): external calendar sync, recurrence and booking-change policy are not approved. */}
+        {notice && <Alert tone="neutral" title={notice} />}
+        {/* TBD(D-04): external calendar sync and booking-change policy are not approved. */}
         <p className="accs-meta">
-          Changes apply in ACCS only. Calendar sync and recurring times are not available yet.
+          Changes apply in ACCS only. Calendar sync is not available yet.
         </p>
       </div>
       <Modal title="Add times" isOpen={addOpen} onOpenChange={setAddOpen}>
@@ -2371,14 +2411,20 @@ function AvailabilityPage({ page }: { page: PageEnvelope }) {
               )}
               <RadioGroup
                 label="Repeat"
-                value="once"
-                description="Recurring times are not available yet."
+                value={repeat}
+                onChange={(value) => setRepeat(value as 'once' | 'weekly')}
+                description="Weekly adds this same time on the same weekday each week. Past and overlapping times are skipped."
               >
                 <Radio value="once">Once</Radio>
-                <Radio value="weekly" isDisabled>
-                  Weekly until the end of term
-                </Radio>
+                <Radio value="weekly">Weekly</Radio>
               </RadioGroup>
+              {repeat === 'weekly' && (
+                <Select label="For how many weeks" selectedKey={weeks} onSelectionChange={(key) => setWeeks(String(key))}>
+                  {Array.from({ length: 15 }, (_, i) => String(i + 2)).map((n) => (
+                    <SelectOption key={n} id={n}>{n} weeks</SelectOption>
+                  ))}
+                </Select>
+              )}
               <Alert tone="neutral" title="Students see changes immediately">
                 To change a requested or booked time, cancel the consultation first.
               </Alert>

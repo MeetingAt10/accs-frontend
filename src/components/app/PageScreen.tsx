@@ -7,6 +7,7 @@ import { ApiError, type PageEnvelope } from '@/lib/api'
 import { categoryText } from '@/lib/concern-categories'
 import { formatDate, initials, relativeTime } from '@/lib/format'
 import { pageIdForPath, pageTitles } from '@/lib/page-catalog'
+import { canOpenPath } from '@/lib/sites'
 import { keepFilteredPage, pageQuery, sessionQuery } from '@/lib/queries'
 import { RequirePermission, RestrictedView, RetryView } from '@/components/app/guards'
 import { GrievancePage } from '@/components/app/grievance'
@@ -122,6 +123,14 @@ function kpiTarget(label: string) {
   return undefined
 }
 
+/** Home tiles the viewer can open: same `canOpenPath` check as navigation. */
+function openableStats(stats: Item[], session: Parameters<typeof canOpenPath>[0] | undefined) {
+  return stats.filter((stat) => {
+    const target = kpiTarget(text(stat.label))
+    return !target || (session ? canOpenPath(session, target) : false)
+  })
+}
+
 /** The office a role works a case as, so Home can mark the cases waiting on this person. */
 const ownStage: Record<string, string> = { professor: 'adviser', chair: 'chair', dean: 'dean', guidance: 'guidance', osas: 'osas' }
 
@@ -192,7 +201,7 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
   const allow = useAllow()
   const session = useQuery(sessionQuery())
   const me = session.data?.user.id
-  const stats = dashboardStats(asItems(data.stats), role)
+  const stats = openableStats(dashboardStats(asItems(data.stats), role), session.data)
   // Each list on the home shows its five newest items; "View all" opens the rest.
   const top = (items: Item[]) => items.slice(0, 5)
   const announcements = top(asItems(data.announcements))
@@ -202,8 +211,8 @@ function DashboardPanel({ data, role, quick }: { data: Item; role: string; quick
   const reports = top(asItems(data.reports))
   const cases = top(asItems(data.cases))
   const sections: Item[] = []
-  const consultations = top(asItems(data.consultations))
-  const assignments = asItems(data.assignments)
+  const consultations = session.data && canOpenPath(session.data, '/consultations') ? top(asItems(data.consultations)) : []
+  const assignments = session.data && canOpenPath(session.data, '/evaluations') ? asItems(data.assignments) : []
   const today = manilaToday()
   const events = asItems(data.events)
     .filter((event) => dayKey(event.date) >= today)
@@ -506,7 +515,7 @@ function HomeDashboard({ page }: { page: PageEnvelope }) {
         pill={pill}
         title={name ? `${greeting()}, ${name}` : greeting()}
         date={date}
-        summary={summaryLine(dashboardStats(asItems(panel.stats), role))}
+        summary={summaryLine(openableStats(dashboardStats(asItems(panel.stats), role), session.data))}
         actions={actions}
       />
       {tabbed && (
@@ -581,7 +590,8 @@ export function PageScreen({ pageId }: { pageId: string }) {
   })
   return (
     <RequirePermission pageId={pageId}>
-      <div className="app-page">
+      {/* Appointment request takes the portal blue instead of the Schedule teal (QA v5 E8). */}
+      <div className="app-page" data-site={pageId === 'P16' ? 'portal' : undefined}>
         {page.isPending ? (
           <PageSkeleton pageId={pageId} />
         ) : page.isError ? (

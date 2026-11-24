@@ -37,7 +37,8 @@ export function choiceProblems(choice: CategoryChoice, options: CategoryOption[]
   const option = options.find((entry) => entry.label === choice.category)
   if (!option) return { category: 'Choose a category.' }
   if (option.requiresDetail) return choice.categoryDetail.trim() ? {} : { categoryDetail: 'Describe the concern in a few words.' }
-  return option.subcategories.includes(choice.subcategory) ? {} : { subcategory: 'Choose a sub-category.' }
+  // Sub-category is optional; cleanChoice already drops one that is not in the category.
+  return {}
 }
 
 /** The fields the API takes: a sub-category, or for "Other" a short description. */

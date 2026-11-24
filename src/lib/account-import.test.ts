@@ -62,7 +62,7 @@ describe('sections (QA 17 November: section 200 was accepted)', () => {
   it('takes letters only', () => {
     const base = { name: 'Ana Reyes', email: 'ana@example.com', studentId: '26-7001', program: 'BSIT', year: '1', section: 'A' }
     expect(studentProblems(base).section).toBeUndefined()
-    expect(studentProblems({ ...base, section: 'ab' }).section).toBeUndefined()
+    expect(studentProblems({ ...base, section: 'ab' }).section).toBe('Use the section letter, like A.')
     expect(studentProblems({ ...base, section: '200' }).section).toBe('Use the section letter, like A.')
     expect(studentProblems({ ...base, section: 'A1' }).section).toBe('Use the section letter, like A.')
   })

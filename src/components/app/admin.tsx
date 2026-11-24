@@ -2,6 +2,7 @@ import { campusYears, canAddRole, sectionPrefix, sectionProblem } from "@/lib/ro
 import { permissionGroup, permissionLabel, proposalWords } from "@/lib/permission-words";
 import { personMatches } from '@/lib/person-search'
 import { roleLabelOf } from '@/lib/role-labels'
+import { canOpenPath } from '@/lib/sites'
 import { PagedList } from '@/components/app/paging'
 import {
   Alert,
@@ -345,6 +346,8 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
   // Requests wait for the CCS Secretary, who approves or rejects each one; an approved change applies (decided 20 November 2026).
   const requests = items(page.data.permissionRequests);
   const decisions = items(page.data.permissionDecisions);
+  // The Secretary owns the matrix: her change applies at once; the administrator's goes to her as a request (QA v5 D2).
+  const owner = page.data.canReviewPermissions === true;
   const [deciding, setDeciding] = useState<{ key: string; decision: "approve" | "reject"; words: string }>();
   const [decisionReason, setDecisionReason] = useState("");
   const decide = () => {
@@ -377,7 +380,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
       <PageHeader
         crumbs={trail({ label: "Permissions" })}
         title="Permission matrix"
-        description="Propose a change to what a role can do. The CCS Secretary approves each request before it applies."
+        description={owner ? "Change what a role can do. Your change applies at once and goes in the audit trail." : "Propose a change to what a role can do. The CCS Secretary approves each request before it applies."}
       />
       {requests.length > 0 && (
         <Panel title="Waiting for approval">
@@ -386,7 +389,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
               const key = word(request.key);
               const words = proposalWords(roleFull(word(request.role)), word(request.permission), request.allowed === true);
               return (
-                <li key={key} className="adm-request">
+                <li key={key} id={`adm-req-${key}`} className="adm-request">
                   <div className="adm-request__text">
                     <strong>{words}</strong>
                     <span className="acct-muted">
@@ -401,8 +404,30 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                       <Button size="sm" onPress={() => setDeciding({ key, decision: "approve", words })}>Approve</Button>
                     </div>
                   ) : (
-                    <span className="acct-muted">{page.data.canReviewPermissions === true ? "Someone else decides your own request." : "Waiting for the CCS Secretary."}</span>
+                    <span className="acct-muted">"Waiting for the CCS Secretary."</span>
                   )}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
+      {decisions.length > 0 && (
+        <Panel title="Recent decisions">
+          <ul className="adm-requests">
+            {decisions.slice(0, 5).map((entry, index) => {
+              const key = word(entry.key);
+              const role = key.slice(0, key.indexOf(":"));
+              const permission = key.slice(key.indexOf(":") + 1);
+              return (
+                <li key={key + index} className="adm-request">
+                  <div className="adm-request__text">
+                    <strong>{proposalWords(roleFull(role), permission, entry.allowed === true)}</strong>
+                    <span className="acct-muted">
+                      {word(entry.decision)} by {word(entry.by)}{entry.at ? ` · ${formatDate(entry.at)}` : ""}{entry.reason ? ` · ${word(entry.reason)}` : ""}
+                    </span>
+                  </div>
+                  <StatusChip tone={entry.decision === "Approved" ? "ok" : "neutral"}>{word(entry.decision)}</StatusChip>
                 </li>
               );
             })}
@@ -475,9 +500,6 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                       <span className="adm-matrix__human">
                         {permissionLabel(permission)}
                       </span>
-                      <span className="adm-matrix__key accs-mono">
-                        {permission}
-                      </span>
                       {locked && <span className="adm-matrix__locked">Fixed: cannot be changed by a request</span>}
                     </th>
                     {roles.map((role) => {
@@ -487,14 +509,14 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                         ? Boolean(proposed)
                         : granted.includes(role);
                       return (
-                        <td key={role}>
+                        <td key={role} id={`adm-cell-${role}:${permission}`}>
                           <MatrixCell
                             on={effective}
                             proposed={hasProposal}
                             locked={locked}
                             label={`${roleFull(role)}: ${permissionLabel(permission)}, ${
                               effective ? "allowed" : "no access"
-                            }${hasProposal ? " (proposed)" : ""}. Propose a change`}
+                            }${hasProposal ? " (proposed)" : ""}. ${owner ? "Change it" : "Propose a change"}`}
                             onPress={() =>
                               setPendingCell({
                                 role,
@@ -547,11 +569,23 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={{ duration: 0.25, ease: EASE }}
                     >
-                      {/* Opens that change, so it can be reviewed or reversed from here. */}
+                      {/* Opens that change: a request the reader can decide goes to the same approve/reject dialog as the list above; otherwise it scrolls to and highlights the entry. */}
                       <button
                         type="button"
                         className="adm-proposed__chip"
-                        onClick={() => setPendingCell({ role: role as Role, permission: rest.join(":"), allowed: !value })}
+                        onClick={() => {
+                          const request = requests.find((r) => word(r.key) === key);
+                          if (request?.canDecide === true) {
+                            setDeciding({ key, decision: "approve", words: proposalWords(roleFull(role), rest.join(":"), Boolean(value)) });
+                          } else {
+                            // Cannot decide: show where it is (the waiting entry, else the table cell).
+                            const target = document.getElementById(`adm-req-${key}`) ?? document.getElementById(`adm-cell-${key}`);
+                            target?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+                            target?.classList.remove("adm-flash");
+                            void target?.offsetWidth;
+                            target?.classList.add("adm-flash");
+                          }
+                        }}
                       >
                         {proposalWords(roleFull(role), rest.join(":"), Boolean(value))}
                       </button>
@@ -573,7 +607,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
         )}
       </AnimatePresence>
       <Modal
-        title="Propose permission change"
+        title={owner ? "Change permission" : "Propose permission change"}
         isOpen={Boolean(pendingCell)}
         onOpenChange={(open) => {
           if (!open) setPendingCell(undefined);
@@ -582,7 +616,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
         <ModalBody>
           <p>
             <strong>{pendingCell ? proposalWords(roleFull(pendingCell.role), pendingCell.permission, pendingCell.allowed) : ""}</strong>.
-            The CCS Secretary approves the request before it applies.
+            {owner ? "It applies at once." : "The CCS Secretary approves the request before it applies."}
           </p>
           <TextArea
             label="Reason"
@@ -601,7 +635,7 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
             isDisabled={!reason.trim()}
             onPress={doChange}
           >
-            Submit proposal
+            {owner ? "Apply change" : "Submit proposal"}
           </Button>
         </ModalActions>
       </Modal>
@@ -624,28 +658,6 @@ export function PermissionMatrix({ page }: { page: PageEnvelope }) {
           </Button>
         </ModalActions>
       </Modal>
-      {decisions.length > 0 && (
-        <Panel title="Recent decisions">
-          <ul className="adm-requests">
-            {decisions.slice(0, 5).map((entry, index) => {
-              const key = word(entry.key);
-              const role = key.slice(0, key.indexOf(":"));
-              const permission = key.slice(key.indexOf(":") + 1);
-              return (
-                <li key={key + index} className="adm-request">
-                  <div className="adm-request__text">
-                    <strong>{proposalWords(roleFull(role), permission, entry.allowed === true)}</strong>
-                    <span className="acct-muted">
-                      {word(entry.decision)} by {word(entry.by)}{entry.at ? ` · ${formatDate(entry.at)}` : ""}{entry.reason ? ` · ${word(entry.reason)}` : ""}
-                    </span>
-                  </div>
-                  <StatusChip tone={entry.decision === "Approved" ? "ok" : "neutral"}>{word(entry.decision)}</StatusChip>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
-      )}
     </div>
   );
 }
@@ -666,7 +678,7 @@ function MatrixCell({
   const reduce = useReducedMotion();
   if (locked)
     return (
-      <span className="adm-cell" data-on={on} data-locked aria-label={label.replace(/\. Propose a change$/, ". Fixed")}>
+      <span className="adm-cell" data-on={on} data-locked aria-label={label.replace(/\. (Propose a change|Change it)$/, ". Fixed")}>
         <span className="adm-cell__glyph">
           <Icon name={on ? "check" : "minus"} size={16} weight={on ? "bold" : "regular"} />
         </span>
@@ -1229,6 +1241,8 @@ function ResetCodePanel({ accountId, name }: { accountId: string; name: string }
 function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const record = object(page.data.record);
   const action = useAction("P47");
+  const session = useQuery(sessionQuery());
+  const canManageRestrictions = session.data ? canOpenPath(session.data, "/restrictions") : false;
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(
     Array.isArray(record.roles) ? (record.roles as Role[]) : [],
   );
@@ -1238,9 +1252,11 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
   const campus = word(record.campus, "SB");
   const [year, setYear] = useState(word(record.year));
   const [section, setSection] = useState(word(record.section));
+  const [irregular, setIrregular] = useState(record.irregular === true);
   const prefix = sectionPrefix({ campus, program, year });
   const sectionError = sectionProblem(section);
   const isStudent = selectedRoles.includes("student");
+  const isAdmin = useQuery(sessionQuery()).data?.user.roles.includes("administrator") === true;
   const studentIncomplete = isStudent && (!year || !section.trim());
   const [reason, setReason] = useState("");
   if (!record.id)
@@ -1293,7 +1309,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               value={selectedRoles}
               onChange={(next) => setSelectedRoles(next as Role[])}
             >
-              {roles.map((role) => (
+              {roles.filter((role) => selectedRoles.includes(role) || (role !== "staff" && (role !== "administrator" || isAdmin))).map((role) => (
                 <Checkbox key={role} value={role} isDisabled={!canAddRole(selectedRoles, role)}>
                   {roleFull(role)}
                 </Checkbox>
@@ -1329,13 +1345,14 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                   placeholder="A"
                   value={section}
                   onChange={(value) => setSection(value.toUpperCase())}
-                  maxLength={3}
+                  maxLength={1}
                   isInvalid={Boolean(sectionError)}
                   errorMessage={sectionError}
                 />
               )}
             </div>
             {isStudent && <p className="acct-muted">Section name: {prefix}{section.trim() || "A"}</p>}
+            {isStudent && <Checkbox isSelected={irregular} onChange={setIrregular}>Irregular student</Checkbox>}
             <TextArea
               label="Reason"
               isRequired
@@ -1359,7 +1376,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                     payload: {
                       roles: selectedRoles,
                       ...(program ? { program } : {}),
-                      ...(isStudent ? { year: Number(year), section: section.trim() } : {}),
+                      ...(isStudent ? { year: Number(year), section: section.trim(), irregular } : {}),
                     },
                     reason,
                   })
@@ -1378,7 +1395,7 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 ["Email", word(record.email, "—")],
                 ["Roles", <Tags values={strings(record.roles)} />],
                 ["Program", word(record.program, "—")],
-                ["Section", word(record.sectionName, word(record.section, "—"))],
+                ["Section", <>{word(record.sectionName, word(record.section, "—"))}{record.irregular === true && <> <StatusChip tone="neutral">Irregular</StatusChip></>}</>],
                 ["Office", word(record.office, "—")],
                 ["Title", word(record.title, "—")],
               ]}
@@ -1398,9 +1415,11 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
                 ],
               ]}
             />
-            <Button variant="tertiary" size="sm" href="/restrictions">
-              Manage restrictions
-            </Button>
+            {canManageRestrictions && (
+              <Button variant="tertiary" size="sm" href="/restrictions">
+                Manage restrictions
+              </Button>
+            )}
           </Panel>
           {/* Recent activity listed every entry for the person and grew too long (QA 19 November); it lives in the audit trail. */}
           <Button variant="tertiary" size="sm" href="/admin/audit">
@@ -1550,6 +1569,8 @@ function ModerationReview({
 }) {
   const record = object(page.data.record);
   const action = useAction("P50");
+  const session = useQuery(sessionQuery());
+  const canManageRestrictions = session.data ? canOpenPath(session.data, "/restrictions") : false;
   // The decisions this reader may make now: a moderator on a pending item, the CCS Secretary on a referred one (dismiss
   // or send to OSAS), OSAS on one sent to it. Before, the panel showed only on pending items, so the Secretary could only read.
   const decisions = (Array.isArray(page.data.decisions) ? page.data.decisions : []).map(String).filter((key) => key in DECISION_CHOICES);
@@ -1678,9 +1699,11 @@ function ModerationReview({
                   >
                     Record decision
                   </Button>
-                  <Link variant="standalone" href="/restrictions">
-                    Apply an approved restriction
-                  </Link>
+                  {canManageRestrictions && (
+                    <Link variant="standalone" href="/restrictions">
+                      Apply an approved restriction
+                    </Link>
+                  )}
                 </div>
               </div>
             </Panel>
@@ -2006,7 +2029,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
             value={from}
             onChange={reset(setFrom)}
             isInvalid={backwards}
-            errorMessage={backwards ? "Choose a date on or before the To date." : undefined}
+            errorMessage={backwards ? "Start date must be on or before the end date." : undefined}
           />
           <TextField
             type="date"
@@ -2014,7 +2037,7 @@ function AuditLogPage({ page }: { page: PageEnvelope }) {
             value={to}
             onChange={reset(setTo)}
             isInvalid={backwards}
-            errorMessage={backwards ? "Choose a date on or after the From date." : undefined}
+            errorMessage={backwards ? "End date must be on or after the start date." : undefined}
           />
         </div>
       </div>
@@ -2219,7 +2242,8 @@ export function AdminScreen({ pageId }: { pageId: string }) {
     case "P45":
       return <AdminOverview page={page.data} />;
     case "P46":
-      return <UsersPage page={page.data} />;
+      // Portal blue instead of the Admin graphite (QA v5 E8).
+      return <div data-site="portal"><UsersPage page={page.data} /></div>;
     case "P47":
       return <UserDetail page={page.data} userId={recordId ?? ""} />;
     case "P48":

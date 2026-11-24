@@ -177,12 +177,12 @@ export function matchesPerson(name: string, input: string) {
 async function copyPicture(threadId: string, messageId: string, fileId: string) {
   try {
     if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("Clipboard pictures are not supported.");
-    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId))).blob();
+    const source = await (await fetch(await messageFileLink(threadId, messageId, fileId), { mode: "cors" })).blob();
     const png = source.type === "image/png" ? source : await toPng(source);
     await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
     toast("Image copied.");
   } catch {
-    toast("This browser couldn't copy the image. Use Copy file link instead.");
+    toast("Couldn't copy the image (browser or file host blocked it). Use Copy file link instead.");
   }
 }
 
@@ -380,8 +380,22 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
     }
   }
 
+  const sendWhenReady = useRef(false);
+  useEffect(() => {
+    if (sendWhenReady.current && !filesBusy) {
+      sendWhenReady.current = false;
+      void sendMessage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filesBusy]);
   async function sendMessage() {
-    if ((!body.trim() && !readyFiles.length) || filesBusy || action.isPending || sending.current) return;
+    if ((!body.trim() && !pendingFiles.length) || action.isPending || sending.current) return;
+    // Enter while a file is still uploading sends as soon as it is ready, so one Enter is enough (QA v5, D13).
+    if (filesBusy) {
+      sendWhenReady.current = true;
+      return;
+    }
+    if (!body.trim() && !readyFiles.length) return;
     sending.current = true;
     try {
       await draftSave.current;
@@ -618,8 +632,8 @@ function MessagesPage({ page }: { page: PageEnvelope }) {
                                   }
                                   if (key === "copy-link")
                                     void navigator.clipboard
-                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)), window.location.origin).toString()).join("\n"))
-                                      .then(() => toast(files.length === 1 ? "File link copied. It opens for people in this conversation." : "File links copied. They open for people in this conversation."))
+                                      ?.writeText(files.map((file) => new URL(messageFilePath(words(conversation.id), words(message.id), words(file.id)) + (words(file.contentType).startsWith("image/") ? "?inline=1" : ""), window.location.origin).toString()).join("\n"))
+                                      .then(() => toast(files.length === 1 ? "Link copied. Opening it downloads the file." : "Links copied. Opening them downloads the files."))
                                       .catch(() => toast("Copy is unavailable in this browser."));
                                   if (key === "report")
                                     setReportedMessage(message);
@@ -1124,6 +1138,9 @@ type AssistantMessage = {
 // The campus date (Manila) of a timestamp; the UTC date put late-night messages under the day before.
 const campusDay = (at: string) => new Date(new Date(at).getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
 
+// Kept for the browser session so closing the drawer or changing pages keeps the chat; a different user starts empty.
+let kept: { uid?: string; messages: AssistantMessage[] } = { messages: [] };
+
 export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const session = useQuery(sessionQuery());
   const queryClient = useQueryClient();
@@ -1131,7 +1148,11 @@ export function AssistantPanel({ suggestions }: { suggestions?: string[] }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState("");
   const askBox = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const uid = session.data?.user.id;
+  const [messages, setMessages] = useState<AssistantMessage[]>(() => (kept.uid === uid ? kept.messages : []));
+  useEffect(() => {
+    if (uid) kept = { uid, messages };
+  }, [uid, messages]);
   const proposed = suggestions ?? [
     "What can you help me with?",
     ...(session.data?.user.roles.includes("student")
@@ -1426,6 +1447,7 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
     ...pageQuery(pageId, recordId, filters),
     enabled: session.data?.allowedPages.includes(pageId) === true,
   });
+  // A failed background refetch (after a mute toggle) keeps the page and its open panel instead of swapping to the error (QA v5, D13).
   return (
     <RequirePermission pageId={pageId}>
       <div className="app-page">
@@ -1457,7 +1479,7 @@ export function CommunicationScreen({ pageId }: { pageId: string }) {
               }
             />
           )
-        ) : page.isError ? (
+        ) : page.isError && !page.data ? (
           page.error instanceof ApiError &&
           [403, 404].includes(page.error.status) ? (
             <RestrictedView record={pageId === "P12"} />

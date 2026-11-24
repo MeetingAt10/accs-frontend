@@ -3,13 +3,13 @@
 
 export const permissionWords: Record<string, string> = {
   'feed.read': 'Read the feed',
-  'post.create': 'Post in the feed',
-  'post.anonymous': 'Post anonymously',
+  'post.create': 'Create posts',
+  'post.anonymous': 'Allow to post anonymously',
   'announcement.publish': 'Publish announcements',
   'message.send': 'Send messages',
   'roster.view': 'See class rosters',
   'calendar.view': 'Use the calendar',
-  'todo.manage': 'Keep personal to-dos',
+  'todo.manage': 'Manage to-dos',
   'consultation.request': 'Request appointments',
   'consultation.decide': 'Accept or decline appointments',
   'report.create': 'File a concern',
@@ -54,6 +54,8 @@ export const permissionGroup = (key: string) => {
   return group.charAt(0).toUpperCase() + group.slice(1)
 }
 
+const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1)
+
 /** A proposed change in words: "Allow Dean to Post anonymously", "Remove Student from Use the calendar". */
 export const proposalWords = (roleLabel: string, key: string, allowed: boolean) =>
-  allowed ? `Allow ${roleLabel} to ${permissionLabel(key).charAt(0).toLowerCase()}${permissionLabel(key).slice(1)}` : `Take "${permissionLabel(key)}" from ${roleLabel}`
+  allowed ? `Allow ${roleLabel} to ${lower(permissionLabel(key).replace(/^Allow to /, ''))}` : `Take "${permissionLabel(key)}" from ${roleLabel}`

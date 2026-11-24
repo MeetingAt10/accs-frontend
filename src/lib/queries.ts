@@ -60,5 +60,8 @@ export function newNotifications(seen: { current: Set<string> | null }, items: u
 export function notificationsFromQuery(page: { isSuccess: boolean; data?: PageEnvelope }) {
   const items = page.isSuccess ? page.data?.data.notifications : undefined
   const all = Array.isArray(items) ? (items as Record<string, unknown>[]) : []
-  return { recent: all.slice(0, 5), unreadCount: all.filter((notice) => notice.read !== true).length }
+  // High priority (restrictions) first, then newest: a restriction notice must not fall past the bell's five (QA v5 F9).
+  const high = (notice: Record<string, unknown>) => Number(notice.priority === 'high')
+  const recent = [...all].sort((a, b) => high(b) - high(a)).slice(0, 5)
+  return { recent, unreadCount: all.filter((notice) => notice.read !== true).length }
 }
