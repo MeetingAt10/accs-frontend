@@ -475,6 +475,7 @@ function ThreadList({
               </h3>
               {/* A removed post's title already reads "This content was removed.", so its body is not repeated under it. */}
               {post.body && !post.removed && <p className="fx-thread__excerpt">{post.body}</p>}
+              {!post.removed && post.attachments?.length ? <PostFiles postId={post.id} files={post.attachments} /> : null}
               {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
               <div className="fx-thread__foot">
                 {/* Someone who can react sees the counts on the reaction button itself. */}
@@ -950,7 +951,7 @@ export function PostComposer({
   const setLabel = (value: string) => setText((current) => ({ ...current, label: value }))
   const setTitle = (value: string) => setText((current) => ({ ...current, title: value }))
   const setBody = (value: string) => setText((current) => ({ ...current, body: value }))
-  const uploads = useFileUploads(10)
+  const uploads = useFileUploads(10, [], true)
   const [identity, setIdentity] = useState<'named' | 'anonymous'>('named')
   const [priority, setPriority] = useState('general')
   // "Add event" on the calendar opens this form with its date (YYYY-MM-DD, today or later).
@@ -1397,7 +1398,7 @@ function PostDetailPage({
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editBody, setEditBody] = useState('')
-  const editUploads = useFileUploads(10)
+  const editUploads = useFileUploads(10, [], true)
   const [editLabel, setEditLabel] = useState('')
   const [editPriority, setEditPriority] = useState('general')
   const [editError, setEditError] = useState('')
