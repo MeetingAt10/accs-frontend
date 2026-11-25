@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fileSize, messageFileAccept, messageFileProblem, messageFileType } from './message-files'
+import { fileSize, messageFileAccept, messageFileProblem, messageFileType, postFileAccept } from './message-files'
 
 describe('files in messages', () => {
   it('accepts pictures and documents the API accepts', () => {
@@ -20,6 +20,19 @@ describe('files in messages', () => {
     expect(messageFileProblem({ name: 'photo.pdf', type: 'image/png', size: 10 })).toBe('Not a picture, PDF, Office or text file.')
     expect(messageFileProblem({ name: 'big.pdf', type: 'application/pdf', size: 10 * 1024 * 1024 + 1 })).toBe('Larger than 10 MB.')
     expect(messageFileProblem({ name: 'empty.txt', type: 'text/plain', size: 0 })).toBe('This file is empty.')
+  })
+
+  it('takes MP4 and WebM videos up to 100 MB on posts only', () => {
+    expect(messageFileProblem({ name: 'demo.mp4', type: 'video/mp4', size: 60 * 1024 * 1024 }, true)).toBe('')
+    expect(messageFileProblem({ name: 'demo.webm', type: 'video/webm', size: 100 * 1024 * 1024 }, true)).toBe('')
+    expect(messageFileProblem({ name: 'demo.mp4', type: 'video/mp4', size: 100 * 1024 * 1024 + 1 }, true)).toBe('Larger than 100 MB.')
+    expect(messageFileProblem({ name: 'demo.mov', type: 'video/quicktime', size: 1000 }, true)).toBe('Not a picture, video, PDF, Office or text file.')
+    expect(messageFileType({ name: 'demo.webm', type: '' }, true)).toBe('video/webm')
+    // Pictures keep their 10 MB limit on posts, and messages take no videos.
+    expect(messageFileProblem({ name: 'big.png', type: 'image/png', size: 10 * 1024 * 1024 + 1 }, true)).toBe('Larger than 10 MB.')
+    expect(messageFileProblem({ name: 'demo.mp4', type: 'video/mp4', size: 1000 })).toBe('Not a picture, PDF, Office or text file.')
+    expect(postFileAccept).toContain('video/mp4')
+    expect(messageFileAccept).not.toContain('video/')
   })
 
   it('writes sizes people can read', () => {

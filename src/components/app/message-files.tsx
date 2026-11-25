@@ -1,4 +1,4 @@
-import { Button, Icon, toast } from '@meetingat10/design-system/react'
+import { Button, Icon, Modal, ModalActions, ModalBody, toast } from '@meetingat10/design-system/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
@@ -26,22 +26,28 @@ export const messageFileExtensions: Readonly<Record<string, readonly string[]>> 
 export const messageFileMaxBytes = 10 * 1024 * 1024
 export const messageFilesPerMessage = 5
 export const messageFileAccept = Object.keys(messageFileExtensions).join(',')
+/** Posts also take MP4 and WebM videos, up to 100 MB each, uploaded straight to storage and played as they are. */
+export const postVideoExtensions: Readonly<Record<string, readonly string[]>> = { 'video/mp4': ['mp4'], 'video/webm': ['webm'] }
+export const postVideoMaxBytes = 100 * 1024 * 1024
+export const postFileAccept = [messageFileAccept, ...Object.keys(postVideoExtensions)].join(',')
 
 /** What is wrong with a chosen file, or an empty string. Short: it shows under the file's name. */
 /**
  * The type to send for a file: the browser's, or, when the browser gives none (common for Office files), the one its
  * extension stands for. Undefined when the file is not an allowed type or its type and extension disagree.
  */
-export function messageFileType(file: { name: string; type: string }) {
+export function messageFileType(file: { name: string; type: string }, onPost = false) {
+  const allowed = onPost ? { ...messageFileExtensions, ...postVideoExtensions } : messageFileExtensions
   const extension = file.name.toLowerCase().split('.').pop() ?? ''
-  if (messageFileExtensions[file.type]?.includes(extension)) return file.type
+  if (allowed[file.type]?.includes(extension)) return file.type
   if (file.type && file.type !== 'application/octet-stream') return undefined
-  return Object.entries(messageFileExtensions).find(([, extensions]) => extensions.includes(extension))?.[0]
+  return Object.entries(allowed).find(([, extensions]) => extensions.includes(extension))?.[0]
 }
 
-export function messageFileProblem(file: { name: string; type: string; size: number }) {
-  if (!messageFileType(file)) return 'Not a picture, PDF, Office or text file.'
-  if (file.size > messageFileMaxBytes) return 'Larger than 10 MB.'
+export function messageFileProblem(file: { name: string; type: string; size: number }, onPost = false) {
+  const type = messageFileType(file, onPost)
+  if (!type) return onPost ? 'Not a picture, video, PDF, Office or text file.' : 'Not a picture, PDF, Office or text file.'
+  if (type.startsWith('video/') ? file.size > postVideoMaxBytes : file.size > messageFileMaxBytes) return type.startsWith('video/') ? 'Larger than 100 MB.' : 'Larger than 10 MB.'
   if (file.size === 0) return 'This file is empty.'
   return ''
 }
@@ -53,22 +59,67 @@ export function fileSize(bytes: number) {
 }
 
 const isPicture = (file: { contentType: string }) => file.contentType.startsWith('image/')
+const isVideo = (file: { contentType: string }) => file.contentType.startsWith('video/')
 
 /** Where a set of files comes from: a message or a post. */
 type FileSource = { key: string[]; path: (fileId: string) => string; link: (fileId: string) => Promise<string> }
 
-function Picture({ source, file }: { source: FileSource; file: MessageFile }) {
-  // Signed links last five minutes; ask again a little before that.
-  const link = useQuery({
-    queryKey: [...source.key, file.id],
-    queryFn: () => source.link(file.id),
-    staleTime: 240_000,
-    refetchInterval: 240_000,
-  })
+/** A picture's short-lived link. Signed links last five minutes; ask again a little before that. */
+const usePictureLink = (source: FileSource, file: MessageFile) => useQuery({
+  queryKey: [...source.key, file.id],
+  queryFn: () => source.link(file.id),
+  staleTime: 240_000,
+  refetchInterval: 240_000,
+})
+
+function Picture({ source, file, onOpen }: { source: FileSource; file: MessageFile; onOpen?: () => void }) {
+  const link = usePictureLink(source, file)
+  if (onOpen) return (
+    <button type="button" className="mf-picture" onClick={onOpen} aria-label={`View ${file.fileName}`}>
+      {link.data ? <img src={link.data} alt={file.fileName} loading="lazy" /> : <span className="mf-picture__wait" aria-hidden><Icon name="file" size={20} /></span>}
+    </button>
+  )
   return (
     <a className="mf-picture" href={link.data ?? source.path(file.id)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.fileName} (opens in a new tab)`}>
       {link.data ? <img src={link.data} alt={file.fileName} loading="lazy" /> : <span className="mf-picture__wait" aria-hidden><Icon name="file" size={20} /></span>}
     </a>
+  )
+}
+
+/**
+ * A video on a post, played in place. Its link lasts an hour and is not refreshed while the page is open, since a new
+ * address would restart the video.
+ */
+function Video({ source, file }: { source: FileSource; file: MessageFile }) {
+  const link = useQuery({ queryKey: [...source.key, file.id], queryFn: () => source.link(file.id), staleTime: 50 * 60_000, refetchOnWindowFocus: false })
+  return link.data
+    ? <video className="mf-video" src={link.data} controls preload="metadata" playsInline aria-label={file.fileName} />
+    : <span className="mf-video mf-picture__wait" aria-hidden><Icon name="file" size={20} /></span>
+}
+
+/** A post's pictures at full size, one at a time, with Previous and Next. */
+function Lightbox({ source, pictures, index, onIndex, onClose }: { source: FileSource; pictures: MessageFile[]; index: number; onIndex: (index: number) => void; onClose: () => void }) {
+  const file = pictures[index]!
+  const link = usePictureLink(source, file)
+  const step = (by: number) => onIndex((index + by + pictures.length) % pictures.length)
+  return (
+    <Modal title={file.fileName} size="lg" isOpen isDismissable onOpenChange={(open) => { if (!open) onClose() }}>
+      <ModalBody>
+        <figure
+          className="mf-lightbox"
+          onKeyDown={(event) => { if (event.key === 'ArrowLeft') step(-1); if (event.key === 'ArrowRight') step(1) }}
+        >
+          {link.data ? <img src={link.data} alt={file.fileName} /> : <span className="mf-picture__wait" aria-hidden><Icon name="file" size={20} /></span>}
+          {pictures.length > 1 && <figcaption>{index + 1} of {pictures.length}</figcaption>}
+        </figure>
+      </ModalBody>
+      {pictures.length > 1 && (
+        <ModalActions>
+          <Button variant="secondary" icon="caret-left" onPress={() => step(-1)}>Previous</Button>
+          <Button variant="secondary" icon="caret-right" onPress={() => step(1)}>Next</Button>
+        </ModalActions>
+      )}
+    </Modal>
   )
 }
 
@@ -77,22 +128,26 @@ export function MessageFiles({ threadId, messageId, files }: { threadId: string;
   return <FileGallery files={files} source={{ key: ['message-file', threadId, messageId], path: (id) => messageFilePath(threadId, messageId, id), link: (id) => messageFileLink(threadId, messageId, id) }} />
 }
 
-/** The pictures and files posted with a post. */
+/** The pictures, videos and files posted with a post. Pictures open in a lightbox; videos play in place. */
 export function PostFiles({ postId, files }: { postId: string; files: MessageFile[] }) {
-  return <FileGallery files={files} source={{ key: ['post-file', postId], path: (id) => postFilePath(postId, id), link: (id) => postFileLink(postId, id) }} />
+  return <FileGallery media files={files} source={{ key: ['post-file', postId], path: (id) => postFilePath(postId, id), link: (id) => postFileLink(postId, id) }} />
 }
 
-function FileGallery({ files, source }: { files: MessageFile[]; source: FileSource }) {
+function FileGallery({ files, source, media = false }: { files: MessageFile[]; source: FileSource; media?: boolean }) {
+  const [open, setOpen] = useState<number>()
   if (!files.length) return null
   const pictures = files.filter(isPicture)
-  const others = files.filter((file) => !isPicture(file))
+  const videos = media ? files.filter(isVideo) : []
+  const others = files.filter((file) => !isPicture(file) && !videos.includes(file))
   return (
     <div className="mf-files">
       {pictures.length > 0 && (
         <div className="mf-pictures" data-count={Math.min(pictures.length, 3)}>
-          {pictures.map((file) => <Picture key={file.id} source={source} file={file} />)}
+          {pictures.map((file, index) => <Picture key={file.id} source={source} file={file} onOpen={media ? () => setOpen(index) : undefined} />)}
         </div>
       )}
+      {open !== undefined && pictures[open] && <Lightbox source={source} pictures={pictures} index={open} onIndex={setOpen} onClose={() => setOpen(undefined)} />}
+      {videos.map((file) => <Video key={file.id} source={source} file={file} />)}
       {others.map((file) => (
         <a key={file.id} className="mf-chip" href={source.path(file.id)} download={file.fileName}>
           <Icon name="file" size={20} />
@@ -132,7 +187,7 @@ export function PendingFiles({ files, onRemove }: { files: PendingFile[]; onRemo
  * Files chosen for a post or a message: each uploads as soon as it is chosen. `ready` are the ones to send; `busy` while
  * any is still uploading. Start from files already saved (editing a post) with `initial` or `reset`.
  */
-export function useFileUploads(max: number, initial: MessageFile[] = []) {
+export function useFileUploads(max: number, initial: MessageFile[] = [], onPost = false) {
   const saved = (list: MessageFile[]): PendingFile[] => list.map((file) => ({ key: file.id, name: file.fileName, size: file.size, state: 'ready', file }))
   const [files, setFiles] = useState<PendingFile[]>(() => saved(initial))
   const ready = files.filter((file) => file.state === 'ready' && file.file).map((file) => file.file!)
@@ -147,11 +202,11 @@ export function useFileUploads(max: number, initial: MessageFile[] = []) {
     if (chosen.length > room) toast(`Only ${room} more ${room === 1 ? 'file fits' : 'files fit'}.`)
     for (const file of chosen.slice(0, room)) {
       const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const problem = messageFileProblem(file)
+      const problem = messageFileProblem(file, onPost)
       const preview = !problem && file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
       setFiles((current) => [...current, { key, name: file.name, size: file.size, preview, state: problem ? 'failed' : 'uploading', problem }])
       if (problem) continue
-      uploadMessageFile(file, messageFileType(file))
+      uploadMessageFile(file, messageFileType(file, onPost), onPost ? '/uploads' : '/messages/uploads')
         .then((uploaded) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'ready', file: uploaded } : item))))
         .catch((error) => setFiles((current) => current.map((item) => (item.key === key ? { ...item, state: 'failed', problem: apiErrorText(error) } : item))))
     }
@@ -167,7 +222,7 @@ export function useFileUploads(max: number, initial: MessageFile[] = []) {
     for (const file of files) if (file.preview) URL.revokeObjectURL(file.preview)
     setFiles(saved(next))
   }
-  return { files, ready, busy, add, remove, reset }
+  return { files, ready, busy, add, remove, reset, onPost }
 }
 
 /** "Add pictures or files" with the chosen files under it. */
@@ -180,7 +235,7 @@ export function FilePicker({ uploads, label = 'Add pictures or files' }: { uploa
         className="mf-input"
         type="file"
         multiple
-        accept={messageFileAccept}
+        accept={uploads.onPost ? postFileAccept : messageFileAccept}
         tabIndex={-1}
         aria-hidden
         onChange={(event) => {
@@ -191,7 +246,7 @@ export function FilePicker({ uploads, label = 'Add pictures or files' }: { uploa
       />
       <div className="mf-picker__bar">
         <Button variant="secondary" icon="paperclip" onPress={() => input.current?.click()}>{label}</Button>
-        <small>Pictures, PDF, Word, PowerPoint, Excel or text. Up to 10 MB each.</small>
+        <small>{uploads.onPost ? 'Pictures, PDF, Word, PowerPoint, Excel or text up to 10 MB each; MP4 or WebM videos up to 100 MB.' : 'Pictures, PDF, Word, PowerPoint, Excel or text. Up to 10 MB each.'}</small>
       </div>
       <PendingFiles files={uploads.files} onRemove={uploads.remove} />
     </div>
