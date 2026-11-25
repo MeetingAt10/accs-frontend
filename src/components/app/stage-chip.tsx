@@ -1,7 +1,7 @@
 import './stage-chip.css'
 
-/** The handling stages a case moves through, in order, ending at the President's Office; Resolved closes the case. */
-export const caseStages = ['adviser', 'chair', 'dean', 'guidance', 'osas', 'executive'] as const
+/** The handling stages a case moves through, in order, ending at OSAS; Resolved closes the case. */
+export const caseStages = ['adviser', 'chair', 'dean', 'guidance', 'osas'] as const
 
 const labels: Record<string, string> = {
   submitted: 'Submitted',

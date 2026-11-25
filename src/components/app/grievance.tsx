@@ -49,8 +49,8 @@ const waitingDays = (report: Item) => Math.max(0, Math.floor((Date.now() - new D
 const reportPath = (report: Item) => '/reports/' + encodeURIComponent(words(report.id))
 const casePath = (report: Item) => '/cases/' + encodeURIComponent(words(report.id))
 
-// Pipeline: the six handling stages (Adviser to the President's Office, restored 2026-11-24) plus Submitted and Resolved.
-const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['executive', "President's Office"], ['resolved', 'Resolved']] as const
+// Pipeline: the five handling stages (Adviser to OSAS; the President's Office is hidden, 25 November 2026) plus Submitted and Resolved.
+const stages = [['submitted', 'Submitted'], ['adviser', 'Adviser'], ['chair', 'Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved']] as const
 // The stage is always the office handling it: the status is now a step ("Submitted"), which must not turn the Adviser's
 // stage into "Submitted" (20 November 2026).
 const stageOf = (report: Item): string => isClosed(report) ? 'resolved' : words(report.stage, 'adviser')
@@ -762,7 +762,7 @@ export function CaseNotes({ report }: { report: Report }) {
 }
 
 const actionLabels: Record<string, string> = { respond: 'Respond', recordAction: 'Record action', escalate: 'Escalate', transfer: 'Transfer', resolve: 'Resolve', close: 'Close', convert: 'Open Case File', milestone: 'Add milestone', return: 'Return to OSAS' }
-const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' }, osas: { stage: 'executive', label: "President's Office" } }
+const nextOffices: Record<string, { stage: string; label: string }> = { adviser: { stage: 'chair', label: 'Program Chair' }, chair: { stage: 'dean', label: 'Dean' }, dean: { stage: 'guidance', label: 'Guidance Office' }, guidance: { stage: 'osas', label: 'OSAS' } }
 // One line under each action in "What you can do", saying what it does.
 const actionNotes: Record<string, string> = {
   respond: 'Send the reporter an update and record it.',
@@ -777,8 +777,8 @@ const actionNotes: Record<string, string> = {
 function caseActions(report: Report) {
   const primary = report.stage === 'adviser' ? 'respond' : report.stage === 'guidance' && !report.caseFileId ? 'convert' : ['guidance', 'osas'].includes(report.stage) ? 'milestone' : 'recordAction'
   const all = (Array.isArray(report.allowedActions) ? report.allowedActions.map(String) : []).sort((a, b) => Number(b === primary) - Number(a === primary))
-  // OSAS can transfer an executive-level case to the President's Office, which can return it to OSAS.
-  return all
+  // The President's Office is not offered: OSAS is the last office (hotfix 25 November 2026).
+  return all.filter((type) => !(report.stage === 'osas' && type === 'transfer') && type !== 'return')
 }
 
 export function CaseActionBar({ report }: { report: Report }) {
@@ -839,8 +839,8 @@ export function CaseActionBar({ report }: { report: Report }) {
   )
 }
 
-// The stage tracker: every office a case can reach, the President's Office included, then Resolved and Closed.
-const trackSteps = [['adviser', 'Adviser'], ['chair', 'Program Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['executive', "President's Office"], ['resolved', 'Resolved'], ['closed', 'Closed']] as const
+// The stage tracker: every office a case can reach (Adviser to OSAS), then Resolved and Closed.
+const trackSteps = [['adviser', 'Adviser'], ['chair', 'Program Chair'], ['dean', 'Dean'], ['guidance', 'Guidance'], ['osas', 'OSAS'], ['resolved', 'Resolved'], ['closed', 'Closed']] as const
 const upcomingNotes: Record<string, string> = { adviser: 'Reviews it first', chair: 'If escalated', dean: 'If escalated', guidance: 'If referred', osas: 'If transferred', executive: 'Executive-level cases only', resolved: 'Outcome recorded', closed: 'Close it after resolving' }
 const stepStates: Record<string, string> = { done: 'done', current: 'current stage', skipped: 'skipped', todo: 'not reached' }
 

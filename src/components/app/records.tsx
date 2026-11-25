@@ -781,7 +781,7 @@ function ClusterReview({ page }: { page: PageEnvelope }) {
 
 /* ---------- Analytics ---------- */
 
-const stages = ["adviser", "chair", "dean", "guidance", "osas", "executive"];
+const stages = ["adviser", "chair", "dean", "guidance", "osas"];
 /** Office names for case stages ("Chair" and "Osas" read as typos; QA 17 November, V3). */
 const stageOffice: Record<string, string> = { adviser: "Adviser", chair: "Program Chair", dean: "Dean", guidance: "Guidance Office", osas: "OSAS", executive: "President's Office" };
 /** Case analytics periods: days back from today, counting today. */
