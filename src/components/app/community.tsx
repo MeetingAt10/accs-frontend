@@ -979,6 +979,10 @@ export function PostComposer({
   // Any announcement can carry an event, which puts it on the calendar; only class and organization ones must.
   const eventShown = kind === 'announcement'
   const eventGiven = Boolean(eventDate || eventTime.trim() || eventPlace.trim() || eventContact.trim())
+  // "Add event" on the calendar opens an event, not a plain announcement (hotfix 25 November 2026): it is titled
+  // "New event", needs a date and time, and returns to the calendar.
+  const eventMode = kind === 'announcement' && params.has('date')
+  const eventTimed = eventRequired || eventMode
   const invalidRequestedAudience = Boolean(
     requested &&
     ![...audiences, ...announcementAudiences].includes(requestedAudience),
@@ -999,7 +1003,7 @@ export function PostComposer({
     if (!body.trim() && !uploads.ready.length) nextErrors.body = 'Write your post or attach a file.'
     if (uploads.busy) nextErrors.body = 'Wait for your files to finish uploading.'
     if (kind === 'discussion' && !label) nextErrors.label = 'Choose a label.'
-    if (eventRequired || (eventShown && eventGiven)) {
+    if (eventTimed || (eventShown && eventGiven)) {
       if (eventDateBad) nextErrors.eventDate = "That date doesn't exist."
       else if (!eventDate) nextErrors.eventDate = 'Choose an event date.'
       else if (eventDate < campusToday().toString()) nextErrors.eventDate = 'Choose today or a later date.'
@@ -1031,7 +1035,7 @@ export function PostComposer({
           // Notify members only for class and organization events: a college-wide one would notify every account.
           ...(eventRequired
             ? { eventDate, eventTime, eventPlace, eventContact, notifyMembers }
-            : eventShown && eventGiven
+            : eventShown && (eventGiven || eventMode)
               ? { eventDate, eventTime, ...(eventPlace.trim() ? { eventPlace } : {}), ...(eventContact.trim() ? { eventContact } : {}) }
               : {}),
         },
@@ -1040,7 +1044,7 @@ export function PostComposer({
       allowLeave.current = true
       clearText()
       router.history.push(
-        created?.id ? `/feed/${encodeURIComponent(created.id)}` : '/feed',
+        eventMode ? '/calendar' : created?.id ? `/feed/${encodeURIComponent(created.id)}` : '/feed',
       )
     } catch {
       // The mutation keeps the entered text and presents the API error below.
@@ -1050,8 +1054,8 @@ export function PostComposer({
   return (
     <div className="fx-page fx-compose-page accs-stack accs-stagger">
       <PageHeader
-        crumbs={[{ label: 'Feed', href: '/feed' }, { label: 'New post' }]}
-        title={kind === 'announcement' ? 'New announcement' : 'Start a discussion'}
+        crumbs={eventMode ? [{ label: 'Calendar', href: '/calendar' }, { label: 'New event' }] : [{ label: 'Feed', href: '/feed' }, { label: 'New post' }]}
+        title={eventMode ? 'New event' : kind === 'announcement' ? 'New announcement' : 'Start a discussion'}
               />
       {invalidRequestedAudience && (
         <Alert tone="danger" title="You can't post there">
@@ -1193,13 +1197,15 @@ export function PostComposer({
                   <p className="fx-group__hint">
                     {eventRequired
                       ? 'Members see this on the post and in the calendar.'
+                      : eventMode
+                      ? 'The event shows on the calendar on this date.'
                       : 'Optional. Add a date and time to put this announcement on the calendar.'}
                   </p>
                 </div>
                 <div className="fx-group__body fx-group__body--grid">
                   <DatePicker
                     label="Event date"
-                    isRequired={eventRequired}
+                    isRequired={eventTimed}
                     defaultValue={requestedDate ? parseDate(requestedDate) : undefined}
                     minValue={campusToday()}
                     onKeyUp={(event) => { const bad = typedDateImpossible(event); if (bad !== null) setEventDateBad(bad) }}
@@ -1217,7 +1223,7 @@ export function PostComposer({
                     label="Time"
                     value={eventTime}
                     onChange={setEventTime}
-                    isRequired={eventRequired}
+                    isRequired={eventTimed}
                     isInvalid={Boolean(errors.eventTime)}
                     errorMessage={errors.eventTime}
                   />
@@ -1264,12 +1270,12 @@ export function PostComposer({
           <div className="fx-form__actions">
             <Button
               variant="secondary"
-              onPress={() => router.history.push('/feed')}
+              onPress={() => router.history.push(eventMode ? '/calendar' : '/feed')}
             >
               Cancel
             </Button>
             <Button type="submit" loading={action.isPending}>
-              Publish
+              {eventMode ? 'Add event' : 'Publish'}
             </Button>
           </div>
         </form>
