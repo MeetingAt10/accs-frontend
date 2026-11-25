@@ -1314,7 +1314,8 @@ function UserDetail({ page, userId }: { page: PageEnvelope; userId: string }) {
               value={selectedRoles}
               onChange={(next) => setSelectedRoles(next as Role[])}
             >
-              {roles.filter((role) => selectedRoles.includes(role) || (role !== "staff" && (role !== "administrator" || isAdmin))).map((role) => (
+              {/* The Secretary is not offered the President's Office (hotfix 25 November 2026); an existing one still shows so it can be removed. */}
+              {roles.filter((role) => selectedRoles.includes(role) || (role !== "staff" && ((role !== "administrator" && role !== "president") || isAdmin))).map((role) => (
                 <Checkbox key={role} value={role} isDisabled={!canAddRole(selectedRoles, role)}>
                   {roleFull(role)}
                 </Checkbox>
