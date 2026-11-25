@@ -286,9 +286,12 @@ export async function sendMaterialFile(upload: MaterialUpload['upload'], file: F
 /** A file sent with a message (MeetingAt10/accs-backend#90). */
 export type MessageFile = { id: string; fileName: string; contentType: string; size: number }
 
-/** Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`. */
-export async function uploadMessageFile(file: File, contentType = file.type): Promise<MessageFile> {
-  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>('/messages/uploads', { fileName: file.name, contentType, size: file.size })
+/**
+ * Uploads one file for a message: asks for a signed address, then sends the file there. The message names it by `id`.
+ * Posts use `/uploads`, which also takes MP4 and WebM videos.
+ */
+export async function uploadMessageFile(file: File, contentType = file.type, path: '/messages/uploads' | '/uploads' = '/messages/uploads'): Promise<MessageFile> {
+  const started = await post<Recorded<{ attachment: MessageFile; upload: MaterialUpload['upload'] }>>(path, { fileName: file.name, contentType, size: file.size })
   await sendMaterialFile(started.record.upload, file)
   return started.record.attachment
 }
@@ -308,7 +311,7 @@ export const messageFileLink = async (threadId: string, messageId: string, fileI
 export const postFilePath = (postId: string, fileId: string) =>
   `${baseUrl}/posts/${encodeURIComponent(postId)}/files/${encodeURIComponent(fileId)}`
 
-/** A short-lived link that shows a post's picture in the browser. */
+/** A short-lived link that shows a post's picture or plays its video in the browser (a CloudFront signed URL when set up). */
 export const postFileLink = async (postId: string, fileId: string) =>
   (await request<Recorded<{ url: string }>>(postFilePath(postId, fileId).slice(baseUrl.length) + '?inline=1&format=json')).record.url
 
