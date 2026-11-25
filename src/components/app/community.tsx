@@ -477,12 +477,13 @@ function ThreadList({
               {post.body && !post.removed && <p className="fx-thread__excerpt">{post.body}</p>}
               {post.underReview && <span className="fx-review" role="note">Under review. Only you can see this until a moderator reviews it.</span>}
               <div className="fx-thread__foot">
-                <span className="fx-stat" title={reactionsRead.total ? topReactions(reactionsRead.counts, 6).map((r) => `${r.label} ${reactionsRead.counts[r.id]}`).join(', ') : undefined}>
+                {/* Someone who can react sees the counts on the reaction button itself. */}
+                {(post.removed || post.canReact !== true) && <span className="fx-stat" title={reactionsRead.total ? topReactions(reactionsRead.counts, 6).map((r) => `${r.label} ${reactionsRead.counts[r.id]}`).join(', ') : undefined}>
                   <span aria-hidden className="fx-stat__emoji">
                     {topReactions(reactionsRead.counts).map((r) => r.emoji).join('') || '👍'}
                   </span>
                   <span><span className="accs-num">{reactionsRead.total}</span>{reactionsRead.total === 1 ? ' reaction' : ' reactions'}</span>
-                </span>
+                </span>}
                 <span className="fx-stat">
                   <Icon name="chat" size={16} />
                   <span><span className="accs-num">{post.commentCount}</span>{post.commentCount === 1 ? ' reply' : ' replies'}</span>
